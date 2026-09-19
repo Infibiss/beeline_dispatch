@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рабочее место диспетчера · Маршруты</title>
+<link rel="stylesheet" href="scenarios.css">
+<script src="scenarios.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">К сценарию</a>
+<header><div class="brand"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span class="brand-divider"></span><span>Диспетчер</span></div><div class="header-actions"><span id="mode-badge" class="simulation">Демо</span><button id="reload" type="button" class="secondary">Обновить</button></div></header>
+<main id="main">
+<h1 class="sr-only">Рабочее место диспетчера</h1>
+<details class="help"><summary>О данных</summary><div id="mode-notice"></div><p>Без GPS. Объяснения по рассчитанным фактам; LLM не подключена.</p></details>
+<div id="error" role="alert" class="error" hidden></div>
+<div id="status" role="status" aria-live="polite">Загрузка состояния…</div>
+<section class="state-strip" aria-label="Текущее состояние"><div><span>Регион</span><strong id="region">—</strong></div><div><span>Версия плана</span><strong id="version">—</strong></div><div><span id="clock-label">Время симуляции</span><strong id="clock">—</strong></div><div><span>Остаток дня: назначено / всего</span><strong id="coverage">—</strong></div></section>
+<nav class="workbench-tabs" role="tablist" aria-label="Рабочее место">
+<button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="panel-plan">План дня</button>
+<button id="tab-events" type="button" role="tab" aria-selected="false" aria-controls="panel-events" tabindex="-1">Перепланирование</button>
+<button id="tab-facts" type="button" role="tab" aria-selected="false" aria-controls="panel-facts" tabindex="-1">Статусы инженеров</button>
+</nav>
+<section id="panel-plan" role="tabpanel" aria-labelledby="tab-plan">
+<div class="plan-toolbar"><div><label for="plan-version">Версия плана</label><select id="plan-version" disabled></select></div><p id="plan-context" class="hint">Загрузка плана…</p></div>
+<iframe id="plan-frame" title="План дня: карта, маршруты и заявки"></iframe>
+
+</section>
+<section id="panel-facts" role="tabpanel" aria-labelledby="tab-facts" hidden>
+<div class="mode-controls"><label for="execution-mode">Учёт выполнения</label><select id="execution-mode"><option value="simulation">Демо: по плану, если нет фактов</option><option value="manual">Ручной: только факты</option></select><button id="mode-apply" type="button" class="secondary">Применить режим</button><p class="hint">В ручном режиме инженер без статуса недоступен для новых назначений.</p></div><div class="workspace"><section class="panel event-panel"><h2>Записать факт</h2>
+
+<form id="facts-form"><fieldset id="facts-fields" disabled><label for="fact-edit">Запись</label><select id="fact-edit"><option value="">Новый факт</option></select><label class="check"><input id="fact-late" type="checkbox"><span>Сообщение пришло с задержкой</span></label><div id="correction-fields" hidden><label for="correction-reason">Причина исправления</label><input id="correction-reason" type="text" minlength="3" maxlength="300"></div>
+<label for="fact-engineer">Инженер</label><select id="fact-engineer" required></select>
+<p id="engineer-fact-context" class="hint"></p><label for="fact-time">Время факта</label><input id="fact-time" type="time" step="60" required>
+<label for="fact-status">Статус</label><select id="fact-status"><option value="available">Свободен</option><option value="traveling">В пути</option><option value="working">Работает</option><option value="completed">Завершил заявку</option><option value="interrupted">Работа прервана</option><option value="unavailable">Недоступен</option></select>
+<label for="fact-request">Заявка</label><select id="fact-request"></select>
+<label for="fact-location">Текущее местоположение</label><select id="fact-location"></select><p id="fact-location-note" class="hint">Выберите известное место вручную.</p>
+<div id="fact-remaining-group" hidden><label for="fact-remaining">Осталось работы, мин</label><input id="fact-remaining" type="number" min="1" step="1"></div>
+<div id="fact-consumed-group" hidden><p id="fact-consumed-note" class="hint"></p><div class="input-pair"><div><label for="fact-router">Списать роутеров</label><input id="fact-router" type="number" min="0" step="1" placeholder="По заявке"></div><div><label for="fact-tv">Списать ТВ-приставок</label><input id="fact-tv" type="number" min="0" step="1" placeholder="По заявке"></div></div></div>
+<button class="primary" type="submit">Записать факт</button><button id="go-replan" class="secondary" type="button" hidden>Перейти к пересчёту →</button>
+</fieldset></form></section><section class="panel diff-panel"><h2>Журнал статусов</h2><div class="table-scroll"><table><thead><tr><th>Инженер</th><th>Статус</th><th>Заявка</th><th>Время факта</th><th>Место</th><th>Осталось, мин</th><th>Записано</th></tr></thead><tbody id="facts-body"></tbody></table></div><details><summary>История исправлений</summary><div id="fact-audit" class="hint"></div></details></section></div>
+</section>
+<section id="panel-events" role="tabpanel" aria-labelledby="tab-events" hidden><div id="replan-needed" class="notice" hidden>Есть новые факты. Выберите «Пересчитать по фактам» и нажмите «Рассчитать варианты». После сравнения примените план.</div>
+<div class="workspace">
+<section class="panel event-panel"><div class="section-heading"><h2>Новое событие</h2></div>
+<form id="event-form"><fieldset id="event-fields" disabled>
+<label for="event-type">Тип события</label><select id="event-type"><option value="replan">Пересчитать по фактам</option><option value="emergency">Аварийная заявка</option><option value="cancel">Отмена заявки</option><option value="unavailable">Инженер недоступен</option></select>
+<label for="event-time">Время события</label><input id="event-time" type="time" required step="60">
+<label id="target-label" for="event-target">Адрес по существующей заявке</label><select id="event-target" required></select>
+<div id="emergency-fields"><details id="new-address-panel"><summary>Новый адрес</summary><label for="new-address">Город, улица, дом</label><input id="new-address" type="text" maxlength="300" placeholder="Москва, улица …, дом …"><button id="address-search" type="button" class="secondary">Найти точку</button><label for="address-candidates">Результаты поиска</label><select id="address-candidates"><option value="">Сначала найдите адрес</option></select><p id="address-context" class="hint"></p><iframe id="address-map" title="Проверка нового адреса на карте" hidden></iframe><button id="address-confirm" type="button" class="secondary" disabled>Использовать точку и рассчитать дороги</button></details><p class="hint">Новая авария в одной из известных точек. Новый адрес можно добавить через поиск ниже.</p><div class="input-pair"><div><label for="duration">Работа, мин</label><input id="duration" type="number" min="1" max="1440" value="80" required></div><div><label for="router">Роутеры, шт.</label><input id="router" type="number" min="0" value="0" required></div></div><label class="check"><input id="redirect" type="checkbox"><span>Разрешить перенаправление в пути</span></label></div>
+<label class="check"><input id="preserve" type="checkbox"><span>Сохранить начатую работу до завершения</span></label>
+<button id="preview" class="primary" type="submit">Рассчитать варианты</button>
+</fieldset></form></section>
+<section class="comparison"><div class="section-heading"><h2>Варианты плана</h2></div>
+
+<div id="comparison-tools" hidden><label for="candidate-sort">Порядок вариантов</label><select id="candidate-sort"><option value="default">По стратегии</option><option value="coverage">Меньше неназначенных</option><option value="response">Раньше начало аварии</option><option value="stable">Меньше изменений</option><option value="distance">Короче дорога</option></select><div id="comparison-table" class="table-scroll"></div><p id="observation-warnings" class="hint"></p></div><div id="candidates" class="cards"><div class="empty">Задайте событие слева.<br>Здесь появятся три допустимых варианта.</div></div>
+<details class="help"><summary>Как сравниваются варианты</summary><p>Сначала — охват заявок. SLA-first — раннее начало приоритетных работ, не договорный SLA. Показатели относятся к остатку дня без закреплённых работ.</p><p id="notice" class="hint"></p></details>
+<section class="panel diff-panel"><div class="section-heading"><h2 id="diff-title">Изменения</h2></div><div class="table-scroll"><table><caption class="sr-only">Изменения инженера и времени начала заявки</caption><thead><tr><th>Заявка</th><th>Инженер: было → станет</th><th>Начало: было → станет</th></tr></thead><tbody id="diff-body"><tr><td colspan="3" class="muted">Выберите вариант для просмотра изменений.</td></tr></tbody></table></div><div class="approval"><p id="approval-note">План изменится только после вашего утверждения.</p><button id="approve" type="button" disabled class="primary">Применить план</button></div></section>
+</section></div>
+<details class="panel commitments"><summary id="commitments-title">Закреплённые работы и оборудование</summary><div class="details-content">
+
+<p id="commitments-context" class="hint">Состояние ещё не загружено.</p>
+<div class="table-scroll"><table><caption>Работы вне пересчёта</caption><thead><tr><th>Инженер</th><th>Заявка</th><th>Статус на указанное время</th><th>Начало → завершение</th></tr></thead><tbody id="frozen-body"></tbody></table></div>
+
+<div class="table-scroll"><table><caption>Физический запас оборудования, шт.</caption><thead><tr><th>Инженер</th><th>Оборудование</th><th>Списано</th><th>В резерве</th><th>Физически свободно</th><th>Доступен</th></tr></thead><tbody id="inventory-body"></tbody></table></div>
+
+</div></details>
+</section>
+
+<noscript><div class="error">Для расчёта сценариев включите JavaScript и откройте страницу через локальный сервер.</div></noscript>
+</main></body></html>

@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "Equipment": {
+      "additionalProperties": false,
+      "properties": {
+        "router": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Router",
+          "type": "integer"
+        },
+        "tv_box": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tv Box",
+          "type": "integer"
+        }
+      },
+      "title": "Equipment",
+      "type": "object"
+    },
+    "Metrics": {
+      "additionalProperties": false,
+      "properties": {
+        "assigned": {
+          "title": "Assigned",
+          "type": "integer"
+        },
+        "unassigned": {
+          "title": "Unassigned",
+          "type": "integer"
+        },
+        "engineers_used": {
+          "title": "Engineers Used",
+          "type": "integer"
+        },
+        "distance_m": {
+          "title": "Distance M",
+          "type": "integer"
+        },
+        "travel_minutes": {
+          "title": "Travel Minutes",
+          "type": "integer"
+        },
+        "service_minutes": {
+          "title": "Service Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "assigned",
+        "unassigned",
+        "engineers_used",
+        "distance_m",
+        "travel_minutes",
+        "service_minutes"
+      ],
+      "title": "Metrics",
+      "type": "object"
+    },
+    "Route": {
+      "additionalProperties": false,
+      "properties": {
+        "engineer_id": {
+          "title": "Engineer Id",
+          "type": "string"
+        },
+        "visits": {
+          "items": {
+            "$ref": "#/$defs/Visit"
+          },
+          "title": "Visits",
+          "type": "array"
+        },
+        "distance_m": {
+          "title": "Distance M",
+          "type": "integer"
+        },
+        "travel_minutes": {
+          "title": "Travel Minutes",
+          "type": "integer"
+        },
+        "service_minutes": {
+          "title": "Service Minutes",
+          "type": "integer"
+        },
+        "loadout": {
+          "$ref": "#/$defs/Equipment"
+        }
+      },
+      "required": [
+        "engineer_id",
+        "visits",
+        "distance_m",
+        "travel_minutes",
+        "service_minutes",
+        "loadout"
+      ],
+      "title": "Route",
+      "type": "object"
+    },
+    "Unassigned": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "code",
+        "reason"
+      ],
+      "title": "Unassigned",
+      "type": "object"
+    },
+    "Visit": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "arrival": {
+          "title": "Arrival",
+          "type": "integer"
+        },
+        "start": {
+          "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "title": "End",
+          "type": "integer"
+        },
+        "travel_minutes": {
+          "title": "Travel Minutes",
+          "type": "integer"
+        },
+        "distance_m": {
+          "title": "Distance M",
+          "type": "integer"
+        },
+        "explanation": {
+          "title": "Explanation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "arrival",
+        "start",
+        "end",
+        "travel_minutes",
+        "distance_m",
+        "explanation"
+      ],
+      "title": "Visit",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "solver": {
+      "title": "Solver",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "routes": {
+      "items": {
+        "$ref": "#/$defs/Route"
+      },
+      "title": "Routes",
+      "type": "array"
+    },
+    "unassigned": {
+      "items": {
+        "$ref": "#/$defs/Unassigned"
+      },
+      "title": "Unassigned",
+      "type": "array"
+    },
+    "metrics": {
+      "$ref": "#/$defs/Metrics"
+    },
+    "elapsed_seconds": {
+      "default": 0,
+      "title": "Elapsed Seconds",
+      "type": "number"
+    },
+    "diagnostics": {
+      "additionalProperties": true,
+      "title": "Diagnostics",
+      "type": "object"
+    }
+  },
+  "required": [
+    "solver",
+    "status",
+    "scenario_id",
+    "routes",
+    "unassigned",
+    "metrics"
+  ],
+  "title": "Plan",
+  "type": "object"
+}

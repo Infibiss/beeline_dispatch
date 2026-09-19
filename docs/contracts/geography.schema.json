@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "GeoLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lon",
+          "type": "number"
+        },
+        "quality": {
+          "enum": [
+            "building_match",
+            "manual",
+            "approximate"
+          ],
+          "title": "Quality",
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "label": {
+          "default": "",
+          "title": "Label",
+          "type": "string"
+        },
+        "query": {
+          "default": "",
+          "title": "Query",
+          "type": "string"
+        },
+        "osm_id": {
+          "default": "",
+          "title": "Osm Id",
+          "type": "string"
+        },
+        "original_address": {
+          "default": "",
+          "title": "Original Address",
+          "type": "string"
+        },
+        "approximation_reason": {
+          "default": "",
+          "title": "Approximation Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lat",
+        "lon",
+        "quality",
+        "source"
+      ],
+      "title": "GeoLocation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scenario_signature": {
+      "title": "Scenario Signature",
+      "type": "string"
+    },
+    "locations": {
+      "additionalProperties": {
+        "$ref": "#/$defs/GeoLocation"
+      },
+      "title": "Locations",
+      "type": "object"
+    },
+    "unresolved": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Unresolved",
+      "type": "object"
+    },
+    "modes": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Modes",
+      "type": "object"
+    },
+    "matrices": {
+      "additionalProperties": true,
+      "title": "Matrices",
+      "type": "object"
+    },
+    "route_shapes": {
+      "additionalProperties": true,
+      "title": "Route Shapes",
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "required": [
+    "scenario_signature",
+    "locations"
+  ],
+  "title": "GeographyBundle",
+  "type": "object"
+}

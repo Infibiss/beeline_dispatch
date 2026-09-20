@@ -8,7 +8,12 @@ from functools import lru_cache
 from heapq import heappop, heappush
 from importlib.resources import files
 import json
+import hashlib
 import math
+
+
+def point_key(point):
+    return f"{point[0]:.7f},{point[1]:.7f}"
 
 
 def distance(a,b):
@@ -28,6 +33,8 @@ def result(kind,legs):
 class TransitNetwork:
     def __init__(self,data):
         self.source=data.get('source','unspecified')
+        self.signature=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        self.access=None
         self.stations={};self.graph={};lines={}
         for s in data['stations']:
             if s['id'] in self.stations: raise ValueError('Duplicate transit station')
@@ -60,14 +67,29 @@ class TransitNetwork:
 
     def approaches(self,point):
         candidates=sorted((distance(point,(s['lat'],s['lon'])),key) for key,s in self.stations.items())
-        return [(d,k) for d,k in candidates[:3] if d<=2500]
+        return [(d,k) for d,k in candidates[:6] if d<=2500]
+
+    def set_access(self,access):
+        if access.get('network_signature')!=self.signature:raise ValueError('Пешеходные подходы устарели после изменения сети')
+        self.access=access;self.cache={}
+        if 'transfers' in access:
+            self.graph={k:[edge for edge in edges if edge[1][0]['mode']!='transfer'] for k,edges in self.graph.items()}
+            for edge in access['transfers']:
+                a=self.stations[edge['from']];b=self.stations[edge['to']]
+                origin=a['name']+' ('+a['line']+')';destination=b['name']+' ('+b['line']+')'
+                self.graph[a['id']].append((b['id'],[leg('transfer',origin,destination,edge['minutes']+4,edge['metres']),leg('wait',destination,destination,3)]))
+
+    def access_paths(self,point,direction):
+        if self.access is not None:
+            return [(k,v['minutes']+2,v['metres']) for k,v in self.access['points'].get(point_key(point),{}).get(direction,{}).items()]
+        return [(k,math.ceil(math.ceil(d*1.3)/1000/4.5*60)+2,math.ceil(d*1.3)) for d,k in self.approaches(point)]
 
     def reachable(self,point):
         if point in self.cache:return self.cache[point]
         best={};heap=[]
-        for d,key in self.approaches(point):
-            s=self.stations[key];label=s['name']+' ('+s['line']+')';walk=math.ceil(d*1.3)
-            legs=[leg('walk','Адрес',label,math.ceil(walk/1000/4.5*60)+2,walk),leg('wait',label,label,3)]
+        for key,minutes,walk in self.access_paths(point,'in'):
+            s=self.stations[key];label=s['name']+' ('+s['line']+')'
+            legs=[leg('walk','Адрес',label,minutes,walk),leg('wait',label,label,3)]
             cost=sum(x['minutes'] for x in legs)
             best[key]=(cost,legs);heappush(heap,(cost,key))
         while heap:
@@ -84,13 +106,13 @@ class TransitNetwork:
 def journey(network,origin,destination,walk_minutes,walk_metres):
     direct=result('walk',[leg('walk','Адрес','Адрес',walk_minutes,walk_metres)])
     if origin==destination:return result('walk',[])
-    destinations=network.approaches(destination)
-    if not network.approaches(origin) or not destinations:return None
+    destinations=network.access_paths(destination,'out')
+    if not network.access_paths(origin,'in') or not destinations:return None
     best=direct;reachable=network.reachable(origin)
-    for d,key in destinations:
+    for key,minutes,walk in destinations:
         if key not in reachable:continue
-        walk=math.ceil(d*1.3);s=network.stations[key]
-        legs=reachable[key][1]+[leg('walk',s['name']+' ('+s['line']+')','Адрес',math.ceil(walk/1000/4.5*60)+2,walk)]
+        s=network.stations[key]
+        legs=reachable[key][1]+[leg('walk',s['name']+' ('+s['line']+')','Адрес',minutes,walk)]
         if not any(x['mode']=='metro' for x in legs):continue
         candidate=result('multimodal',legs)
         if candidate['minutes']<best['minutes']:best=candidate
@@ -104,6 +126,8 @@ def bundled_data():
 
 def apply_transit(geo,network=None):
     network=network or TransitNetwork(bundled_data())
+    access=geo.metadata.get('transit_access')
+    if access:network.set_access(access)
     matrix=deepcopy(geo.matrices);ids=matrix['locations'];journeys={};counts={}
     for i,a in enumerate(ids):
         journeys[a]={}
@@ -123,7 +147,7 @@ def apply_transit(geo,network=None):
             counts[p['kind']]=counts.get(p['kind'],0)+1
     matrix['public_journeys']=journeys
     modes=deepcopy(geo.modes)
-    modes['public']={'kind':'estimate','model':'walk-metro-walk-v1','source':network.source,
-        'description':'Пешком + метро + пересадки; интервальная оценка, неполная сеть. Вне покрытия — средняя оценка. Подходы не проверены по пешеходной сети.',
-        'assumptions':{'walk_kmh':4.5,'walk_detour_factor':1.3,'max_access_straight_metres':2500,'nearest_stations':3,'metro_kmh':35,'stop_minutes':1,'wait_minutes':3,'entry_exit_minutes':2,'transfer_radius_metres':350},'journey_counts':counts}
+    modes['public']={'kind':'estimate','model':'walk-metro-walk-v2' if access else 'walk-metro-walk-v1','network_signature':network.signature,'pedestrian_access':'road-to-station-point' if access else 'distance-estimate','source':network.source,
+        'description':('Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. ' if access else 'Подходы оценены по расстоянию. ')+'Поезда и ожидания оценочные; вне покрытия средняя оценка.',
+        'assumptions':{'walk_kmh':None if access else 4.5,'walk_detour_factor':None if access else 1.3,'max_access_straight_metres':2500,'nearest_stations':6,'metro_kmh':35,'stop_minutes':1,'wait_minutes':3,'entry_exit_minutes':2,'transfer_radius_metres':700 if access else 350,'max_approach_minutes':45 if access else None,'max_transfer_walk_minutes':20 if access else None},'journey_counts':counts}
     return geo.model_copy(update={'matrices':matrix,'modes':modes,'route_shapes':{}})

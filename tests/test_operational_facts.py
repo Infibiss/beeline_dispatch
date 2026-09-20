@@ -116,3 +116,12 @@ def test_busy_engineer_requires_explicit_end_before_switch(make_scenario,status,
     before=deepcopy(session.dump())
     with pytest.raises(ValueError):session.record_fact({'version':2,'time':555,'engineer_id':'e1','request_id':request_id,'status':status,'remaining_minutes':5,'location_id':'office'})
     assert session.dump()==before
+
+
+def test_working_cannot_jump_to_another_job_without_closure(make_scenario):
+    from test_replanning import demo
+    from field_router.replanning import ScenarioSession
+    s,p=demo(make_scenario);session=ScenarioSession(s,p)
+    session.record_fact({'version':1,'time':550,'engineer_id':'e1','request_id':'a','status':'working','remaining_minutes':30})
+    with pytest.raises(ValueError,match='заверш|прерв'):
+        session.record_fact({'version':2,'time':560,'engineer_id':'e1','request_id':'b','status':'working','remaining_minutes':30})

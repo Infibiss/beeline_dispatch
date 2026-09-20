@@ -187,7 +187,7 @@ def main(argv=None):
         scenario=Scenario.model_validate(payload['scenario'])
         plan=next((p for p in payload['plans'] if p['solver']=='ortools'),payload['plans'][0])
         session=ScenarioSession(scenario,Plan.model_validate(plan),geography=payload.get('geography'))
-    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,address_service=AddressService(CachedHttp(args.cache)) if args.network else None)
+    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
     print(f'Scenario Center: http://127.0.0.1:{server.server_port} · локальный диспетчер, без GPS',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass

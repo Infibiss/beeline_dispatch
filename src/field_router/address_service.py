@@ -8,8 +8,9 @@ from .road_travel import build_matrices
 
 
 class AddressService:
-    def __init__(self,client):
+    def __init__(self,client,*,routed_access=False):
         self.client=client
+        self.routed_access=routed_access
         self.candidates={}
 
     def search(self,session,payload):
@@ -54,7 +55,7 @@ class AddressService:
         updated=deepcopy(session)
         key='address:'+uuid4().hex
         geo=updated.geography.model_copy(update={'locations':{**updated.geography.locations,key:point}})
-        updated.geography=build_matrices(geo,self.client,allow_public_estimate=True)
+        updated.geography=build_matrices(geo,self.client,allow_public_estimate=True,routed_access=self.routed_access)
         updated.geo_locations[key]=point;updated.aliases[key]=key
         updated.version+=1;updated.batches.clear()
         updated.history.append({'version':updated.version,'event':{'id':key,'type':'address','time':updated.time},'point':point.model_dump()})

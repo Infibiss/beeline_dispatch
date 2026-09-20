@@ -32,7 +32,7 @@ def test_shipped_road_demo_is_valid_and_restorable(region):
 def test_saved_multimodal_details_match_planning_matrices(region):
     payload=json.loads((DATA / f'{region}.json').read_text())
     geo=payload['geography'];m=geo['matrices'];counts={}
-    assert geo['modes']['public']['model']=='walk-metro-walk-v1'
+    assert geo['modes']['public']['model']=='walk-metro-walk-v2'
     for i,a in enumerate(m['locations']):
         for j,b in enumerate(m['locations']):
             trip=m['public_journeys'][a][b]

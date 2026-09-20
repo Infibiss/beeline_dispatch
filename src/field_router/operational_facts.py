@@ -19,6 +19,8 @@ def validate_fact(session,payload):
         raise ValueError('Сначала явно завершите или прервите начатую работу')
     if kind in ('working','completed','interrupted','traveling'):
         if key not in session.catalog:raise ValueError('Нужна известная заявка')
+        if any(h.get('event',{}).get('type')=='cancel' and h['event'].get('request_id')==key and h['event']['time']<=now for h in session.history):
+            raise ValueError('Заявка отменена до этого факта; проверьте время сообщения')
         if any(f['status']=='completed' and f.get('request_id')==key for f in session.fact_log):raise ValueError('Заявка уже завершена фактически')
         owner=next((r.engineer_id for r in session.plan.routes for v in r.visits if v.request_id==key),None)
         if owner is None:owner=next((r['engineer_id'] for r in session.frozen for v in r['visits'] if v['request_id']==key),None)

@@ -6,7 +6,7 @@ Code/data repository license: MIT (see METRO-LICENSE.txt).
 Upstream README attributes original station data to data.mos.ru under Creative Commons Attribution 3.0.
 Original publisher: Правительство Москвы, Портал открытых данных https://data.mos.ru/
 License: https://creativecommons.org/licenses/by/3.0/
-Changes: selected nine non-branching lines, renamed fields, added stable line/order IDs.
+Changes: selected thirteen non-branching lines, merged the two contiguous Sokolnicheskaya segments by Order, added MCC ring closure, renamed fields and added stable line/order IDs.
 Coverage is incomplete. No verification of current closures, station access, or schedules.
 Line adjacency inferred from upstream Order. Nearby inter-line stations are connected by modeled walking transfers.
 All headways, walking approaches and train durations are model assumptions, not source data.

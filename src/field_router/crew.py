@@ -125,7 +125,7 @@ class CrewService:
         scenario=Scenario.model_validate(data)
         if geo:
             if new_points:
-                geo=build_matrices(geo.model_copy(update={'locations':locations,'scenario_signature':scenario_signature(scenario)}),self.address_service.client,allow_public_estimate=True)
+                geo=build_matrices(geo.model_copy(update={'locations':locations,'scenario_signature':scenario_signature(scenario)}),self.address_service.client,allow_public_estimate=True,routed_access=getattr(self.address_service,'routed_access',False))
             else:geo=cloned_geography(geo,scenario,locations,origins)
             travel=bundle_travel(geo)
         else:travel=synthetic_travel(scenario)

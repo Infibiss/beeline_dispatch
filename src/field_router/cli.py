@@ -159,7 +159,7 @@ def main(argv=None):
         if args.command=="matrices":
             geo = GeographyBundle.model_validate_json(args.geography.read_text(encoding="utf-8"))
             endpoints = json.loads(args.endpoints.read_text()) if args.endpoints else None
-            geo = build_matrices(geo,CachedHttp(args.cache,offline=not args.network),allow_public_estimate=args.allow_public_estimate,endpoints=endpoints)
+            geo = build_matrices(geo,CachedHttp(args.cache,offline=not args.network),allow_public_estimate=args.allow_public_estimate,endpoints=endpoints,routed_access=True)
             _write_json(args.output,geo.model_dump(mode="json"))
             print(f"Матрицы сохранены: {args.output}")
             return 0

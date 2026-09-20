@@ -38,7 +38,7 @@ def _matrix(values,n,divisor):
     return result
 
 
-def build_matrices(geo:GeographyBundle,client,*,allow_public_estimate=False,endpoints=None):
+def build_matrices(geo:GeographyBundle,client,*,allow_public_estimate=False,endpoints=None,routed_access=False):
     if not allow_public_estimate:
         raise ValueError('Нужны расписания общественного транспорта или явное разрешение оценки')
     if geo.unresolved or not geo.locations: raise ValueError('Сначала исправьте координаты')
@@ -65,9 +65,16 @@ def build_matrices(geo:GeographyBundle,client,*,allow_public_estimate=False,endp
                       for j,d in enumerate(row)] for i,row in enumerate(distances['public'])]
     modes['public']={'kind':'estimate','source':'road distance from car profile; no transit timetable',
                      'speed_kmh':18,'boarding_minutes':7,'description':'Оценка: длина автомобильного пути / 18 км/ч + 7 мин; не маршрут автобуса/метро'}
-    from .multimodal import apply_transit
-    return apply_transit(geo.model_copy(update={'modes':modes,'matrices':{'locations':ids,'minutes':times,'metres':distances,
-        'coordinates_signature':coordinates_signature(geo.locations)},'route_shapes':{}}))
+    from .multimodal import apply_transit, TransitNetwork, bundled_data
+    result=geo.model_copy(update={'modes':modes,'matrices':{'locations':ids,'minutes':times,'metres':distances,
+        'coordinates_signature':coordinates_signature(geo.locations)},'route_shapes':{}})
+    if routed_access:
+        from .transit_access import build_access
+        access=build_access(result,TransitNetwork(bundled_data()),client,previous=geo.metadata.get('transit_access'))
+        result=result.model_copy(update={'metadata':{**result.metadata,'transit_access':access}})
+    elif 'transit_access' in result.metadata:
+        result=result.model_copy(update={'metadata':{k:v for k,v in result.metadata.items() if k!='transit_access'}})
+    return apply_transit(result)
 
 
 def bundle_travel(geo:GeographyBundle):

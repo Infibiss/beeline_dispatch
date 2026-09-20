@@ -162,7 +162,7 @@ def test_llm_explains_without_mutating_batch_and_stale_request_rejected(make_sce
     s,p=demo(make_scenario);session=ScenarioSession(s,p);calls=[]
     def send(body):
         calls.append(body)
-        return {'output':[{'content':[{'type':'output_text','text':'{"points":["coverage","changes"]}'}]}]}
+        return {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"stable","points":["coverage","changes"]}'}]}]}
     server=create_server(session,tmp_path/'state.json',port=0,time_limit=.03,explainer=Explainer(send=send))
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     def post(route,data):
@@ -174,9 +174,11 @@ def test_llm_explains_without_mutating_batch_and_stale_request_rejected(make_sce
         assert post('/api/explain',payload)['source']=='yandexgpt'
         post('/api/explain',payload)
         assert len(calls)==1
+        assert post('/api/recommend',{'version':1,'batch_id':b['id']})['candidate_id'] in ('sla','stable','cost')
+        assert len(calls)==2
         # Approval still verifies the original fingerprint after explanation.
         assert post('/api/approve',payload)['version']==2
         with pytest.raises(HTTPError):post('/api/explain',payload)
-        assert len(calls)==1
+        assert len(calls)==2
     finally:
         server.shutdown();server.server_close();thread.join()

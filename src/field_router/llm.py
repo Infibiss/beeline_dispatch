@@ -39,6 +39,36 @@ def verified_points(batch):
             f"аварии {c['facts']['emergency_assigned']}/{c['facts']['emergency_total']}, подключения {c['facts']['connection_assigned']}/{c['facts']['connection_total']}")
     return points
 
+def recommendation_text(batch,choice,order):
+    """Explain the selected plan's advantages/tradeoffs with verified numbers only."""
+    candidates=batch['candidates'];parts=[]
+    fields={'coverage':('unassigned','Число заявок без назначения','Наименьшее число заявок без назначения'),
+            'changes':('reassigned','Смена исполнителя, заявок','Наименьшее число смен исполнителя'),
+            'travel':('travel_minutes','Дорога, мин','Наименьшее время дороги')}
+    for key in order:
+        if key in fields:
+            field,label,advantage=fields[key]
+            if not all(field in c['facts'] for c in candidates):continue
+            values=[c['facts'][field] for c in candidates];value=choice['facts'][field]
+            if len(set(values))==1:
+                if key=='coverage':parts.append(f"По охвату варианты одинаковы: назначено — {choice['facts']['assigned']}, без назначения — {value}.")
+                else:parts.append(f'{label} — {value}; варианты одинаковы.')
+            elif value==min(values):parts.append(f'{advantage} — {value} (в остальных вариантах до {max(values)}).')
+            else:parts.append(f'{label} — {value}; у лучшей альтернативы — {min(values)}.')
+        elif key=='reaction':
+            e=choice.get('emergency') or {}
+            if not e.get('assigned'):parts.append('Новая авария не назначена.')
+            else:
+                values=[c['emergency']['response_minutes'] for c in candidates if (c.get('emergency') or {}).get('assigned')]
+                value=e['response_minutes']
+                parts.append(f'До начала новой аварии — {value} мин; минимум среди вариантов — {min(values)} мин. Включает ожидание освобождения бригады.')
+        elif key=='priorities':
+            f=choice['facts']
+            if all(k in f for k in ('emergency_assigned','emergency_total','connection_assigned','connection_total')):
+                parts.append(f"Назначены аварии {f['emergency_assigned']}/{f['emergency_total']} и подключения {f['connection_assigned']}/{f['connection_total']} — максимальный охват приоритетов среди этих вариантов.")
+    return ' '.join(parts)
+
+
 def settings(path=Path('.env')):
     values={}
     if path.exists():
@@ -70,7 +100,13 @@ class Explainer:
         if not 0<=max_calls<=1000:raise ValueError('YANDEX_LLM_MAX_CALLS должен быть от 0 до 1000')
         self.send=send;self.max_calls=max_calls;self.calls=0;self.cache={};self.lock=threading.Lock()
 
+    def recommend(self,batch):
+        return self.explain(batch,None)
+
     def explain(self,batch,candidate_id):
+        recommend=candidate_id is None
+        if recommend:
+            candidate_id=min(eligible_candidates(batch),key=recommendation_rank)['id']
         candidate=next((c for c in batch['candidates'] if c['id']==candidate_id),None)
         if candidate is None:raise ValueError('Неизвестный вариант')
         summaries=[]
@@ -80,12 +116,22 @@ class Explainer:
                 if k in ('assigned','response_minutes') and (v is None or type(v) in (int,float,bool))}
             summaries.append({'strategy':c['id'],'facts':facts,'emergency':emergency})
         points=verified_points(batch)
-        body={'input':PROMPT+json.dumps({'selected':candidate_id,'variants':summaries,'available_points':list(points)},ensure_ascii=False),
+        instruction=PROMPT
+        if recommend:
+            instruction=instruction.replace('{"points":["coverage","reaction","changes"]}', '{"candidate_id":"stable","points":["coverage","changes"]}')
+            instruction+='\nВыбери один candidate_id ТОЛЬКО из eligible_candidates и добавь его в JSON. Сначала максимальный охват аварий, затем подключений. Далее более раннее начало новой аварии, охват остальных и стабильность. При равенстве предпочти stable. Объяснение points должно включать причины выбора.\n'
+        context={'variants':summaries,'available_points':list(points)}
+        if recommend:context['eligible_candidates']=[c['id'] for c in eligible_candidates(batch)]
+        else:context['selected']=candidate_id
+        body={'input':instruction+json.dumps(context,ensure_ascii=False),
               'temperature':0.1,'max_output_tokens':500}
         key=hashlib.sha256(json.dumps([batch['id'],batch['version'],body],sort_keys=True).encode()).hexdigest()
         with self.lock:
             if key in self.cache:return dict(self.cache[key])
             result={'text':candidate['explanation'],'source':'template','notice':'LLM недоступна; показано объяснение по проверенным показателям.'}
+            if recommend:
+                result.update(candidate_id=candidate_id,source='rule',notice='ИИ недоступен. Рекомендация по правилу: приоритеты → реакция → охват → стабильность.')
+                result['text']=recommendation_text(batch,candidate,list(points)[:4])
             if self.calls>=self.max_calls:result['notice']='Лимит вызовов LLM исчерпан; показано обычное объяснение.'
             else:
                 self.calls+=1
@@ -101,10 +147,34 @@ class Explainer:
                     selection=json.loads(text)
                     order=selection.get('points')
                     if not isinstance(order,list) or not 2<=len(order)<=4 or not all(isinstance(k,str) and k in points for k in order) or len(set(order))!=len(order) or order[0]!='coverage':raise ValueError('Непроверенные тезисы')
-                    text=' '.join(points[k] for k in order)+' План утверждает диспетчер; оптимальность не доказана.'
+                    if recommend:
+                        choice=next((c for c in batch['candidates'] if c['id']==selection.get('candidate_id')),None)
+                        if choice is None or choice['id'] not in {c['id'] for c in eligible_candidates(batch)}:raise ValueError('Нарушены приоритеты')
+                    text=recommendation_text(batch,choice,order) if recommend else ' '.join(points[k] for k in order)+' План утверждает диспетчер; оптимальность не доказана.'
                     result={'text':text,'source':'yandexgpt','notice':'YandexGPT выбрала акценты; текст и числа сформированы из проверенных показателей.'}
+                    if recommend:result.update(candidate_id=choice['id'],notice='Рекомендация YandexGPT. Показатели проверены; решение за диспетчером.')
                 except (OSError,ValueError,TypeError,KeyError,AttributeError):
                     pass  # Never expose provider bodies, credentials, or internal errors.
             self.cache[key]=result
             if len(self.cache)>128:self.cache.pop(next(iter(self.cache)))
             return dict(result)
+
+
+def recommendation_rank(c):
+    f=c['facts'];e=c.get('emergency') or {}
+    return (-f.get('emergency_assigned',0),-f.get('connection_assigned',0),
+            e.get('response_minutes') if e.get('response_minutes') is not None else 10**6,
+            f.get('unassigned',0),f.get('reassigned',0),f.get('time_shift_minutes',0),
+            f.get('travel_minutes',0),c['id']!='stable')
+
+
+def eligible_candidates(batch):
+    candidates=batch['candidates']
+    priority=min(recommendation_rank(c)[:2] for c in candidates)
+    candidates=[c for c in candidates if recommendation_rank(c)[:2]==priority]
+    def vector(c):
+        f=c['facts']
+        return recommendation_rank(c)[2:-1]+(f.get('lost_assignments',0),f.get('engineers_used',0))
+    return [c for c in candidates if not any(
+        all(a<=b for a,b in zip(vector(other),vector(c))) and any(a<b for a,b in zip(vector(other),vector(c)))
+        for other in candidates)]

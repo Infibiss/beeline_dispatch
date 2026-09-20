@@ -1,7 +1,7 @@
-"""Frequency-based metro + walking model; all non-road durations are estimates.
+"""Versioned rail, scheduled surface transit and road walking model.
 
-A deliberately incomplete, versioned network. No timetables, closures or claim
-that a straight-line approach is a verified pedestrian route.
+Static travel estimates, not a live or departure-time-aware navigator.
+See data source files for coverage and service-date limitations.
 """
 from copy import deepcopy
 from functools import lru_cache
@@ -33,6 +33,8 @@ def result(kind,legs):
 class TransitNetwork:
     def __init__(self,data):
         self.source=data.get('source','unspecified')
+        self.surface_source=data.get('surface_source')
+        self.service_date=data.get('service_date')
         self.signature=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
         self.access=None
         self.stations={};self.graph={};lines={}
@@ -42,7 +44,7 @@ class TransitNetwork:
                 raise ValueError('Invalid transit coordinates')
             self.stations[s['id']]=s;self.graph[s['id']]=[]
             lines.setdefault(s['line'],[]).append(s)
-        for name,stations in lines.items():
+        for name,stations in (lines.items() if "edges" not in data else []):
             stations.sort(key=lambda s:s['order'])
             if len({s['order'] for s in stations})!=len(stations):raise ValueError('Duplicate line order')
             pairs=list(zip(stations,stations[1:]))
@@ -50,13 +52,19 @@ class TransitNetwork:
             for a,b in pairs:
                 d=distance((a['lat'],a['lon']),(b['lat'],b['lon']))
                 self.connect(a,b,'metro',max(1,math.ceil(d/1000/35*60+1)),d)
-        values=list(self.stations.values())
+        for edge in data.get('edges',[]):
+            if edge['from'] not in self.stations or edge['to'] not in self.stations:raise ValueError('Unknown edge endpoint')
+            if any(type(edge[k]) is not int or edge[k]<0 for k in ('minutes','metres')):raise ValueError('Invalid edge cost')
+            a=self.stations[edge['from']];b=self.stations[edge['to']]
+            self.graph[a['id']].append((b['id'],[leg(edge['mode'],a['name']+' ('+a['line']+')',b['name']+' ('+b['line']+')',edge['minutes'],edge['metres'])]))
+        values=list(self.stations.values()) if 'edges' not in data else []
         for i,a in enumerate(values):
             for b in values[i+1:]:
                 d=distance((a['lat'],a['lon']),(b['lat'],b['lon']))
                 if a['line']!=b['line'] and d<=350:
                     self.connect(a,b,'transfer',math.ceil(d*1.3/1000/4.5*60)+2,math.ceil(d*1.3))
-        self.cache={}
+        self.access_stations={k:s for k,s in self.stations.items() if s.get('access',True)}
+        self.cache={};self.approach_cache={}
 
     def connect(self,a,b,mode,minutes,metres):
         for start,end in ((a,b),(b,a)):
@@ -66,8 +74,17 @@ class TransitNetwork:
             self.graph[start['id']].append((end['id'],legs))
 
     def approaches(self,point):
-        candidates=sorted((distance(point,(s['lat'],s['lon'])),key) for key,s in self.stations.items())
-        return [(d,k) for d,k in candidates[:6] if d<=2500]
+        if point in self.approach_cache:return self.approach_cache[point]
+        candidates=sorted((distance(point,(s['lat'],s['lon'])),key) for key,s in self.access_stations.items())
+        rail=[(d,k) for d,k in candidates if not self.stations[k].get('surface') and d<=2500][:6]
+        surface=[(d,k) for d,k in candidates if self.stations[k].get('surface') and d<=800][:3]
+        if len(self.approach_cache)>=256:self.approach_cache.pop(next(iter(self.approach_cache)))
+        self.approach_cache[point]=rail+surface
+        return self.approach_cache[point]
+
+    def entry(self,key):return 0 if self.stations[key].get('surface') else 2
+    def wait(self,key):return self.stations[key].get('wait_minutes',0 if self.stations[key].get('surface') else 3)
+
 
     def set_access(self,access):
         if access.get('network_signature')!=self.signature:raise ValueError('Пешеходные подходы устарели после изменения сети')
@@ -77,28 +94,29 @@ class TransitNetwork:
             for edge in access['transfers']:
                 a=self.stations[edge['from']];b=self.stations[edge['to']]
                 origin=a['name']+' ('+a['line']+')';destination=b['name']+' ('+b['line']+')'
-                self.graph[a['id']].append((b['id'],[leg('transfer',origin,destination,edge['minutes']+4,edge['metres']),leg('wait',destination,destination,3)]))
+                self.graph[a['id']].append((b['id'],[leg('transfer',origin,destination,edge['minutes']+self.entry(a['id'])+self.entry(b['id']),edge['metres']),leg('wait',destination,destination,self.wait(b['id']))]))
 
     def access_paths(self,point,direction):
         if self.access is not None:
-            return [(k,v['minutes']+2,v['metres']) for k,v in self.access['points'].get(point_key(point),{}).get(direction,{}).items()]
-        return [(k,math.ceil(math.ceil(d*1.3)/1000/4.5*60)+2,math.ceil(d*1.3)) for d,k in self.approaches(point)]
+            return [(k,v['minutes']+self.entry(k),v['metres']) for k,v in self.access['points'].get(point_key(point),{}).get(direction,{}).items()]
+        return [(k,math.ceil(math.ceil(d*1.3)/1000/4.5*60)+self.entry(k),math.ceil(d*1.3)) for d,k in self.approaches(point)]
 
     def reachable(self,point):
         if point in self.cache:return self.cache[point]
         best={};heap=[]
         for key,minutes,walk in self.access_paths(point,'in'):
             s=self.stations[key];label=s['name']+' ('+s['line']+')'
-            legs=[leg('walk','Адрес',label,minutes,walk),leg('wait',label,label,3)]
+            legs=[leg('walk','Адрес',label,minutes,walk),leg('wait',label,label,self.wait(key))]
             cost=sum(x['minutes'] for x in legs)
-            best[key]=(cost,legs);heappush(heap,(cost,key))
+            best[key]=(cost,None,legs);heappush(heap,(cost,key))
         while heap:
             cost,key=heappop(heap)
             if cost!=best[key][0]:continue
             for end,legs in self.graph[key]:
                 value=cost+sum(x['minutes'] for x in legs)
                 if end not in best or value<best[end][0]:
-                    best[end]=(value,best[key][1]+legs);heappush(heap,(value,end))
+                    best[end]=(value,key,legs);heappush(heap,(value,end))
+        if len(self.cache)>=4:self.cache.pop(next(iter(self.cache)))
         self.cache[point]=best
         return best
 
@@ -112,8 +130,11 @@ def journey(network,origin,destination,walk_minutes,walk_metres):
     for key,minutes,walk in destinations:
         if key not in reachable:continue
         s=network.stations[key]
-        legs=reachable[key][1]+[leg('walk',s['name']+' ('+s['line']+')','Адрес',minutes,walk)]
-        if not any(x['mode']=='metro' for x in legs):continue
+        prefix=[];cursor=key
+        while cursor is not None:
+            item=reachable[cursor];prefix.append(item[2]);cursor=item[1]
+        legs=[x for chunk in reversed(prefix) for x in chunk]+[leg('walk',s['name']+' ('+s['line']+')','Адрес',minutes,walk)]
+        if not any(x['mode'] in ('metro','rail','bus','tram') for x in legs):continue
         candidate=result('multimodal',legs)
         if candidate['minutes']<best['minutes']:best=candidate
     return best
@@ -121,7 +142,14 @@ def journey(network,origin,destination,walk_minutes,walk_metres):
 
 @lru_cache(maxsize=1)
 def bundled_data():
-    return json.loads(files('field_router').joinpath('data/metro.json').read_text())
+    data=json.loads(files('field_router').joinpath('data/metro.json').read_text())
+    surface=files('field_router').joinpath('data/surface.json')
+    if 'edges' in data and surface.is_file():
+        extra=json.loads(surface.read_text())
+        data['stations']+=extra['stations'];data['edges']+=extra['edges']
+        data['surface_source']=extra['source'];data['service_date']=extra['service_date']
+        data['source']+='; '+extra['source']
+    return data
 
 
 def apply_transit(geo,network=None):
@@ -141,13 +169,13 @@ def apply_transit(geo,network=None):
                 metres=matrix['metres']['car'][i][j]
                 minutes=0 if metres==0 else math.ceil(metres/1000/18*60+7)
                 p=result('fallback',[leg('estimate','Адрес','Адрес',minutes,metres)])
-                if walk_minutes<=minutes:p=result('walk',[leg('walk','Адрес','Адрес',walk_minutes,walk_metres)])
+                if network.surface_source or walk_minutes<=minutes:p=result('walk',[leg('walk','Адрес','Адрес',walk_minutes,walk_metres)])
             journeys[a][b]=p
             matrix['minutes']['public'][i][j]=p['minutes'];matrix['metres']['public'][i][j]=p['metres']
             counts[p['kind']]=counts.get(p['kind'],0)+1
     matrix['public_journeys']=journeys
     modes=deepcopy(geo.modes)
-    modes['public']={'kind':'estimate','model':'walk-metro-walk-v2' if access else 'walk-metro-walk-v1','network_signature':network.signature,'pedestrian_access':'road-to-station-point' if access else 'distance-estimate','source':network.source,
-        'description':('Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. ' if access else 'Подходы оценены по расстоянию. ')+'Поезда и ожидания оценочные; вне покрытия средняя оценка.',
-        'assumptions':{'walk_kmh':None if access else 4.5,'walk_detour_factor':None if access else 1.3,'max_access_straight_metres':2500,'nearest_stations':6,'metro_kmh':35,'stop_minutes':1,'wait_minutes':3,'entry_exit_minutes':2,'transfer_radius_metres':700 if access else 350,'max_approach_minutes':45 if access else None,'max_transfer_walk_minutes':20 if access else None},'journey_counts':counts}
+    modes['public']={'kind':'estimate','model':'multimodal-v3' if network.surface_source else ('walk-metro-walk-v2' if access else 'walk-metro-walk-v1'),'network_signature':network.signature,'pedestrian_access':'road-to-station-point' if access else 'distance-estimate','source':network.source,'service_date':network.service_date,
+        'description':('Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. ' if access else 'Подходы оценены по расстоянию. ')+'Рельсовые поездки оценочные. Автобусы/трамваи: максимальное наблюдаемое время сегмента и полный максимальный интервал из GTFS за рабочий день, частое движение с 09:00 до 22:00. Нет расчёта под минуту отправления; вне подтверждённой сети используется только пеший маршрут.',
+        'assumptions':{'walk_kmh':None if access else 4.5,'walk_detour_factor':None if access else 1.3,'max_access_straight_metres':2500,'nearest_stations':6,'nearest_surface_stops':3,'max_surface_access_straight_metres':800,'metro_kmh':35,'stop_minutes':1,'wait_minutes':3,'entry_exit_minutes':2,'transfer_radius_metres':700 if access else 350,'max_approach_minutes':45 if access else None,'max_transfer_walk_minutes':20 if access else None},'journey_counts':counts}
     return geo.model_copy(update={'matrices':matrix,'modes':modes,'route_shapes':{}})

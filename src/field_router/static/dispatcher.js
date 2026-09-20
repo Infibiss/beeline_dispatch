@@ -176,9 +176,9 @@
         const aliases=geo.location_aliases || {};
         const trip=geo.matrices?.public_journeys?.[aliases[origin] || origin]?.[aliases[request.id] || request.id];
         if (trip && trip.minutes === visit.travel_minutes && trip.metres === visit.distance_m) {
-          const labels={walk:'Пешком',wait:'Ожидание',metro:'Метро',transfer:'Пересадка',estimate:'Средняя оценка транспорта'};
+          const labels={walk:'Пешком',wait:'Ожидание',metro:'Метро',rail:'МЦД / МЦК',bus:'Автобус',tram:'Трамвай',alight:'Выход',transfer:'Пересадка',estimate:'Средняя оценка транспорта'};
           fact(list,'Состав переезда',trip.legs.map(x=>(labels[x.mode] || x.mode)+' '+x.minutes+' мин: '+x.origin+' → '+x.destination).join('; ') || 'В той же точке');
-          fact(list,'Точность транспорта',trip.kind==='walk'?'Пеший путь по дорожной матрице':trip.kind==='fallback'?'Вне покрытия метро: усреднённая оценка без известного маршрута':(geo.modes?.public?.pedestrian_access==='road-to-station-point'?'Пешие участки по дорожной сети до точек станций; входы не подтверждены. Поезда и ожидание — оценка.':'Неполная сеть метро; время, подходы и пересадки — оценки без расписания'));
+          fact(list,'Точность транспорта',trip.kind==='walk'?'Пеший путь по дорожной матрице':trip.kind==='fallback'?'Вне покрытия метро: усреднённая оценка без известного маршрута':(geo.modes?.public?.pedestrian_access==='road-to-station-point'?'Пешие участки по дорожной сети. Наземный транспорт — оценки из GTFS, рельсовый — модель. Нет актуальных пробок и точного расписания отправления; входы не подтверждены.':'Неполная сеть метро; время, подходы и пересадки — оценки без расписания'));
         } else fact(list,'Состав переезда','Для этого участка детализация отсутствует; время указано по модели плана.');
       }
       fact(list,'Обоснование назначения',visit.explanation || 'Допустимо по ограничениям модели');

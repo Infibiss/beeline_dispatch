@@ -1,0 +1,23 @@
+GTFS source: Moscow Transport, MobilityDatabase community feed mdb-3226.
+Archive: https://files.mobilitydatabase.org/mdb-3226/mdb-3226-202606301640/mdb-3226-202606301640.zip
+Catalog: https://mobilitydatabase.org/feeds/gtfs/mdb-3226
+Archive timestamp: 2026-06-30; downloaded 2026-09-20.
+Producer URL listed by catalog returned 404. Catalog mirror was used.
+Original route agencies include Mosgortrans; this is not a live agency API.
+Service date selected for shipped demo: 2026-08-17 (Monday).
+Normalization: ignore empty/extra CSV columns; keep active calendar services,
+route types 0 and 3; preserve stop_sequence, directions, exact trip patterns,
+and repeated occurrences of the same physical stop.
+Profile: daytime 09:00-22:00; at least 12 departures, first by 10:00,
+last after 21:00; initial frequency filter P90 headway / 2 <=20 minutes.
+Boarding additionally requires service spanning 09:00-22:00; charge the full
+maximum observed headway intersecting this range, and maximum observed segment
+time. This conservative static estimate is not a realtime upper bound.
+Excluded infrequent/time-limited services must not be presented as usable all day.
+323 compiled route IDs, 307 with at least one boardable position after the full-day filter. Transfer between bus patterns requires boarding again.
+Stops are geographic GTFS points. Bus/tram metres use straight stop-to-stop
+distances because shapes.txt is absent. Times use schedule observations.
+No realtime traffic, vehicle locations, disruptions or exact departure-time search.
+Rebuild: .venv/bin/python scripts/build_surface.py FEED.zip OUTPUT.json [YYYYMMDD]
+
+Archive SHA256: dec3ec0ccc2efb7f1327ee6f26a0636a4a271494490e6debedcb2c1ccc579e76

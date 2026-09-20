@@ -120,15 +120,16 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 if not 0<length<=65536:raise ValueError('Недопустимый размер запроса')
                 payload=json.loads(self.rfile.read(length))
                 if not isinstance(payload,dict):raise ValueError('Ожидается объект запроса')
-                if self.path=='/api/explain':
+                if self.path in ('/api/explain','/api/recommend'):
                     with lock:
                         session=holder['session']
                         if payload.get('version')!=session.version:raise ValueError('Устаревшая версия плана')
                         stored=session.batches.get(payload.get('batch_id'))
                         if stored is None:raise ValueError('Варианты устарели; рассчитайте заново')
                         batch=deepcopy(stored['batch'])
+                    if self.path=='/api/explain' and payload.get('candidate_id') is None:raise ValueError('Нужен вариант для объяснения')
                     if explainer is None:raise ValueError('LLM не настроена')
-                    result=explainer.explain(batch,payload.get('candidate_id'))
+                    result=explainer.recommend(batch) if self.path=='/api/recommend' else explainer.explain(batch,payload.get('candidate_id'))
                     return self.reply(200,result)
                 with lock:
                     if self.path=='/api/address/search':

@@ -33,7 +33,7 @@ def test_shipped_road_demo_is_valid_and_restorable(region):
 def test_saved_multimodal_details_match_planning_matrices(region):
     payload=json.loads((DATA / f'{region}.json').read_text())
     geo=payload['geography'];m=geo['matrices'];counts={}
-    assert geo['modes']['public']['model']=='walk-metro-walk-v2'
+    assert geo['modes']['public']['model']=='multimodal-v3'
     for i,a in enumerate(m['locations']):
         for j,b in enumerate(m['locations']):
             trip=m['public_journeys'][a][b]
@@ -42,6 +42,6 @@ def test_saved_multimodal_details_match_planning_matrices(region):
             assert trip['metres']==m['metres']['public'][i][j]==sum(x['metres'] for x in trip['legs'])
             if trip['kind']=='multimodal':
                 assert trip['legs'][0]['mode']==trip['legs'][-1]['mode']=='walk'
-                assert any(x['mode']=='metro' for x in trip['legs'])
+                assert any(x['mode'] in ('metro','rail','bus','tram') for x in trip['legs'])
     assert counts==geo['modes']['public']['journey_counts']
     assert counts['multimodal']>0

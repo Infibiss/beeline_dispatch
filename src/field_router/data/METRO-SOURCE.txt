@@ -1,12 +1,36 @@
-Source: ARyaskov/metro-ru, src/data/moscow.json
-Pinned revision: 018cfaf6aade6ff7f8fdb340e28a93b46eadfd48
-https://github.com/ARyaskov/metro-ru/tree/018cfaf6aade6ff7f8fdb340e28a93b46eadfd48
-Retrieved 2026-09-20.
-Code/data repository license: MIT (see METRO-LICENSE.txt).
-Upstream README attributes original station data to data.mos.ru under Creative Commons Attribution 3.0.
-Original publisher: Правительство Москвы, Портал открытых данных https://data.mos.ru/
-License: https://creativecommons.org/licenses/by/3.0/
-Changes: selected thirteen non-branching lines, merged the two contiguous Sokolnicheskaya segments by Order, added MCC ring closure, renamed fields and added stable line/order IDs.
-Coverage is incomplete. No verification of current closures, station access, or schedules.
-Line adjacency inferred from upstream Order. Nearby inter-line stations are connected by modeled walking transfers.
-All headways, walking approaches and train durations are model assumptions, not source data.
+Current coordinate source: https://api.hh.ru/metro/1 (public HH metro directory),
+downloaded 2026-09-20. Service topology selected for demo day 2026-08-17.
+440 station-line records, 20 lines including metro, MCC and D1-D4.
+This is a corrected coordinate directory, not a timetable or live transit feed.
+
+Explicit directed edges replace implicit station order. Corrections:
+- Filyovskaya branch starts at Kievskaya; no Alexandrovsky Sad -> branch link.
+- Nekrasovskaya runs Nizhegorodskaya -> Nekrasovka; old BKL segment removed.
+- BKL is a ring; Delovoy Centre/Shelepikha branch removed.
+- Old Kakhovskaya independent line removed.
+- D2 Maryina Roshcha moved before Rizhskaya; old Pokrovskoye-Streshnevo and
+  Moskva Tovarnaya nodes removed. Some newer MCD stops are absent in the source.
+- D4 Novoperedelkino branch point excluded.
+- D3 Levoberezhnaya conservatively excluded pending directional stop access.
+- Rublyovo-Arkhangelskaya opened after the demo date and is not included.
+- Troitskaya includes the 11-station first stage.
+
+Official corroboration:
+https://mosmetro.ru/news/details/4759 (BKL branch closure)
+https://www.mosmetro.ru/about/history (Nekrasovskaya/BKL changes)
+https://transport.mos.ru/mostrans/all_news/126335 (11 Troitskaya stations)
+https://transport.mos.ru/metro/repairs_closures_metro (D3 restriction)
+https://transport.mos.ru/mostrans/all_news/131501 (Rublyovo opening September 2026)
+https://transport.mos.ru/mostrans/all_news/113889 (D2 Maryina Roshcha)
+
+Train times remain estimates: straight segment distance / 35 km/h + 1 minute.
+Boarding waits: 3 minutes metro/MCC, 6 minutes MCD. Entrances are station points,
+not verified individual gates. Road approaches and surface transfers use OSRM.
+No claim of complete stop inventory, timetable precision or current disruptions.
+Rebuild: .venv/bin/python scripts/build_rail.py HH_METRO_JSON OUTPUT.json
+
+Previous v1/v2 network used ARyaskov/metro-ru revision
+018cfaf6aade6ff7f8fdb340e28a93b46eadfd48 (MIT; original data.mos.ru CC BY 3.0).
+METRO-LICENSE.txt is retained for provenance of that earlier snapshot.
+
+HH JSON SHA256: aa4e9b034e308e754daecd4c9f0e7b37c622e11b4fa7cc043a1b05f4ab363840

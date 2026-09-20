@@ -52,3 +52,48 @@ def test_fenced_json_is_accepted_but_unknown_points_are_not():
     assert e.explain(batch(),'sla')['source']=='yandexgpt'
     e=Explainer(send=lambda _:response('{"points":["coverage","invented"]}'))
     assert e.explain(batch(),'sla')['source']=='template'
+
+
+def test_recommendation_validates_choice_and_rejects_unknown_plan():
+    from field_router.llm import Explainer
+    b=batch()
+    def result(choice):return {'output':[{'content':[{'type':'output_text','text':json.dumps({'candidate_id':choice,'points':['coverage','changes']})}]}]}
+    e=Explainer(send=lambda _:result('sla'))
+    assert e.recommend(b)['candidate_id']=='sla'
+    assert e.recommend(b)['source']=='yandexgpt'
+    e=Explainer(send=lambda _:result('invented'))
+    assert e.recommend(b)['source']=='rule'
+
+
+def test_recommendation_cannot_reduce_emergency_coverage():
+    from field_router.llm import Explainer
+    b=batch();b['candidates'][0]['facts']['emergency_assigned']=1
+    other=deepcopy(b['candidates'][0]);other['id']='cost';other['facts']['emergency_assigned']=0;b['candidates'].append(other)
+    e=Explainer(send=lambda _: {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"cost","points":["coverage","changes"]}'}]}]})
+    r=e.recommend(b)
+    assert r['source']=='rule' and r['candidate_id']=='sla'
+
+
+def test_recommendation_explains_ties_without_repeating_three_plans():
+    from field_router.llm import recommendation_text
+    b=batch();other=deepcopy(b['candidates'][0]);other['id']='stable';b['candidates'].append(other)
+    text=recommendation_text(b,other,['coverage','changes'])
+    assert 'одинаковы' in text and 'без назначения — 1' in text
+    assert 'Меньше изменений' not in text
+
+
+def test_recommendation_explains_advantage_and_tradeoff():
+    from field_router.llm import recommendation_text
+    b=batch();other=deepcopy(b['candidates'][0]);other['id']='cost'
+    other['facts'].update(unassigned=2,reassigned=0);b['candidates'].append(other)
+    text=recommendation_text(b,b['candidates'][0],['coverage','changes'])
+    assert 'Наименьшее' in text and 'у лучшей альтернативы — 0' in text
+
+
+def test_recommendation_prompt_has_one_unambiguous_schema():
+    from field_router.llm import Explainer
+    def send(body):
+        assert '"candidate_id":"stable"' in body['input']
+        assert '"selected"' not in body['input']
+        return {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"sla","points":["coverage","changes"]}'}]}]}
+    assert Explainer(send=send).recommend(batch())['source']=='yandexgpt'

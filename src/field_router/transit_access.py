@@ -46,15 +46,29 @@ def build_access(geo,network,client,previous=None):
             points[key]=entry
     if 'transfers' in previous:transfers=previous['transfers']
     else:
-        stations=list(network.stations.values());pairs=[]
-        for i,a in enumerate(stations):
-            for b in stations[i+1:]:
-                if a['line']!=b['line'] and distance((a['lat'],a['lon']),(b['lat'],b['lon']))<=700:pairs.append((a['id'],b['id']))
-        for offset in range(0,len(pairs),35):
-            batch=pairs[offset:offset+35];ids=sorted({k for pair in batch for k in pair});indices={k:i for i,k in enumerate(ids)}
+        stations=list(network.access_stations.values());pairs=set()
+        rail=[s for s in stations if not s.get('surface')]
+        for a in rail:
+            for b in stations:
+                if a['id']==b['id'] or a['line']==b['line']:continue
+                if abs(a['lat']-b['lat'])>.007 or abs(a['lon']-b['lon'])>.013:continue
+                if distance((a['lat'],a['lon']),(b['lat'],b['lon']))<=700:pairs.add(tuple(sorted((a['id'],b['id']))))
+        pairs=sorted(pairs)
+        for batch in pair_batches(pairs):
+            ids=sorted({k for pair in batch for k in pair});indices={k:i for i,k in enumerate(ids)}
             get=table(client,[(network.stations[k]['lat'],network.stations[k]['lon']) for k in ids])
             for a,b in batch:
                 for start,end in ((a,b),(b,a)):
                     value=get(indices[start],indices[end])
                     if value is not None and value['minutes']<=20:transfers.append({'from':start,'to':end,**value})
     return {'network_signature':network.signature,'prepared_at':datetime.now(timezone.utc).isoformat(),'source':FOOT,'method':'road-to-station-point','max_snap_metres':150,'points':points,'transfers':transfers}
+
+
+def pair_batches(pairs,limit=90):
+    batch=[];nodes=set()
+    for pair in pairs:
+        if len(nodes|set(pair))>limit:
+            yield batch
+            batch=[];nodes=set()
+        batch.append(pair);nodes.update(pair)
+    if batch:yield batch

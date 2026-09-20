@@ -75,7 +75,7 @@
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
   }
   function resetCandidates(message) {
-    batch = null; selected = null; $('comparison-tools').hidden = true; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
+    batch = null; selected = null; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
     $('candidates').replaceChildren(element('div', message || 'Задайте событие и рассчитайте варианты.', 'empty'));
     $('diff-title').textContent = 'Изменения выбранного варианта';
     const row = element('tr'), cell = element('td', 'Выберите вариант для просмотра изменений.', 'muted');
@@ -268,9 +268,28 @@
     $('approval-note').textContent = 'К применению: ' + strategyName(candidate) + '. Потеряно назначений: ' + (candidate.facts.lost_assignments || 0) + '. Проверьте список выше.';
     controls();
   }
+  $('ai-recommend').addEventListener('click', async () => {
+    const current=batch;
+    if (!current || busy) return;
+    $('ai-recommend').disabled=true; $('ai-result').textContent='Сравниваем варианты…';
+    try {
+      const result=await request('/api/recommend',{version:current.version,batch_id:current.id});
+      if (batch!==current || state.version!==current.version) return;
+      const choice=current.candidates.find(c=>c.id===result.candidate_id);
+      if (!choice) throw new Error('Неизвестный вариант');
+      $('ai-result').textContent='Рекомендуем «'+strategyName(choice)+'». '+result.notice+' '+result.text;
+    } catch (_) {
+      if (batch===current) $('ai-result').textContent='ИИ недоступен. Сравните показатели и выберите вариант вручную.';
+    } finally {
+      if (batch===current) $('ai-recommend').disabled=false;
+    }
+  });
   function renderBatch(data) {
     if (!data || !Array.isArray(data.candidates) || data.version !== state.version) throw new Error('Варианты не соответствуют текущей версии.');
     batch = data; selected = null;
+    $('ai-panel').hidden=!data.llm_enabled || !data.candidates.length;
+    $('ai-recommend').disabled=false;
+    $('ai-result').textContent='ИИ сравнит варианты и предложит план. Утверждение остаётся за вами.';
     $('comparison-tools').hidden = false;
     $('replan-needed').hidden = true;
     $('observation-warnings').textContent = (data.observation_warnings || []).join(' ');
@@ -305,17 +324,6 @@
       if (candidate.emergency) { const e = candidate.emergency; card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + ' · ' + time(e.start) + '–' + time(e.end) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary')); }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
       card.append(dl); const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
-      if (data.llm_enabled) {
-        const ask=element('button','Объяснить с YandexGPT','secondary'), answer=element('p','', 'explanation');
-        ask.type='button'; explanation.append(ask,answer);
-        ask.addEventListener('click',async () => {
-          ask.disabled=true; answer.textContent='Готовим пояснение…';
-          try {
-            const result=await request('/api/explain',{version:data.version,batch_id:data.id,candidate_id:candidate.id});
-            answer.textContent=result.notice+' '+result.text;
-          } catch (_) { answer.textContent='Пояснение недоступно. Используйте показатели и базовое объяснение выше.'; }
-        });
-      }
 
       const button = element('button', 'Выбрать вариант', 'secondary'); button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.addEventListener('click', () => select(candidate)); card.append(button);
       return card;

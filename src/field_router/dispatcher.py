@@ -33,7 +33,7 @@ def _operation_context(payload: dict) -> tuple[str, str]:
     engineers = {item.get('id'): item.get('name', item.get('id'))
                  for item in payload.get('scenario', {}).get('engineers', [])}
     historical = operations.get('historical', operations.get('is_historical', False))
-    heading = 'История · только просмотр' if historical else 'Текущая версия'
+    heading = 'Предпросмотр · не применён' if operations.get('preview') else 'История · только просмотр' if historical else 'Текущая версия'
     mode = operations.get('mode', 'simulation')
     mode_label = {'simulation': 'Симуляция', 'manual': 'Ручной учёт',
                   'mixed': 'Ручные статусы + симуляция остальных'}.get(mode, mode)

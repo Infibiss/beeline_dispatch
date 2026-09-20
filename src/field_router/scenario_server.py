@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from .dispatcher import render_dispatcher
 from .address_service import AddressService
+from .crew import CrewService
 from .geo_http import CachedHttp
 from .models import Scenario, Plan
 from .replanning import ScenarioSession
@@ -37,6 +38,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
     path=Path(state_path)
     lock=threading.Lock()
     holder={'session':session}
+    crews=CrewService(address_service)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -84,10 +86,24 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     return self.reply(200,document.encode('utf-8'),'text/html; charset=utf-8',rendered=True)
                 except (ValueError,KeyError,TypeError) as exc:
                     return self.reply(400,{'error':str(exc)})
+            if self.path=='/api/crew':
+                with lock:self.reply(200,crews.settings(holder['session']))
+                return
+            if route.path in ('/crew-plan','/crew-report'):
+                try:
+                    query=parse_qs(route.query)
+                    with lock:candidate=crews.selected(holder['session'],{'id':query['id'][0],'version':int(query['version'][0])})
+                    preview=candidate.workbench();preview['operations']['preview']=True
+                    if route.path=='/crew-plan':
+                        report_url='/crew-report?id='+query['id'][0]+'&amp;version='+str(int(query['version'][0]))
+                        document=render_dispatcher(preview).replace('href="report.html"','href="'+report_url+'"',1)
+                    else:document=render_report(candidate.scenario,[candidate.plan])
+                    return self.reply(200,document.encode(),'text/html; charset=utf-8',rendered=True)
+                except (ValueError,KeyError,TypeError) as exc:return self.reply(400,{'error':str(exc)})
             if self.path=='/api/state':
                 with lock:self.reply(200,holder['session'].state())
                 return
-            files={'/':('scenarios.html','text/html; charset=utf-8'),'/scenarios.js':('scenarios.js','text/javascript; charset=utf-8'),'/scenarios.css':('scenarios.css','text/css; charset=utf-8')}
+            files={'/crew':('crew.html','text/html; charset=utf-8'),'/crew.js':('crew.js','text/javascript; charset=utf-8'),'/crew.css':('crew.css','text/css; charset=utf-8'),'/':('scenarios.html','text/html; charset=utf-8'),'/scenarios.js':('scenarios.js','text/javascript; charset=utf-8'),'/scenarios.css':('scenarios.css','text/css; charset=utf-8')}
             if route.path.startswith('/assets/'):
                 name=route.path[len('/assets/'):]
                 if name not in _ASSETS:return self.reply(404,{'error':'Не найдено'})
@@ -116,6 +132,15 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         temporary=path.with_suffix(path.suffix+'.tmp')
                         temporary.write_text(json.dumps(candidate.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
                         temporary.replace(path);holder['session']=candidate
+                    elif self.path=='/api/crew/preview':
+                        result=crews.preview(holder['session'],payload,time_limit=time_limit)
+                    elif self.path=='/api/crew/apply':
+                        candidate=crews.selected(holder['session'],payload)
+                        path.parent.mkdir(parents=True,exist_ok=True)
+                        temporary=path.with_suffix(path.suffix+'.tmp')
+                        temporary.write_text(json.dumps(candidate.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
+                        temporary.replace(path);holder['session']=candidate;crews.draft=None
+                        result=candidate.state()
                     elif self.path=='/api/preview':
                         result=holder['session'].preview(payload,time_limit=time_limit)
                     elif self.path in ('/api/approve','/api/facts','/api/mode'):

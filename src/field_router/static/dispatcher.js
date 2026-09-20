@@ -170,6 +170,17 @@
       fact(list,'Прибытие → начало → окончание',time(visit.arrival)+' → '+time(visit.start)+' → '+time(visit.end));
       fact(list,'Предыдущий переезд / ожидание',number(visit.travel_minutes)+' мин · '+km(visit.distance_m)+' км / '+Math.max(0,visit.start-visit.arrival)+' мин');
       fact(list,'Инженер / транспорт',(record.engineer?.name || record.route.engineer_id)+' · '+(TRANSPORT[record.engineer?.transport] || record.engineer?.transport || '—'));
+      if (record.engineer?.transport === 'public') {
+        const index=record.route.visits.findIndex(v=>v.request_id===request.id);
+        const origin=index>0?record.route.visits[index-1].request_id:record.engineer.start_location;
+        const aliases=geo.location_aliases || {};
+        const trip=geo.matrices?.public_journeys?.[aliases[origin] || origin]?.[aliases[request.id] || request.id];
+        if (trip && trip.minutes === visit.travel_minutes && trip.metres === visit.distance_m) {
+          const labels={walk:'Пешком',wait:'Ожидание',metro:'Метро',transfer:'Пересадка',estimate:'Средняя оценка транспорта'};
+          fact(list,'Состав переезда',trip.legs.map(x=>(labels[x.mode] || x.mode)+' '+x.minutes+' мин: '+x.origin+' → '+x.destination).join('; ') || 'В той же точке');
+          fact(list,'Точность транспорта',trip.kind==='walk'?'Пеший путь по дорожной матрице':trip.kind==='fallback'?'Вне покрытия метро: усреднённая оценка без известного маршрута':'Неполная сеть метро; время, подходы и пересадки — оценки без расписания');
+        } else fact(list,'Состав переезда','Для этого участка детализация отсутствует; время указано по модели плана.');
+      }
       fact(list,'Обоснование назначения',visit.explanation || 'Допустимо по ограничениям модели');
     } else fact(list,'Причина',record.unassigned?.reason || (plans.length?'В плане нет назначения этой заявки.':'План ещё не рассчитан.'),'reason');
     const equipment=request.equipment || {};

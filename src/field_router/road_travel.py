@@ -65,8 +65,9 @@ def build_matrices(geo:GeographyBundle,client,*,allow_public_estimate=False,endp
                       for j,d in enumerate(row)] for i,row in enumerate(distances['public'])]
     modes['public']={'kind':'estimate','source':'road distance from car profile; no transit timetable',
                      'speed_kmh':18,'boarding_minutes':7,'description':'Оценка: длина автомобильного пути / 18 км/ч + 7 мин; не маршрут автобуса/метро'}
-    return geo.model_copy(update={'modes':modes,'matrices':{'locations':ids,'minutes':times,'metres':distances,
-        'coordinates_signature':coordinates_signature(geo.locations)},'route_shapes':{}})
+    from .multimodal import apply_transit
+    return apply_transit(geo.model_copy(update={'modes':modes,'matrices':{'locations':ids,'minutes':times,'metres':distances,
+        'coordinates_signature':coordinates_signature(geo.locations)},'route_shapes':{}}))
 
 
 def bundle_travel(geo:GeographyBundle):

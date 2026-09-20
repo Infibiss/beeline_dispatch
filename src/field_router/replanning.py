@@ -119,7 +119,7 @@ class ScenarioSession:
                 'needs_replanning':self.needs_replanning,'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values()))},
             'validation':{'valid':not self.needs_replanning,'violations':[]}}
         if self.geography:
-            payload['geography']={**self.geography.model_dump(mode='json'),'locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},'route_shapes':self.geography.route_shapes if self.version==1 else {}}
+            payload['geography']={**self.geography.model_dump(mode='json'),'location_aliases':dict(self.aliases),'locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},'route_shapes':self.geography.route_shapes if self.version==1 else {}}
         self.views[self.version]=payload
 
     def workbench(self,version=None):

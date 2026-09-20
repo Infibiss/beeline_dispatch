@@ -54,7 +54,7 @@
     return nearest;
   }
   function priorityLabel(priority) {
-    return {urgent:'Срочный · высший уровень',high:'Высокий · высший уровень'}[priority] || 'Обычный';
+    return {urgent:'Авария · максимальный приоритет',high:'Подключение · после аварий'}[priority] || 'Обычный';
   }
   function prioritySummary(scenario, plan) {
     const top=(scenario.requests || []).filter(request=>['urgent','high'].includes(request.priority));
@@ -135,7 +135,7 @@
     $('plan-status').textContent = STATUS[plan.status] || plan.status || 'Расчёт не выполнен';
     if (plan.solver === 'ortools') $('plan-status').textContent += ' · Оптимальность не гарантируется';
     const top=prioritySummary(scenario,plan);
-    $('plan-status').textContent += ' · Высший уровень: '+top.served+' / '+top.total+'. Аварийные заявки и новые подключения равноприоритетны.';
+    $('plan-status').textContent += ' · Аварии и подключения: '+top.served+' / '+top.total+'. Приоритет: авария → подключение → ремонт / дозаказ.';
   }
   function renderList() {
     $('request-count').textContent=String(filtered.length);

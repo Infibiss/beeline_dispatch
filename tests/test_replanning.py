@@ -116,3 +116,19 @@ def test_explicit_cancellation_is_not_a_lost_assignment(make_scenario):
     s,p=demo(make_scenario);session=ScenarioSession(s,p)
     batch=session.preview({'version':1,'event':{'id':'cancel','type':'cancel','time':540,'request_id':'b'}},time_limit=.03)
     assert all(c['facts']['lost_assignments']==0 for c in batch['candidates'])
+
+
+def test_new_emergency_default_norm_is_100_and_cannot_start_before_arrival(make_scenario):
+    from field_router.replanning import Event, ScenarioSession
+    s,p=demo(make_scenario)
+    from field_router.models import Skill
+    s=s.model_copy(update={'engineers':[e.model_copy(update={'skills':[Skill.LOCAL,Skill.EMERGENCY]}) for e in s.engineers]})
+    session=ScenarioSession(s,p)
+    assert Event(id='new',type='emergency',time=600).duration_minutes==100
+    batch=session.preview({'version':1,'event':{'id':'arrived','type':'emergency','time':600,'anchor_id':'a'},'preserve_in_progress':True},time_limit=.05)
+    assert all(c['emergency']['assigned'] for c in batch['candidates'])
+    for candidate in batch['candidates']:
+        for route in candidate['plan']['routes']:
+            for visit in route['visits']:
+                if visit['request_id']=='emergency:arrived':
+                    assert visit['start']>=600 and visit['end']-visit['start']==100

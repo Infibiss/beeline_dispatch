@@ -83,8 +83,11 @@ def choose_candidate(address,features,*,source='Photon / OpenStreetMap'):
 def addresses(scenario):
     result={r.id:r.address for r in scenario.requests}
     for e in scenario.engineers:
-        if e.start_location!='office': raise ValueError('Для нестандартных стартов требуется отдельный источник адресов')
-        result[e.start_location]=scenario.office_address
+        address = scenario.office_address if e.start_location=='office' else e.start_address or result.get(e.start_location)
+        if not address: raise ValueError('Для нестандартных стартов требуется отдельный источник адресов')
+        if e.start_location in result and result[e.start_location] != address:
+            raise ValueError('Противоречивые адреса одной стартовой точки')
+        result[e.start_location]=address
     return result
 
 

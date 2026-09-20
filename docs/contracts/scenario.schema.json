@@ -21,6 +21,18 @@
           "title": "Start Location",
           "type": "string"
         },
+        "start_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Address"
+        },
         "shift": {
           "$ref": "#/$defs/TimeWindow"
         },

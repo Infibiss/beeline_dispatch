@@ -22,7 +22,7 @@ class Event(Model):
     request_id: str | None = None
     engineer_id: str | None = None
     anchor_id: str | None = None
-    duration_minutes: int = Field(default=80,gt=0,le=1440,strict=True)
+    duration_minutes: int = Field(default=100,gt=0,le=1440,strict=True)
     router: int = Field(default=0,ge=0,le=100,strict=True)
 
 
@@ -47,7 +47,11 @@ def differences(before,after,ids):
 def facts_for(scenario,plan,diff):
     assigned={v.request_id for r in plan.routes for v in r.visits}
     high={r.id for r in scenario.requests if r.priority in ('high','urgent')}
+    urgent={r.id for r in scenario.requests if r.priority=='urgent'}
+    connections={r.id for r in scenario.requests if r.priority=='high'}
     return {**plan.metrics.model_dump(),'high_assigned':len(high & assigned),'high_total':len(high),
+        'emergency_assigned':len(urgent & assigned),'emergency_total':len(urgent),
+        'connection_assigned':len(connections & assigned),'connection_total':len(connections),
         'lost_assignments':sum(d['before_engineer'] is not None and d['after_engineer'] is None for d in diff),
         'new_assignments':sum(d['before_engineer'] is None and d['after_engineer'] is not None for d in diff),
         'reassigned':sum(d['before_engineer'] is not None and d['after_engineer'] is not None and d['before_engineer']!=d['after_engineer'] for d in diff),
@@ -57,7 +61,7 @@ def facts_for(scenario,plan,diff):
 
 def explanation(facts):
     return (f"В оставшейся части дня назначено {facts['assigned']} заявок, без назначения — {facts['unassigned']}. "
-            f"Высший приоритет: {facts['high_assigned']} из {facts['high_total']}. "
+            f"Аварии: {facts['emergency_assigned']} из {facts['emergency_total']}; подключения: {facts['connection_assigned']} из {facts['connection_total']}. "
             f"Смена инженера у {facts['reassigned']} заявок; сдвиг начала у {facts['shifted']}. "
             f"Оставшийся путь: {facts['distance_m']/1000:.1f} км. "
             "Вариант проверен на окна, смены, навыки и доступное оборудование. Оптимальность не доказана.")

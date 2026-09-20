@@ -71,14 +71,14 @@ def test_dispatcher_loadout_totals_russian_labels_and_optimality_limit():
     assert html.index('Утренняя загрузка') < html.index('<details class="route"')
 
 
-def test_report_counts_emergency_and_new_connection_as_equal_top_priority():
+def test_report_explains_distinct_priority_tiers():
     scenario, plan = fixture()
     urgent = scenario.requests[0].model_copy(update={'id': 'emergency', 'priority': 'urgent'})
     high = scenario.requests[0].model_copy(update={'priority': 'high'})
     scenario = scenario.model_copy(update={'requests': [urgent, high]})
     html = render(scenario, [plan])
-    assert 'Высший уровень, выполнено / всего' in html
+    assert 'Аварии + подключения, назначено / всего' in html
     assert '<td>1 / 2</td>' in html
-    assert 'Аварийные заявки и новые подключения имеют одинаковый высший приоритет' in html
-    assert 'Высокий · высший уровень' in html
-    assert 'Срочный · высший уровень' in html
+    assert 'Приоритет: аварии, затем подключения, затем ремонт и дозаказы' in html
+    assert 'Подключение · после аварий' in html
+    assert 'Авария · максимальный приоритет' in html

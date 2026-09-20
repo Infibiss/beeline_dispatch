@@ -53,7 +53,7 @@ def prepare_scenario(source: ImportResult, region: str, config: dict, *, synthet
                 "duration":"A01/A02/I03: config.work_rules, XLSX technical + documents",
                 "equipment":"A09/I04: seeded synthetic demand",
                 "coordinates":"A12: synthetic Cartesian plane, not actual address location",
-                "priority":f"I01: config.work_rules[{raw.bk_type}].priority={rule['priority']}; high and urgent share one tier",
+                "priority":f"I01: config.work_rules[{raw.bk_type}].priority={rule['priority']}; urgent > high > normal",
                 "windows":"Original CSV start/end preserved; priority does not alter customer windows",
                 "order":"I01: CSV row order"}))
     if engineers is None:
@@ -67,6 +67,10 @@ def prepare_scenario(source: ImportResult, region: str, config: dict, *, synthet
                 shift=TimeWindow(start=start,end=end),skills=cfg["skill_sets"][i % len(cfg["skill_sets"])],
                 transport=mode))
     for e in engineers:
+        if e.start_location not in points and e.start_address:
+            rng = _rng(seed, f"{region}:{e.start_address}:home")
+            radius = config['geography']['radius_km']
+            points[e.start_location] = Point(x_km=rng.uniform(-radius,radius), y_km=rng.uniform(-radius,radius))
         if e.start_location not in points:
             raise ValueError(f"Нет координат стартовой точки {e.start_location}")
     return Scenario(id=f"{region}-{source.requests[0].date}",region=region,date=source.requests[0].date,

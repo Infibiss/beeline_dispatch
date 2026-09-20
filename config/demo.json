@@ -1,38 +1,119 @@
 {
-  "version": "demo-2-priority",
+  "version": "demo-3-organizer-2026-09-20",
   "seed": 40,
   "engineers": {
     "count": 15,
     "early_count": 8,
-    "early_shift": [540, 1080],
-    "late_shift": [780, 1320],
-    "transports": ["public", "public", "public", "public", "public", "public", "public", "public", "public", "car", "car", "car", "walk", "walk", "bicycle"],
-    "skill_sets": [["local", "connection", "emergency"], ["local", "connection"], ["connection"], ["local"], ["local", "emergency"]]
+    "early_shift": [
+      540,
+      1080
+    ],
+    "late_shift": [
+      780,
+      1320
+    ],
+    "transports": [
+      "public",
+      "public",
+      "public",
+      "public",
+      "public",
+      "public",
+      "public",
+      "public",
+      "public",
+      "car",
+      "car",
+      "car",
+      "walk",
+      "walk",
+      "bicycle"
+    ],
+    "skill_sets": [
+      [
+        "local",
+        "connection",
+        "emergency"
+      ],
+      [
+        "local",
+        "connection"
+      ],
+      [
+        "connection"
+      ],
+      [
+        "local"
+      ],
+      [
+        "local",
+        "emergency"
+      ]
+    ]
   },
   "work_rules": {
-    "Подключение": {"skill": "connection", "duration_minutes": 70, "priority": "high"},
-    "Дозаказ": {"skill": "connection", "duration_minutes": 20, "priority": "normal"},
-    "Локальная заявка": {"skill": "local", "duration_minutes": 30, "priority": "normal"},
-    "Глобальная проблема": {"skill": "emergency", "duration_minutes": 80, "priority": "urgent"}
+    "Подключение": {
+      "skill": "connection",
+      "duration_minutes": 70,
+      "priority": "high"
+    },
+    "Дозаказ": {
+      "skill": "connection",
+      "duration_minutes": 20,
+      "priority": "normal"
+    },
+    "Локальная заявка": {
+      "skill": "local",
+      "duration_minutes": 30,
+      "priority": "normal"
+    },
+    "Глобальная проблема": {
+      "skill": "emergency",
+      "duration_minutes": 100,
+      "priority": "urgent"
+    }
   },
-  "equipment": {"router_probability": 0.5, "tv_box_probability": 0.2},
-  "geography": {"radius_km": 8.0, "cluster_radius_km": 1.5},
+  "equipment": {
+    "router_probability": 0.5,
+    "tv_box_probability": 0.2
+  },
+  "geography": {
+    "radius_km": 8.0,
+    "cluster_radius_km": 1.5
+  },
   "travel": {
     "kind": "synthetic_euclidean",
-    "speed_kmh": {"car": 25, "walk": 4.5, "bicycle": 12, "public": 18},
-    "distance_factor": {"car": 1.3, "walk": 1.15, "bicycle": 1.2, "public": 1.3},
-    "boarding_minutes": {"car": 0, "walk": 0, "bicycle": 0, "public": 7}
+    "speed_kmh": {
+      "car": 25,
+      "walk": 4.5,
+      "bicycle": 12,
+      "public": 18
+    },
+    "distance_factor": {
+      "car": 1.3,
+      "walk": 1.15,
+      "bicycle": 1.2,
+      "public": 1.3
+    },
+    "boarding_minutes": {
+      "car": 0,
+      "walk": 0,
+      "bicycle": 0,
+      "public": 7
+    }
   },
   "assumptions": [
     "A01: время на объекте отдельно от дороги; нормативы сохранены в generation_config.work_rules",
-    "A02: Информация/Мониторинг используют норматив глобальной проблемы из конфигурации (демо: 80 минут)",
+    "A02: Информация/Мониторинг используют норматив глобальной проблемы из конфигурации (норматив организаторов: 100 минут)",
     "A03–A07: заменяемый справочник инженеров; фактический состав и смены сохранены в сценарии",
     "A08–A11: роутеры/приставки под план; stock=null означает достаточную утреннюю выдачу, заданные остатки ограничивают маршрут; днем нет передач и пополнения",
     "A12: синтетические координаты в километрах, НЕ геокодирование московских адресов",
-    "I01: порядок поступления = порядок строк CSV; приоритет задается work_rules: high и urgent равны в целевой функции и выше normal; в демо новые подключения high, аварии urgent; политика пересматривается конфигурацией, исходные окна CSV не изменяются",
+    "I01: порядок поступления = порядок строк CSV; приоритет задается work_rules: urgent (аварии) выше high (подключения), затем normal (ремонт/дозаказ); в демо новые подключения high, аварии urgent; политика пересматривается конфигурацией, исходные окна CSV не изменяются",
     "I02: распределение смен/транспорта/навыков задается конфигурацией; при импорте используются предоставленные инженеры",
     "I03: правила BK заданы таблицей; дополнительные устройства не добавляют время поверх норматива",
     "I04: независимая синтетическая потребность в одном роутере/приставке с вероятностями из сохраненной конфигурации; явные замены требуют соответствующее устройство",
-    "I05: расстояние по синтетической плоскости с коэффициентом; скорости/посадка условны и не являются измерениями Москвы"
+    "I05: расстояние по синтетической плоскости с коэффициентом; скорости/посадка условны и не являются измерениями Москвы",
+    "I34: ВК — Beekeeper, HD — HelpDesk; соответствие классификаторов задается work_rules, это не отдельные виды работ",
+    "I35: время поступления исходных аварий не указано; исходные окна сохраняются. Для новых аварий время события — поступление, начало не раньше него"
   ]
 }

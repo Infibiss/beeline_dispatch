@@ -280,7 +280,8 @@
     const table = element('table'), head = element('tr');
     ['Показатель', ...ordered.map(strategyName)].forEach(label => head.append(element('th', label))); table.append(head);
     const metricsRows = [
-      ['Приоритетные назначены', c => c.facts.high_assigned + ' / ' + c.facts.high_total],
+      ['Аварии назначены', c => c.facts.emergency_assigned + ' / ' + c.facts.emergency_total],
+      ['Подключения назначены', c => c.facts.connection_assigned + ' / ' + c.facts.connection_total],
       ['Без назначения', c => c.facts.unassigned],
       ['Потеряно назначений', c => c.facts.lost_assignments],
       ['Начало новой аварии', c => c.emergency ? (c.emergency.assigned ? time(c.emergency.start) : 'Не назначена') : '—'],

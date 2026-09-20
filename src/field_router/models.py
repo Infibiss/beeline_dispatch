@@ -57,7 +57,7 @@ class Request(Model):
     duration_minutes: int = Field(gt=0, le=1440, strict=True)
     skill: Skill
     required_transport: Transport | None = None
-    # high (new connection) and urgent (emergency) share the same objective tier.
+    # Emergency > connection > repair/additional order.
     priority: Priority = "normal"
     equipment: Equipment = Field(default_factory=Equipment)
     source_line: int | None = None
@@ -69,6 +69,7 @@ class Engineer(Model):
     name: str
     region: str
     start_location: str = "office"
+    start_address: str | None = None
     shift: TimeWindow
     skills: list[Skill] = Field(min_length=1, max_length=3)
     transport: Transport

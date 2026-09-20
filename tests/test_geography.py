@@ -122,3 +122,11 @@ def test_approximate_location_requires_explanation_and_original_address():
     point=GeoLocation(lat=55.7,lon=37.7,quality='approximate',source='Photon',
         original_address='Москва, дом 9Бс1',label='Москва, дом 9',approximation_reason='Согласован соседний дом')
     assert point.original_address!='' and point.approximation_reason
+
+
+def test_home_start_uses_its_own_address(make_scenario):
+    from conftest import engineer, job
+    from field_router.geography import addresses
+    e=engineer().model_copy(update={'start_location':'home:e1','start_address':'Кашира, Садовая улица, 1'})
+    s=make_scenario([job('a')],[e])
+    assert addresses(s)['home:e1']=='Кашира, Садовая улица, 1'

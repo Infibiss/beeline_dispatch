@@ -1,6 +1,7 @@
 """OR-Tools VRPTW adapter, open routes, service time, compatibility and devices.
 
-Objective bounds preserve lexicographic priority: high-tier coverage, total coverage,
+Emergency coverage is seeded first and protected by a hard lower bound.
+Then objective bounds preserve connection coverage, total coverage,
 used engineers, metres. Local search is time-limited, not an optimality proof.
 """
 import math
@@ -26,7 +27,8 @@ def _reference_visits(scenario, reference):
 
 def objective_key(plan, scenario, *, profile=None, reference=None):
     high_tier = {r.id for r in scenario.requests if r.priority in ("high", "urgent")}
-    coverage = (sum(u.request_id in high_tier for u in plan.unassigned), plan.metrics.unassigned)
+    urgent = {r.id for r in scenario.requests if r.priority == "urgent"}
+    coverage = (sum(u.request_id in urgent for u in plan.unassigned), sum(u.request_id in high_tier for u in plan.unassigned), plan.metrics.unassigned)
     resources = (plan.metrics.engineers_used, plan.metrics.distance_m)
     visits = [(r.engineer_id, v) for r in plan.routes for v in r.visits]
     if profile == "sla":
@@ -40,7 +42,7 @@ def objective_key(plan, scenario, *, profile=None, reference=None):
 
 
 class OrToolsSolver:
-    def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference: Plan | None = None):
+    def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference: Plan | None = None, _priority_seed=True):
         if profile not in (None, "sla", "stable", "cost"):
             raise ValueError("Unknown objective profile")
         prior = _reference_visits(scenario, reference)
@@ -52,6 +54,19 @@ class OrToolsSolver:
         if not jobs:
             return baseline.model_copy(update={"solver":"ortools","status":"empty"})
         n, v = len(jobs), len(engineers)
+        urgent_ids = {r.id for r in jobs if r.priority == 'urgent'}
+        urgent_floor = 0
+        if _priority_seed and urgent_ids:
+            urgent_scenario = scenario.model_copy(update={'requests':[r for r in jobs if r.id in urgent_ids]})
+            urgent_plan = self.solve(urgent_scenario, travel, time_limit_seconds=time_limit_seconds*.3,
+                                    _priority_seed=False)
+            seed = make_plan(scenario, travel,
+                {r.engineer_id:[x.request_id for x in r.visits] for r in urgent_plan.routes},
+                'baseline','emergency_coverage_seed')
+            if objective_key(seed,scenario,profile=profile,reference=reference) < objective_key(baseline,scenario,profile=profile,reference=reference):
+                baseline = seed
+            urgent_floor = sum(v.request_id in urgent_ids for r in baseline.routes for v in r.visits)
+            time_limit_seconds *= .7
         manager = pywrapcp.RoutingIndexManager(n+1,v,0)
         routing = pywrapcp.RoutingModel(manager)
         max_edge = 0
@@ -75,28 +90,37 @@ class OrToolsSolver:
                 node = manager.IndexToNode(j)
                 changed = (node > 0 and jobs[node-1].id in prior
                            and prior[jobs[node-1].id][0] != engineer_id)
-                return distances[manager.IndexToNode(i)][node] + reassignment_cost * changed
+                return math.ceil(distances[manager.IndexToNode(i)][node] / distance_unit) + reassignment_cost * changed
 
             time_evaluators.append(routing.RegisterTransitCallback(transit))
             routing.SetArcCostEvaluatorOfVehicle(routing.RegisterTransitCallback(cost),vehicle)
 
         # A route set has <= n travel legs. Larger conservative bound is harmless.
-        distance_bound = (n+v)*max_edge
-        engineer_cost = distance_bound+1
-        resource_bound = v*engineer_cost+distance_bound
-        shift_cost = reassignment_cost = 0
-        if profile in ("sla", "stable"):
-            shift_cost = resource_bound + 1
-            resource_bound += n * 1440 * shift_cost
-        if profile == "stable":
-            reassignment_cost = resource_bound + 1
-            resource_bound += n * reassignment_cost
-        # One ordinary assignment dominates all possible engineer/distance costs;
-        # one high-tier assignment dominates all n ordinary drops plus those costs.
-        drop_penalty = resource_bound+1
-        high_priority_bonus = n*drop_penalty+resource_bound+1
-        if n*(drop_penalty+high_priority_bonus)+resource_bound >= 2**60:
-            raise ValueError("Input too large for safe integer objective weights")
+        # Scale only secondary search distance costs if integer bounds require it.
+        # Reported route distances and candidate comparison keep exact metres.
+        distance_unit = 1
+        while True:
+            distance_bound = (n+v)*math.ceil(max_edge/distance_unit)
+            engineer_cost = distance_bound+1
+            resource_bound = v*engineer_cost+distance_bound
+            shift_cost = reassignment_cost = 0
+            if profile in ("sla", "stable"):
+                shift_cost = resource_bound+1
+                resource_bound += n*1440*shift_cost
+            if profile == "stable":
+                reassignment_cost = resource_bound+1
+                resource_bound += n*reassignment_cost
+            drop_penalty = resource_bound+1
+            high_priority_bonus = n*drop_penalty+resource_bound+1
+            if n*(drop_penalty+high_priority_bonus)+resource_bound < 2**60:
+                break
+            if distance_unit >= max(1,max_edge):
+                raise ValueError("Input too large for safe integer objective weights")
+            distance_unit *= 10
+        if urgent_floor:
+            routing.solver().Add(routing.solver().Sum([
+                routing.ActiveVar(manager.NodeToIndex(i+1)) for i,r in enumerate(jobs) if r.id in urgent_ids
+            ]) >= urgent_floor)
         for vehicle in range(v):
             routing.SetFixedCostOfVehicle(engineer_cost,vehicle)
         routing.AddDimensionWithVehicleTransits(time_evaluators,1440,1440,False,"Time")
@@ -146,12 +170,13 @@ class OrToolsSolver:
         warm = routing.ReadAssignmentFromRoutes([base_routes.get(e.id,[]) for e in engineers],True)
         solution = routing.SolveFromAssignmentWithParameters(warm,params) if warm is not None else routing.SolveWithParameters(params)
         diagnostics = {"routing_status":routing.status(),"time_limit_seconds":time_limit_seconds,
-                       "objective": "high_tier_unassigned, unassigned, " + {
+                       "objective": "emergency_unassigned, connection_unassigned, unassigned, " + {
                            "stable":"reassigned, absolute_start_shift, engineers_used, distance_m",
                            "sla":"high_tier_start_sum, engineers_used, distance_m",
                        }.get(profile,"engineers_used, distance_m"),
                        "profile":profile,
-                       "priority_tiers":{"high":["high","urgent"],"normal":["normal"]},
+                       "priority_tiers":{"emergency":["urgent"],"connection":["high"],"other":["normal"]},
+                       "emergency_coverage_floor":urgent_floor,"search_distance_unit_metres":distance_unit,
                        "optimality_proven":False,"warm_start":warm is not None,
                        "weights":{"start_minute":shift_cost,"reassignment":reassignment_cost,"engineer":engineer_cost,"high_priority_bonus":high_priority_bonus,"drop":drop_penalty}}
         if solution is None:

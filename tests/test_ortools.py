@@ -84,7 +84,7 @@ def test_one_high_tier_job_takes_precedence_over_two_normal_jobs(make_scenario, 
     assert not validate_plan(s,t,optimized)
 
 
-def test_emergency_and_connection_have_equal_rank_then_total_coverage_breaks_tie(make_scenario):
+def test_emergency_precedes_connection_and_total_coverage(make_scenario):
     from field_router.solvers.ortools_solver import objective_key
     from field_router.planning import make_plan
 
@@ -94,10 +94,10 @@ def test_emergency_and_connection_have_equal_rank_then_total_coverage_breaks_tie
     t = travel(s)
     emergency_only = make_plan(s,t,{"e1":["emergency"]},"test","test")
     connection_only = make_plan(s,t,{"e1":["connection"]},"test","test")
-    assert objective_key(emergency_only,s) == objective_key(connection_only,s)
+    assert objective_key(emergency_only,s) < objective_key(connection_only,s)
     p = OrToolsSolver().solve(s,t,time_limit_seconds=.3)
-    assert [v.request_id for v in p.routes[0].visits] == ["connection", "normal"]
-    assert objective_key(p,s) < objective_key(emergency_only,s)
+    assert [v.request_id for v in p.routes[0].visits] == ["emergency"]
+    assert objective_key(p,s) == objective_key(emergency_only,s)
 
 
 def test_coverage_takes_precedence_over_extra_engineer(make_scenario):

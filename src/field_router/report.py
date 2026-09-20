@@ -17,7 +17,7 @@ def _json(value) -> str:
     return _e(json.dumps(value, ensure_ascii=False, indent=2, default=str))
 
 
-_PRIORITY = {"urgent": "Срочный · высший уровень", "high": "Высокий · высший уровень", "normal": "Обычный"}
+_PRIORITY = {"urgent": "Авария · максимальный приоритет", "high": "Подключение · после аварий", "normal": "Обычный"}
 _TRANSPORT = {"car": "Автомобиль", "walk": "Пешком", "bicycle": "Велосипед", "public": "Общественный транспорт"}
 _STATUS = {
     "FEASIBLE": "Допустимое решение", "OPTIMAL": "Оптимальное решение",
@@ -73,12 +73,12 @@ def render_report(scenario: Scenario, plans: list[Plan]) -> str:
              f'<div class="grid"><div class="stat"><b>{len(scenario.requests)}</b>заявок в сценарии</div>'
              f'<div class="stat"><b>{len(scenario.engineers)}</b>доступных инженеров</div>'
              f'<div class="stat"><b>{len(plans)}</b>вариантов плана</div></div>',
-             '<h2>Сравнение вариантов</h2><p class="muted">Аварийные заявки и новые подключения имеют одинаковый высший приоритет. После них учитывается общее число обслуженных заявок.</p>']
+             '<h2>Сравнение вариантов</h2><p class="muted">Приоритет: аварии, затем подключения, затем ремонт и дозаказы.</p>']
     if not plans:
         parts.append('<p>Планы отсутствуют. Выполните расчёт для этого сценария.</p>')
     else:
         parts.append('<div class="card scroll"><table><thead><tr><th>Алгоритм / статус</th>'
-                     '<th>Назначено</th><th>Высший уровень, выполнено / всего</th><th>Не назначено</th><th>Инженеров</th><th>Путь, км</th>'
+                     '<th>Назначено</th><th>Аварии + подключения, назначено / всего</th><th>Не назначено</th><th>Инженеров</th><th>Путь, км</th>'
                      '<th>В пути, мин</th><th>Работа, мин</th><th>Расчёт, с</th></tr></thead><tbody>')
         for plan in plans:
             m = plan.metrics

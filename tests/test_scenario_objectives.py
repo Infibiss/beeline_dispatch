@@ -53,10 +53,11 @@ def test_bad_profile_rejected(make_scenario):
         OrToolsSolver().solve(s,travel(s),profile='invented')
 
 
-def test_profile_weights_fail_closed_on_overflow(make_scenario):
+def test_profile_weights_scale_secondary_distance_without_overflow(make_scenario):
     s = make_scenario([job('a')])
-    with pytest.raises(ValueError,match='safe integer'):
-        OrToolsSolver().solve(s,travel(s,metres=10**15),profile='stable',time_limit_seconds=.1)
+    p=OrToolsSolver().solve(s,travel(s,metres=10**15),profile='stable',time_limit_seconds=.1)
+    assert p.diagnostics['search_distance_unit_metres'] > 1
+    assert not validate_plan(s,travel(s,metres=10**15),p)
 
 
 def test_stable_reconstructs_waiting_and_arrivals_for_multiple_visits(make_scenario):
@@ -79,3 +80,11 @@ def test_default_and_cost_keep_same_objective_order(make_scenario):
     cost = OrToolsSolver().solve(s,t,profile='cost',time_limit_seconds=.1)
     assert objective_key(default,s) == objective_key(cost,s,profile='cost')
     assert default.metrics.engineers_used == 1
+
+@pytest.mark.parametrize('profile', ['sla','stable','cost'])
+def test_emergency_precedes_two_connections(make_scenario, profile):
+    s=make_scenario([job('connection1',start=600,end=600,duration=30,priority='high'),
+                     job('connection2',start=640,end=640,duration=30,priority='high'),
+                     job('emergency',start=600,end=600,duration=100,priority='urgent')], [engineer(end=700)])
+    p=OrToolsSolver().solve(s,travel(s),profile=profile,time_limit_seconds=.2)
+    assert [v.request_id for r in p.routes for v in r.visits]==['emergency']

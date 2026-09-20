@@ -116,13 +116,13 @@ console.log(JSON.stringify([
     assert json.loads(result.stdout) == ['61540', '61540', '77563', None]
 
 
-def test_urgent_and_high_share_top_tier_and_coverage_is_counted_once():
+def test_priority_labels_distinguish_emergency_and_connection():
     result = run_js('''
 const scenario={requests:[{id:'emergency',priority:'urgent'},{id:'new',priority:'high'},{id:'normal',priority:'normal'}]};
 const plan={routes:[{visits:[{request_id:'new'},{request_id:'normal'},{request_id:'new'}]}]};
 console.log(JSON.stringify({labels:['urgent','high','normal'].map(core.priorityLabel),summary:core.prioritySummary(scenario,plan)}));
 ''')
     assert json.loads(result.stdout) == {
-        'labels': ['Срочный · высший уровень', 'Высокий · высший уровень', 'Обычный'],
+        'labels': ['Авария · максимальный приоритет', 'Подключение · после аварий', 'Обычный'],
         'summary': {'served': 1, 'total': 2},
     }

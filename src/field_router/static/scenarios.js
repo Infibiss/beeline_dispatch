@@ -305,6 +305,18 @@
       if (candidate.emergency) { const e = candidate.emergency; card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + ' · ' + time(e.start) + '–' + time(e.end) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary')); }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
       card.append(dl); const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
+      if (data.llm_enabled) {
+        const ask=element('button','Объяснить с YandexGPT','secondary'), answer=element('p','', 'explanation');
+        ask.type='button'; explanation.append(ask,answer);
+        ask.addEventListener('click',async () => {
+          ask.disabled=true; answer.textContent='Готовим пояснение…';
+          try {
+            const result=await request('/api/explain',{version:data.version,batch_id:data.id,candidate_id:candidate.id});
+            answer.textContent=result.notice+' '+result.text;
+          } catch (_) { answer.textContent='Пояснение недоступно. Используйте показатели и базовое объяснение выше.'; }
+        });
+      }
+
       const button = element('button', 'Выбрать вариант', 'secondary'); button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.addEventListener('click', () => select(candidate)); card.append(button);
       return card;
     });

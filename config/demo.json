@@ -1,5 +1,5 @@
 {
-  "version": "demo-3-organizer-2026-09-20",
+  "version": "demo-4-emergency-80",
   "seed": 40,
   "engineers": {
     "count": 15,
@@ -69,7 +69,7 @@
     },
     "Глобальная проблема": {
       "skill": "emergency",
-      "duration_minutes": 100,
+      "duration_minutes": 80,
       "priority": "urgent"
     }
   },

@@ -1,6 +1,8 @@
 import json
 import threading
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener, ProxyHandler
+# Local HTTP contract tests must not inherit an external proxy.
+urlopen=build_opener(ProxyHandler({})).open
 from urllib.error import HTTPError
 import pytest
 from test_replanning import demo
@@ -151,3 +153,30 @@ def test_new_get_routes_reject_foreign_origin_and_host(unified_server):
                 response.read()
             finally:
                 connection.close()
+
+
+def test_llm_explains_without_mutating_batch_and_stale_request_rejected(make_scenario,tmp_path):
+    from field_router.replanning import ScenarioSession
+    from field_router.scenario_server import create_server
+    from field_router.llm import Explainer
+    s,p=demo(make_scenario);session=ScenarioSession(s,p);calls=[]
+    def send(body):
+        calls.append(body)
+        return {'output':[{'content':[{'type':'output_text','text':'{"points":["coverage","changes"]}'}]}]}
+    server=create_server(session,tmp_path/'state.json',port=0,time_limit=.03,explainer=Explainer(send=send))
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    def post(route,data):
+        with urlopen(Request(f'http://127.0.0.1:{server.server_port}'+route,data=json.dumps(data).encode(),headers={'Content-Type':'application/json'})) as r:return json.load(r)
+    try:
+        b=post('/api/preview',{'version':1,'event':{'id':'r','type':'replan','time':540}})
+        assert b['llm_enabled']
+        payload={'version':1,'batch_id':b['id'],'candidate_id':'stable'}
+        assert post('/api/explain',payload)['source']=='yandexgpt'
+        post('/api/explain',payload)
+        assert len(calls)==1
+        # Approval still verifies the original fingerprint after explanation.
+        assert post('/api/approve',payload)['version']==2
+        with pytest.raises(HTTPError):post('/api/explain',payload)
+        assert len(calls)==1
+    finally:
+        server.shutdown();server.server_close();thread.join()

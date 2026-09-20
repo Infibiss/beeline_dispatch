@@ -16,6 +16,7 @@ def test_shipped_road_demo_is_valid_and_restorable(region):
     scenario = Scenario.model_validate(payload['scenario'])
     geo = GeographyBundle.model_validate(payload['geography'])
     plans = [Plan.model_validate(p) for p in payload['plans']]
+    assert all(r.duration_minutes==80 for r in scenario.requests if r.skill.value=="emergency")
     assert not geo.unresolved
     assert any(p.quality == 'approximate' for p in geo.locations.values())
     for plan in plans:

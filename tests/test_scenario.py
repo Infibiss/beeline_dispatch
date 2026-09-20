@@ -21,7 +21,7 @@ def test_preparation_is_reproducible_and_marks_synthetic_geography():
     assert a.metadata["geography"] == "synthetic_cartesian_km"
     assert a.requests[0].address == source.requests[0].address
     assert all(r.provenance["duration"] for r in a.requests)
-    assert all(r.duration_minutes == 100 for r in a.requests if r.bk_type == "Глобальная проблема")
+    assert all(r.duration_minutes == 80 for r in a.requests if r.bk_type == "Глобальная проблема")
     assert Scenario.model_validate_json(a.model_dump_json()) == a
 
 

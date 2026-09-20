@@ -22,7 +22,7 @@ class Event(Model):
     request_id: str | None = None
     engineer_id: str | None = None
     anchor_id: str | None = None
-    duration_minutes: int = Field(default=100,gt=0,le=1440,strict=True)
+    duration_minutes: int = Field(default=80,gt=0,le=1440,strict=True)
     router: int = Field(default=0,ge=0,le=100,strict=True)
 
 
@@ -391,7 +391,7 @@ class ScenarioSession:
                 'llm':{'status':'not_connected','facts_only':True,'instruction':'Объясни компромиссы только по facts и diff. Не придумывай SLA, деньги, причины невозможности или оптимальность. Решение принимает диспетчер.'}})
             seen.setdefault(signature,profile)
         batch={'request_labels':labels,'observation_warnings':[f"{self.initial_engineers[eid].name}: последний ручной факт в {f['time']//60:02}:{f['time']%60:02}; последующее выполнение не подтверждено." for eid,f in self.statuses.items() if f['time']<event.time],'id':uuid4().hex,'version':self.version,'event':event.model_dump(),'candidates':candidates,'frozen':frozen,'inventory':inventory,
-            'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. LLM не подключена: объяснение сформировано по проверенным фактам.'}
+            'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам.'}
         # Internal payload never trusts a plan sent back from the browser.
         self.batches[batch['id']]={'batch':deepcopy(batch),'scenario':s,'hash':fingerprint(batch),'policy':{'allow_redirect':payload.get('allow_redirect',False),'preserve_in_progress':payload.get('preserve_in_progress',False)}}
         return batch

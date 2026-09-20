@@ -1,4 +1,4 @@
-"""Loopback Scenario Center; optional geocoding/routing, no LLM calls."""
+"""Loopback Scenario Center; optional geocoding/routing and bounded LLM explanations."""
 import argparse
 from html import escape
 from copy import deepcopy
@@ -34,7 +34,7 @@ def _version(query):
     return int(versions[0])
 
 
-def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None):
+def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None):
     path=Path(state_path)
     lock=threading.Lock()
     holder={'session':session}
@@ -120,6 +120,16 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 if not 0<length<=65536:raise ValueError('Недопустимый размер запроса')
                 payload=json.loads(self.rfile.read(length))
                 if not isinstance(payload,dict):raise ValueError('Ожидается объект запроса')
+                if self.path=='/api/explain':
+                    with lock:
+                        session=holder['session']
+                        if payload.get('version')!=session.version:raise ValueError('Устаревшая версия плана')
+                        stored=session.batches.get(payload.get('batch_id'))
+                        if stored is None:raise ValueError('Варианты устарели; рассчитайте заново')
+                        batch=deepcopy(stored['batch'])
+                    if explainer is None:raise ValueError('LLM не настроена')
+                    result=explainer.explain(batch,payload.get('candidate_id'))
+                    return self.reply(200,result)
                 with lock:
                     if self.path=='/api/address/search':
                         if address_service is None:raise ValueError('Поиск адресов выключен; запустите сервер с --network')
@@ -142,7 +152,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         temporary.replace(path);holder['session']=candidate;crews.draft=None
                         result=candidate.state()
                     elif self.path=='/api/preview':
-                        result=holder['session'].preview(payload,time_limit=time_limit)
+                        result={**holder['session'].preview(payload,time_limit=time_limit),'llm_enabled':explainer is not None}
                     elif self.path in ('/api/approve','/api/facts','/api/mode'):
                         # Persist the candidate state before publishing it in memory.
                         candidate=deepcopy(holder['session'])
@@ -187,7 +197,9 @@ def main(argv=None):
         scenario=Scenario.model_validate(payload['scenario'])
         plan=next((p for p in payload['plans'] if p['solver']=='ortools'),payload['plans'][0])
         session=ScenarioSession(scenario,Plan.model_validate(plan),geography=payload.get('geography'))
-    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
+    from .llm import configured
+    explainer=configured()
+    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
     print(f'Scenario Center: http://127.0.0.1:{server.server_port} · локальный диспетчер, без GPS',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass

@@ -1,5 +1,7 @@
 """Loopback Scenario Center; optional geocoding/routing and bounded LLM explanations."""
 import argparse
+import hashlib
+import re
 from html import escape
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,16 +36,36 @@ def _version(query):
     return int(versions[0])
 
 
-def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None):
-    path=Path(state_path)
+def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,regions=None):
     lock=threading.Lock()
-    holder={'session':session}
-    crews=CrewService(address_service)
+    def entry(session,path,addresses):
+        return {'holder':{'session':session},'path':Path(path),'addresses':addresses,'crews':CrewService(addresses),
+                'label':getattr(getattr(session,'scenario',None),'region','Текущий регион')}
+    entries={'current':entry(session,state_path,address_service)}
+    for key,(other,other_path) in (regions or {}).items():
+        if not re.fullmatch(r'[a-zA-Z0-9_-]+',key) or key=='current':raise ValueError('Некорректный ID региона')
+        addresses=AddressService(address_service.client,routed_access=address_service.routed_access) if address_service else None
+        entries[key]=entry(other,other_path,addresses)
+    if len({e['path'].resolve() for e in entries.values()})!=len(entries):raise ValueError('Регионам нужны отдельные файлы состояния')
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
 
+        def context(self):
+            self.region='current';self.prefix='/'
+            if self.path.startswith('/regions/'):
+                parts=self.path.split('/',3)
+                if len(parts)!=4 or parts[2] not in entries:
+                    self.reply(404,{'error':'Неизвестный регион'});return None
+                self.region=parts[2];self.prefix='/regions/'+self.region+'/'
+                self.path='/'+parts[3]
+            e=entries[self.region]
+            return e['holder'],e['path'],e['crews'],e['addresses']
+
+
         def reply(self,status,value,kind='application/json; charset=utf-8',*,rendered=False):
+            if kind.startswith('text/html') and getattr(self,'prefix','/')!='/':
+                value=value.decode('utf-8').replace('href="/','href="'+self.prefix).replace('src="/','src="'+self.prefix).encode('utf-8')
             body=json.dumps(value,ensure_ascii=False,allow_nan=False).encode() if kind.startswith('application/json') else value
             self.send_response(status)
             self.send_header('Content-Type',kind)
@@ -63,6 +85,11 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
 
         def do_GET(self):
             if not self.trusted():return self.reply(403,{'error':'Разрешен только локальный доступ'})
+            context=self.context()
+            if context is None:return
+            holder,path,crews,address_service=context
+            if self.path=='/api/regions':
+                return self.reply(200,{'current':self.region,'regions':[{'id':k,'name':v['label'],'url':'/regions/'+k+'/'} for k,v in entries.items()]})
             route=urlsplit(self.path)
             if route.path=='/address-preview':
                 try:
@@ -114,6 +141,9 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
 
         def do_POST(self):
             if not self.trusted():return self.reply(403,{'error':'Запрос с другого сайта запрещен'})
+            context=self.context()
+            if context is None:return
+            holder,path,crews,address_service=context
             if self.headers.get('Content-Type','').split(';')[0]!='application/json':return self.reply(415,{'error':'Ожидается JSON'})
             try:
                 length=int(self.headers.get('Content-Length','0'))
@@ -181,26 +211,39 @@ def point_preview(point):
         'L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);L.marker(p).addTo(m);</script></html>')
 
 
+def load_session(comparison,state_path):
+    payload=json.loads(Path(comparison).read_text())
+    scenario=Scenario.model_validate(payload['scenario'])
+    if Path(state_path).exists():
+        session=ScenarioSession.restore(json.loads(Path(state_path).read_text()))
+        if session.scenario.region!=scenario.region:raise ValueError('Файл состояния принадлежит другому региону')
+        return session
+    plan=next((p for p in payload['plans'] if p['solver']=='ortools'),payload['plans'][0])
+    return ScenarioSession(scenario,Plan.model_validate(plan),geography=payload.get('geography'))
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description='Локальный Scenario Center: симуляция событий')
     parser.add_argument('comparison',type=Path)
     parser.add_argument('--state',type=Path,default=Path('output/scenario-state.json'))
+    parser.add_argument('--regions-dir',type=Path,help='Каталог сравнений для переключения регионов; каждому выделяется своё состояние')
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--network',action='store_true',help='Разрешить поиск адресов через Photon и координатные запросы OSRM')
     parser.add_argument('--cache',type=Path,default=Path('output/geo-cache'))
     parser.add_argument('--time-limit',type=float,default=1)
     args=parser.parse_args(argv)
     if args.state.resolve()==args.comparison.resolve():parser.error('Файл состояния не должен перезаписывать исходное сравнение')
-    if args.state.exists():
-        session=ScenarioSession.restore(json.loads(args.state.read_text()))
-    else:
-        payload=json.loads(args.comparison.read_text())
-        scenario=Scenario.model_validate(payload['scenario'])
-        plan=next((p for p in payload['plans'] if p['solver']=='ortools'),payload['plans'][0])
-        session=ScenarioSession(scenario,Plan.model_validate(plan),geography=payload.get('geography'))
+    session=load_session(args.comparison,args.state)
+    regions={}
+    if args.regions_dir:
+        for source in sorted(args.regions_dir.glob('*.json')):
+            if source.resolve()==args.comparison.resolve():continue
+            key=hashlib.sha256(source.stem.encode()).hexdigest()[:12]
+            state_path=args.state.parent/(args.state.stem+'-regions')/(key+'.json')
+            regions[key]=(load_session(source,state_path),state_path)
     from .llm import configured
     explainer=configured()
-    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
+    server=create_server(session,args.state,regions=regions,port=args.port,time_limit=args.time_limit,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
     print(f'Scenario Center: http://127.0.0.1:{server.server_port} · локальный диспетчер, без GPS',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass

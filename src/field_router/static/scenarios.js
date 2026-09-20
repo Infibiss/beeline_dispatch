@@ -52,6 +52,7 @@
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = {requestsForEngineer, eventPayload, factPayload, minute, time, frozenStatus};
   if (typeof document === 'undefined') return;
+  const regionURL = path => new URL(path.replace(/^\//, ''), new URL('.', location.href)).href;
   const $ = id => document.getElementById(id);
   let state = null, batch = null, selected = null, busy = false;
   const strategyNames = {sla:'Раньше приоритетные', stable:'Меньше изменений', cost:'Меньше ресурсов'};
@@ -65,6 +66,7 @@
     return node;
   }
   function controls() {
+    $('region-select').disabled=busy || $('region-select').options.length<2;
     $('event-fields').disabled = busy || !state;
     $('facts-fields').disabled = busy || !state;
     $('plan-version').disabled = busy || !state;
@@ -96,7 +98,7 @@
     controls();
   }
   async function request(path, payload) {
-    const response = await fetch(path, payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
+    const response = await fetch(regionURL(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
     let data;
     try { data = await response.json(); } catch { throw new Error('Сервер вернул некорректный ответ. Откройте страницу через локальный сервер.'); }
     if (!response.ok) { const error = new Error((response.status === 409 ? 'Версия изменилась. ' : '') + (data.error || 'Ошибка сервера.')); error.httpStatus = response.status; throw error; }
@@ -150,7 +152,7 @@
   function showPlan() {
     if (!state) return;
     const version = $('plan-version').value, historical = String(state.version) !== version;
-    $('plan-frame').src = '/dispatcher?version=' + encodeURIComponent(version);
+    $('plan-frame').src = regionURL('/dispatcher?version=' + encodeURIComponent(version));
     $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : 'Текущий утверждённый план · версия ' + version + '.';
   }
   function factRequests() {
@@ -339,7 +341,7 @@
     const point=addressCandidates.find(p=>p.id===$('address-candidates').value);
     $('address-map').hidden = !point;
     $('address-context').textContent = point ? (point.quality==='approximate' ? 'Приблизительное совпадение — проверьте точку. ' : 'Совпадение здания. ') + point.lat + ', ' + point.lon : '';
-    if(point) $('address-map').src='/address-preview?version='+state.version+'&candidate_id='+encodeURIComponent(point.id);
+    if(point) $('address-map').src=regionURL('/address-preview?version='+state.version+'&candidate_id='+encodeURIComponent(point.id));
     controls();
   }
   $('address-candidates').addEventListener('change',addressSelection);
@@ -420,6 +422,11 @@
     finally { busy = false; controls(); }
   });
   $('reload').addEventListener('click', reload);
+  request('/api/regions').then(data=>{
+    $('region-select').replaceChildren(...data.regions.map(r=>{const o=element('option',r.name);o.value=r.url;o.selected=r.id===data.current;return o;}));
+    controls();
+  }).catch(()=>{ $('region-select').replaceChildren(element('option','Регион недоступен')); });
+  $('region-select').addEventListener('change',()=>{if(!busy) location.href=$('region-select').value;});
   reload();
 })();
 

@@ -1,12 +1,13 @@
 (function(){
 'use strict';
+const regionURL=path=>new URL(path.replace(/^\//,''),new URL('.',location.href)).href;
 const $=id=>document.getElementById(id);let state,draft,busy=false;
 const labelTransport={public:'Общественный транспорт',car:'Авто',walk:'Пешком',bicycle:'Велосипед'};
 function node(tag,text){const n=document.createElement(tag);if(text!=null)n.textContent=text;return n;}
 function reset(){draft=null;$('preview').hidden=true;}
 function status(message){$('status').textContent=message;$('error').hidden=true;}
 function controls(){ $('fields').disabled=busy||!state?.editable;$('apply').disabled=busy||!draft; }
-async function api(path,payload){const r=await fetch(path,payload?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error((d.error||'Ошибка сервера')+(r.status===409?' Обновите страницу и повторите настройку.':''));return d;}
+async function api(path,payload){const r=await fetch(regionURL(path),payload?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error((d.error||'Ошибка сервера')+(r.status===409?' Обновите страницу и повторите настройку.':''));return d;}
 async function run(action){busy=true;controls();$('error').hidden=true;try{await action();}catch(e){reset();$('error').textContent=e.message;$('error').hidden=false;$('status').textContent='Изменения не применены.';}finally{busy=false;controls();}}
 function clock(n){return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
 function minutes(s){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s))throw Error('Проверьте время смены');return Number(s.slice(0,2))*60+Number(s.slice(3));}
@@ -31,7 +32,7 @@ function collect(){return [...$('rows').children].map(card=>{const get=k=>card.q
 $('fields').addEventListener('input',reset);$('fields').addEventListener('change',reset);
 $('recommend').onclick=()=>{$('rows').replaceChildren();state.recommended_engineers.forEach(row);reset();status('Форма заполнена моделью участка. Рассчитайте и сравните план перед применением.');};
 $('add').onclick=()=>{row({id:'crew-'+crypto.randomUUID(),name:'Новая бригада',transport:'public',shift:{start:540,end:1080},skills:['local'],start_location:'office',stock_mode:'plan',router:1,tv_box:0});reset();};
-$('crew-form').onsubmit=e=>{e.preventDefault();run(async()=>{reset();status('Расчёт состава, дорог и нового плана…');draft=await api('/api/crew/preview',{version:state.version,engineers:collect()});$('comparison').textContent='Назначено: '+draft.before.assigned+' → '+draft.after.assigned+'. Без назначения: '+draft.before.unassigned+' → '+draft.after.unassigned+'. Инженеров на линии: '+draft.after.engineers_used+'.';$('unassigned').textContent=draft.unassigned.map(x=>x.request_id+': '+x.reason).join(' ');$('issue').replaceChildren(...draft.issue.map(x=>node('p',x.name+': роутеры '+x.router+', ТВ '+x.tv_box)));$('plan-link').href='/crew-plan?id='+encodeURIComponent(draft.id)+'&version='+state.version;$('preview').hidden=false;status('Проверьте план и выдачу. Состав пока не изменён.');});};
-$('apply').onclick=()=>run(async()=>{await api('/api/crew/apply',{id:draft.id,version:state.version});location.href='/';});
+$('crew-form').onsubmit=e=>{e.preventDefault();run(async()=>{reset();status('Расчёт состава, дорог и нового плана…');draft=await api('/api/crew/preview',{version:state.version,engineers:collect()});$('comparison').textContent='Назначено: '+draft.before.assigned+' → '+draft.after.assigned+'. Без назначения: '+draft.before.unassigned+' → '+draft.after.unassigned+'. Инженеров на линии: '+draft.after.engineers_used+'.';$('unassigned').textContent=draft.unassigned.map(x=>x.request_id+': '+x.reason).join(' ');$('issue').replaceChildren(...draft.issue.map(x=>node('p',x.name+': роутеры '+x.router+', ТВ '+x.tv_box)));$('plan-link').href=regionURL('/crew-plan?id='+encodeURIComponent(draft.id)+'&version='+state.version);$('preview').hidden=false;status('Проверьте план и выдачу. Состав пока не изменён.');});};
+$('apply').onclick=()=>run(async()=>{await api('/api/crew/apply',{id:draft.id,version:state.version});location.href=regionURL('/');});
 run(async()=>{state=await api('/api/crew');$('context').textContent=state.region+' · бригад сейчас '+state.engineers.length+(state.control_count?' · в контрольном дне '+state.control_count:'')+'. Ориентир, не обязательный штат.';state.engineers.forEach(row);status(state.editable?'Настройка до начала дня. Сначала расчёт, затем применение.':'День уже начат: состав доступен только для просмотра.');});
 })();

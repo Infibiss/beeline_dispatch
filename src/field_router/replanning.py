@@ -280,6 +280,9 @@ class ScenarioSession:
                     location=v.request_id
                     ready=max(ready,v.end)
                 else:
+                    # This engineer is removed, not rerouted. Its current position
+                    # is unnecessary; release future work without inventing GPS.
+                    if event.type=='unavailable' and event.engineer_id==e.id:break
                     if on_road:
                         observation=self.statuses.get(e.id,{})
                         if observation.get('status')=='traveling' and observation.get('time')==now:

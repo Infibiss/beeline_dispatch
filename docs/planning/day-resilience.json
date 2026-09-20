@@ -1,0 +1,665 @@
+{
+  "solver_limit_seconds": 3.0,
+  "regions": [
+    {
+      "region": "Восток",
+      "source": "data/demo-road/Восток.json",
+      "sha256": "b24f0e7c212a186dac616fb4709594a3bc85d867e83e3a5888a611e9692839a2",
+      "requests": 66,
+      "initial_assigned": 66,
+      "stress_results": [
+        {
+          "stress": "baseline",
+          "fixed_execution": {
+            "window_breaches": 0,
+            "shift_breaches": 0,
+            "breached_requests": 0,
+            "pending": 0,
+            "max_start_delay_minutes": 0,
+            "max_shift_overrun_minutes": 0
+          }
+        },
+        {
+          "stress": "travel+20%",
+          "fixed_execution": {
+            "window_breaches": 7,
+            "shift_breaches": 1,
+            "breached_requests": 8,
+            "pending": 0,
+            "max_start_delay_minutes": 32,
+            "max_shift_overrun_minutes": 3
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 62,
+            "pending": 4
+          }
+        },
+        {
+          "stress": "travel+40%",
+          "fixed_execution": {
+            "window_breaches": 12,
+            "shift_breaches": 4,
+            "breached_requests": 16,
+            "pending": 0,
+            "max_start_delay_minutes": 63,
+            "max_shift_overrun_minutes": 39
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 60,
+            "pending": 6
+          }
+        },
+        {
+          "stress": "service+20%",
+          "fixed_execution": {
+            "window_breaches": 8,
+            "shift_breaches": 7,
+            "breached_requests": 15,
+            "pending": 0,
+            "max_start_delay_minutes": 60,
+            "max_shift_overrun_minutes": 52
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 60,
+            "pending": 6
+          }
+        },
+        {
+          "stress": "travel+40% service+20%",
+          "fixed_execution": {
+            "window_breaches": 21,
+            "shift_breaches": 9,
+            "breached_requests": 27,
+            "pending": 0,
+            "max_start_delay_minutes": 111,
+            "max_shift_overrun_minutes": 101
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 57,
+            "pending": 9
+          }
+        }
+      ],
+      "dynamic_day": {
+        "stages": [
+          {
+            "event": {
+              "id": "emergency-1",
+              "type": "emergency",
+              "time": 545,
+              "anchor_id": "74198",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 8,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "emergency-2",
+              "type": "emergency",
+              "time": 565,
+              "anchor_id": "86160",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 61,
+            "pending": 0,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "cancel",
+              "type": "cancel",
+              "time": 566,
+              "request_id": "74198"
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "unavailable",
+              "type": "unavailable",
+              "time": 567,
+              "engineer_id": "Восток-04"
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "delay-fact-replan",
+              "type": "replan",
+              "time": 600
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 59,
+            "pending": 1,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "completion-replan",
+              "type": "replan",
+              "time": 690
+            },
+            "urgent_assigned_remaining": 8,
+            "urgent_pending": 0,
+            "assigned_remaining": 52,
+            "pending": 0,
+            "frozen": 15,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "post-restore",
+              "type": "replan",
+              "time": 691
+            },
+            "urgent_assigned_remaining": 8,
+            "urgent_pending": 0,
+            "assigned_remaining": 52,
+            "pending": 0,
+            "frozen": 15,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "end-of-shift",
+              "type": "replan",
+              "time": 1320
+            },
+            "urgent_assigned_remaining": 0,
+            "urgent_pending": 0,
+            "assigned_remaining": 0,
+            "pending": 2,
+            "frozen": 65,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          }
+        ],
+        "delay_fact": {
+          "engineer_id": "Восток-03",
+          "request_id": "77563",
+          "time": 600,
+          "extra_service_minutes": 20,
+          "remaining_minutes": 90
+        },
+        "restore_equal": true,
+        "final_pending": 2,
+        "cancelled": "74198",
+        "unavailable_engineer": "Восток-04",
+        "note": "Frozen includes simulated execution and explicit facts; these are not observed field outcomes."
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "source": "data/demo-road/Юго-восток.json",
+      "sha256": "9a3603afedbaf5c1071912b894ff4919de325979b435dda412890e8eaaf2b9b2",
+      "requests": 83,
+      "initial_assigned": 71,
+      "stress_results": [
+        {
+          "stress": "baseline",
+          "fixed_execution": {
+            "window_breaches": 0,
+            "shift_breaches": 0,
+            "breached_requests": 0,
+            "pending": 12,
+            "max_start_delay_minutes": 0,
+            "max_shift_overrun_minutes": 0
+          }
+        },
+        {
+          "stress": "travel+20%",
+          "fixed_execution": {
+            "window_breaches": 7,
+            "shift_breaches": 2,
+            "breached_requests": 9,
+            "pending": 12,
+            "max_start_delay_minutes": 62,
+            "max_shift_overrun_minutes": 24
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 66,
+            "pending": 17
+          }
+        },
+        {
+          "stress": "travel+40%",
+          "fixed_execution": {
+            "window_breaches": 11,
+            "shift_breaches": 4,
+            "breached_requests": 14,
+            "pending": 12,
+            "max_start_delay_minutes": 130,
+            "max_shift_overrun_minutes": 50
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 61,
+            "pending": 22
+          }
+        },
+        {
+          "stress": "service+20%",
+          "fixed_execution": {
+            "window_breaches": 9,
+            "shift_breaches": 6,
+            "breached_requests": 14,
+            "pending": 12,
+            "max_start_delay_minutes": 78,
+            "max_shift_overrun_minutes": 76
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 65,
+            "pending": 18
+          }
+        },
+        {
+          "stress": "travel+40% service+20%",
+          "fixed_execution": {
+            "window_breaches": 19,
+            "shift_breaches": 12,
+            "breached_requests": 27,
+            "pending": 12,
+            "max_start_delay_minutes": 142,
+            "max_shift_overrun_minutes": 119
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 58,
+            "pending": 25
+          }
+        }
+      ],
+      "dynamic_day": {
+        "stages": [
+          {
+            "event": {
+              "id": "emergency-1",
+              "type": "emergency",
+              "time": 545,
+              "anchor_id": "67472",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 13,
+            "urgent_pending": 0,
+            "assigned_remaining": 64,
+            "pending": 12,
+            "frozen": 8,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "emergency-2",
+              "type": "emergency",
+              "time": 565,
+              "anchor_id": "84466",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 65,
+            "pending": 12,
+            "frozen": 8,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "cancel",
+              "type": "cancel",
+              "time": 566,
+              "request_id": "67472"
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 64,
+            "pending": 12,
+            "frozen": 8,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "unavailable",
+              "type": "unavailable",
+              "time": 630,
+              "engineer_id": "Юго-восток-04"
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 63,
+            "pending": 13,
+            "frozen": 8,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "delay-fact-replan",
+              "type": "replan",
+              "time": 631
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 63,
+            "pending": 13,
+            "frozen": 8,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "completion-replan",
+              "type": "replan",
+              "time": 690
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 59,
+            "pending": 13,
+            "frozen": 12,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "post-restore",
+              "type": "replan",
+              "time": 691
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 59,
+            "pending": 13,
+            "frozen": 12,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "end-of-shift",
+              "type": "replan",
+              "time": 1320
+            },
+            "urgent_assigned_remaining": 0,
+            "urgent_pending": 1,
+            "assigned_remaining": 0,
+            "pending": 18,
+            "frozen": 66,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          }
+        ],
+        "delay_fact": {
+          "engineer_id": "Юго-восток-01",
+          "request_id": "876",
+          "time": 631,
+          "extra_service_minutes": 20,
+          "remaining_minutes": 59
+        },
+        "restore_equal": true,
+        "final_pending": 18,
+        "cancelled": "67472",
+        "unavailable_engineer": "Юго-восток-04",
+        "note": "Frozen includes simulated execution and explicit facts; these are not observed field outcomes."
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "source": "data/demo-road/Югоцентр.json",
+      "sha256": "dbd04aca8e43f37b2b9d06817879765fff863829f83add0e1054226edd0ba9f1",
+      "requests": 56,
+      "initial_assigned": 55,
+      "stress_results": [
+        {
+          "stress": "baseline",
+          "fixed_execution": {
+            "window_breaches": 0,
+            "shift_breaches": 0,
+            "breached_requests": 0,
+            "pending": 1,
+            "max_start_delay_minutes": 0,
+            "max_shift_overrun_minutes": 0
+          }
+        },
+        {
+          "stress": "travel+20%",
+          "fixed_execution": {
+            "window_breaches": 4,
+            "shift_breaches": 2,
+            "breached_requests": 6,
+            "pending": 1,
+            "max_start_delay_minutes": 35,
+            "max_shift_overrun_minutes": 19
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 53,
+            "pending": 3
+          }
+        },
+        {
+          "stress": "travel+40%",
+          "fixed_execution": {
+            "window_breaches": 6,
+            "shift_breaches": 3,
+            "breached_requests": 8,
+            "pending": 1,
+            "max_start_delay_minutes": 78,
+            "max_shift_overrun_minutes": 63
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 52,
+            "pending": 4
+          }
+        },
+        {
+          "stress": "service+20%",
+          "fixed_execution": {
+            "window_breaches": 5,
+            "shift_breaches": 5,
+            "breached_requests": 9,
+            "pending": 1,
+            "max_start_delay_minutes": 46,
+            "max_shift_overrun_minutes": 47
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 53,
+            "pending": 3
+          }
+        },
+        {
+          "stress": "travel+40% service+20%",
+          "fixed_execution": {
+            "window_breaches": 11,
+            "shift_breaches": 8,
+            "breached_requests": 16,
+            "pending": 1,
+            "max_start_delay_minutes": 124,
+            "max_shift_overrun_minutes": 123
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 50,
+            "pending": 6
+          }
+        }
+      ],
+      "dynamic_day": {
+        "stages": [
+          {
+            "event": {
+              "id": "emergency-1",
+              "type": "emergency",
+              "time": 545,
+              "anchor_id": "32840",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 51,
+            "pending": 1,
+            "frozen": 5,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "emergency-2",
+              "type": "emergency",
+              "time": 565,
+              "anchor_id": "78540",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 3,
+            "urgent_pending": 0,
+            "assigned_remaining": 52,
+            "pending": 1,
+            "frozen": 5,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "cancel",
+              "type": "cancel",
+              "time": 566,
+              "request_id": "32840"
+            },
+            "urgent_assigned_remaining": 3,
+            "urgent_pending": 0,
+            "assigned_remaining": 51,
+            "pending": 1,
+            "frozen": 5,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "unavailable",
+              "type": "unavailable",
+              "time": 567,
+              "engineer_id": "Югоцентр-04"
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 49,
+            "pending": 1,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "delay-fact-replan",
+              "type": "replan",
+              "time": 600
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 49,
+            "pending": 1,
+            "frozen": 7,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "completion-replan",
+              "type": "replan",
+              "time": 650
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 47,
+            "pending": 1,
+            "frozen": 9,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "post-restore",
+              "type": "replan",
+              "time": 651
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 47,
+            "pending": 1,
+            "frozen": 9,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "end-of-shift",
+              "type": "replan",
+              "time": 1320
+            },
+            "urgent_assigned_remaining": 0,
+            "urgent_pending": 1,
+            "assigned_remaining": 0,
+            "pending": 5,
+            "frozen": 52,
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          }
+        ],
+        "delay_fact": {
+          "engineer_id": "Югоцентр-01",
+          "request_id": "80308",
+          "time": 600,
+          "extra_service_minutes": 20,
+          "remaining_minutes": 50
+        },
+        "restore_equal": true,
+        "final_pending": 5,
+        "cancelled": "32840",
+        "unavailable_engineer": "Югоцентр-04",
+        "note": "Frozen includes simulated execution and explicit facts; these are not observed field outcomes."
+      }
+    }
+  ]
+}

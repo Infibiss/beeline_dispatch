@@ -1,0 +1,3739 @@
+{
+  "python": "3.11.9",
+  "ortools": "9.15.6755",
+  "method": "Fixed matrix offline replay; exhaustive single insertion; bounded OR-Tools search. No optimality claim.",
+  "regions": [
+    {
+      "source": "data/demo-road/Юго-восток.json",
+      "sha256": "9a3603afedbaf5c1071912b894ff4919de325979b435dda412890e8eaaf2b9b2",
+      "region": "Юго-восток",
+      "request_count": 83,
+      "engineers": [
+        {
+          "id": "Юго-восток-01",
+          "name": "Инженер 01",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection",
+            "emergency"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-02",
+          "name": "Инженер 02",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-03",
+          "name": "Инженер 03",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-04",
+          "name": "Инженер 04",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-05",
+          "name": "Инженер 05",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "emergency"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-06",
+          "name": "Инженер 06",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection",
+            "emergency"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-07",
+          "name": "Инженер 07",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-08",
+          "name": "Инженер 08",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-09",
+          "name": "Инженер 09",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-10",
+          "name": "Инженер 10",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "emergency"
+          ],
+          "transport": "car",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-11",
+          "name": "Инженер 11",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "connection",
+            "emergency"
+          ],
+          "transport": "car",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-12",
+          "name": "Инженер 12",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "connection"
+          ],
+          "transport": "car",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-13",
+          "name": "Инженер 13",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "connection"
+          ],
+          "transport": "walk",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-14",
+          "name": "Инженер 14",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local"
+          ],
+          "transport": "walk",
+          "stock": null
+        },
+        {
+          "id": "Юго-восток-15",
+          "name": "Инженер 15",
+          "region": "Юго-восток",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "emergency"
+          ],
+          "transport": "bicycle",
+          "stock": null
+        }
+      ],
+      "travel_modes": {
+        "car": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-car",
+          "profile": "car",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 72.03718946
+        },
+        "walk": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-foot",
+          "profile": "walk",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 28.2529481
+        },
+        "bicycle": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-bike",
+          "profile": "bicycle",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 28.2529481
+        },
+        "public": {
+          "kind": "estimate",
+          "model": "multimodal-v3",
+          "network_signature": "a76977baf7925f0876de135574c86633cd7db7ca7ea5191f06f6b4a3ddecfb9f",
+          "pedestrian_access": "road-to-station-point",
+          "source": "HH open metro directory 2026-09-20; corrected service topology for demo 2026-08-17, see METRO-SOURCE.txt; GTFS Moscow, MobilityDatabase mdb-3226, snapshot 2026-06-30",
+          "service_date": "2026-08-17",
+          "description": "Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. Рельсовые поездки оценочные. Автобусы/трамваи: максимальное наблюдаемое время сегмента и полный максимальный интервал из GTFS за рабочий день, частое движение с 09:00 до 22:00. Нет расчёта под минуту отправления; вне подтверждённой сети используется только пеший маршрут.",
+          "assumptions": {
+            "walk_kmh": null,
+            "walk_detour_factor": null,
+            "max_access_straight_metres": 2500,
+            "nearest_stations": 6,
+            "nearest_surface_stops": 3,
+            "max_surface_access_straight_metres": 800,
+            "metro_kmh": 35,
+            "stop_minutes": 1,
+            "wait_minutes": 3,
+            "entry_exit_minutes": 2,
+            "transfer_radius_metres": 700,
+            "max_approach_minutes": 45,
+            "max_transfer_walk_minutes": 20
+          },
+          "journey_counts": {
+            "walk": 6018,
+            "multimodal": 1038
+          }
+        }
+      },
+      "saved": {
+        "metrics": {
+          "assigned": 71,
+          "unassigned": 12,
+          "engineers_used": 15,
+          "distance_m": 482036,
+          "travel_minutes": 2155,
+          "service_minutes": 3850
+        },
+        "status": "feasible_search_completed",
+        "objective_key": [
+          0,
+          7,
+          12,
+          15,
+          482036
+        ],
+        "unassigned": [
+          "20362",
+          "23094",
+          "3151",
+          "40111",
+          "46199",
+          "57353",
+          "62011",
+          "63577",
+          "65268",
+          "66944",
+          "75745",
+          "78876"
+        ],
+        "assigned_by_priority": {
+          "urgent": 12,
+          "high": 29,
+          "normal": 30
+        },
+        "elapsed_seconds": 5.040655000000697
+      },
+      "requests": [
+        {
+          "request": {
+            "id": "66944",
+            "region": "Юго-восток",
+            "address": "Домодедово, ул.Зеленая, д. 85",
+            "locality": "Домодедово",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Конвергенция абонента",
+            "windows": [
+              {
+                "start": 600,
+                "end": 720
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 0,
+              "tv_box": 0
+            },
+            "source_line": 6,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 22,
+              "earliest_arrival": 802,
+              "relaxed_minutes": 22,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 22,
+              "earliest_arrival": 802,
+              "relaxed_minutes": 22,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 1107,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "75745",
+            "region": "Юго-восток",
+            "address": "Домодедово, ул.Зеленая, д. 85",
+            "locality": "Домодедово",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Заказ подключения/Дозаказ оборудования",
+            "windows": [
+              {
+                "start": 600,
+                "end": 720
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 0,
+              "tv_box": 0
+            },
+            "source_line": 18,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 867,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 22,
+              "earliest_arrival": 802,
+              "relaxed_minutes": 22,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 22,
+              "earliest_arrival": 802,
+              "relaxed_minutes": 22,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 327,
+              "earliest_arrival": 1107,
+              "relaxed_minutes": 327,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "62011",
+            "region": "Юго-восток",
+            "address": "Кашира, ул.Садовая, д. 18",
+            "locality": "Кашира",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Конвергенция абонента",
+            "windows": [
+              {
+                "start": 600,
+                "end": 720
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 1,
+              "tv_box": 0
+            },
+            "source_line": 23,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2111,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2111,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2111,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2111,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2111,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2111,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 84,
+              "earliest_arrival": 864,
+              "relaxed_minutes": 84,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 84,
+              "earliest_arrival": 864,
+              "relaxed_minutes": 84,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1571,
+              "earliest_arrival": 2351,
+              "relaxed_minutes": 1571,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "57353",
+            "region": "Юго-восток",
+            "address": "Кашира, ул.Садовая, д. 2/11",
+            "locality": "Кашира",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Заказ подключения/Дозаказ оборудования",
+            "windows": [
+              {
+                "start": 720,
+                "end": 840
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 0,
+              "tv_box": 1
+            },
+            "source_line": 24,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2100,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2100,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2100,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2100,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2100,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2100,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 83,
+              "earliest_arrival": 863,
+              "relaxed_minutes": 83,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 83,
+              "earliest_arrival": 863,
+              "relaxed_minutes": 83,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1560,
+              "earliest_arrival": 2340,
+              "relaxed_minutes": 1559,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "78876",
+            "region": "Юго-восток",
+            "address": "Кашира, ул.Юбилейная, д. 9",
+            "locality": "Кашира",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Конвергенция абонента",
+            "windows": [
+              {
+                "start": 600,
+                "end": 720
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 1,
+              "tv_box": 1
+            },
+            "source_line": 28,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2122,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2122,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2122,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2122,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2122,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2122,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 85,
+              "earliest_arrival": 865,
+              "relaxed_minutes": 85,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 85,
+              "earliest_arrival": 865,
+              "relaxed_minutes": 85,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1582,
+              "earliest_arrival": 2362,
+              "relaxed_minutes": 1577,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "23094",
+            "region": "Юго-восток",
+            "address": "Кашира, ул.8 Марта, д. 22",
+            "locality": "Кашира",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Конвергенция абонента",
+            "windows": [
+              {
+                "start": 720,
+                "end": 840
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 0,
+              "tv_box": 0
+            },
+            "source_line": 29,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "https://yandex.ru/maps/10732/kashira/house/ulitsa_8_marta_22/Z0EYdARpSUwOQFtufXR1dXljbA==/; manual",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2104,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2104,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2104,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2104,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2104,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2104,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 84,
+              "earliest_arrival": 864,
+              "relaxed_minutes": 84,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 84,
+              "earliest_arrival": 864,
+              "relaxed_minutes": 84,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1564,
+              "earliest_arrival": 2344,
+              "relaxed_minutes": 1563,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "20362",
+            "region": "Юго-восток",
+            "address": "Кашира, ул.Юбилейная, д. 8",
+            "locality": "Кашира",
+            "date": "2026-08-17",
+            "bk_type": "Подключение",
+            "hd_type": "Конвергенция абонента",
+            "windows": [
+              {
+                "start": 840,
+                "end": 960
+              }
+            ],
+            "duration_minutes": 70,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "high",
+            "equipment": {
+              "router": 0,
+              "tv_box": 0
+            },
+            "source_line": 36,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2114,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2114,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2114,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2114,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2114,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2114,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 84,
+              "earliest_arrival": 864,
+              "relaxed_minutes": 84,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 84,
+              "earliest_arrival": 864,
+              "relaxed_minutes": 84,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1574,
+              "earliest_arrival": 2354,
+              "relaxed_minutes": 1573,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [
+            "Юго-восток-11",
+            "Юго-восток-12"
+          ],
+          "impossible_under_relaxed_travel": false,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "65268",
+            "region": "Юго-восток",
+            "address": "Ступино, ул.Калинина, д. 34",
+            "locality": "Ступино",
+            "date": "2026-08-17",
+            "bk_type": "Локальная заявка",
+            "hd_type": "Работа с кабелем",
+            "windows": [
+              {
+                "start": 1200,
+                "end": 1320
+              }
+            ],
+            "duration_minutes": 30,
+            "skill": "local",
+            "required_transport": null,
+            "priority": "normal",
+            "equipment": {
+              "router": 0,
+              "tv_box": 1
+            },
+            "source_line": 45,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-04",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-05",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-09",
+              "transport": "public",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 2103,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-10",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 70,
+              "earliest_arrival": 850,
+              "relaxed_minutes": 70,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 70,
+              "earliest_arrival": 850,
+              "relaxed_minutes": 70,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 70,
+              "earliest_arrival": 850,
+              "relaxed_minutes": 70,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-14",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 2103,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-15",
+              "transport": "bicycle",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 381,
+              "earliest_arrival": 1161,
+              "relaxed_minutes": 381,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [
+            "Юго-восток-10",
+            "Юго-восток-11",
+            "Юго-восток-12",
+            "Юго-восток-15"
+          ],
+          "impossible_under_relaxed_travel": false,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "40111",
+            "region": "Юго-восток",
+            "address": "Ступино, ул.Калинина, д. 34",
+            "locality": "Ступино",
+            "date": "2026-08-17",
+            "bk_type": "Локальная заявка",
+            "hd_type": "Работа с кабелем",
+            "windows": [
+              {
+                "start": 600,
+                "end": 720
+              }
+            ],
+            "duration_minutes": 30,
+            "skill": "local",
+            "required_transport": null,
+            "priority": "normal",
+            "equipment": {
+              "router": 0,
+              "tv_box": 0
+            },
+            "source_line": 51,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-04",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-05",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 1863,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-09",
+              "transport": "public",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 2103,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-10",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 70,
+              "earliest_arrival": 850,
+              "relaxed_minutes": 70,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 70,
+              "earliest_arrival": 850,
+              "relaxed_minutes": 70,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 70,
+              "earliest_arrival": 850,
+              "relaxed_minutes": 70,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-14",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1323,
+              "earliest_arrival": 2103,
+              "relaxed_minutes": 1323,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-15",
+              "transport": "bicycle",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 381,
+              "earliest_arrival": 1161,
+              "relaxed_minutes": 381,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "46199",
+            "region": "Юго-восток",
+            "address": "Домодедово, ул.Ильюшина, д. 11 к 2",
+            "locality": "Домодедово",
+            "date": "2026-08-17",
+            "bk_type": "Локальная заявка",
+            "hd_type": "Нет линка",
+            "windows": [
+              {
+                "start": 720,
+                "end": 840
+              }
+            ],
+            "duration_minutes": 30,
+            "skill": "local",
+            "required_transport": null,
+            "priority": "normal",
+            "equipment": {
+              "router": 1,
+              "tv_box": 0
+            },
+            "source_line": 52,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 931,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 931,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-04",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 931,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-05",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 931,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 931,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 931,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-09",
+              "transport": "public",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 1171,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-10",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 30,
+              "earliest_arrival": 810,
+              "relaxed_minutes": 30,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 30,
+              "earliest_arrival": 810,
+              "relaxed_minutes": 30,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 30,
+              "earliest_arrival": 810,
+              "relaxed_minutes": 30,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-14",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 391,
+              "earliest_arrival": 1171,
+              "relaxed_minutes": 391,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-15",
+              "transport": "bicycle",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 137,
+              "earliest_arrival": 917,
+              "relaxed_minutes": 137,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [
+            "Юго-восток-10",
+            "Юго-восток-11",
+            "Юго-восток-12"
+          ],
+          "impossible_under_relaxed_travel": false,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "63577",
+            "region": "Юго-восток",
+            "address": "Домодедово, ул.Корнеева, д. 48",
+            "locality": "Домодедово",
+            "date": "2026-08-17",
+            "bk_type": "Локальная заявка",
+            "hd_type": "Нет линка",
+            "windows": [
+              {
+                "start": 600,
+                "end": 720
+              }
+            ],
+            "duration_minutes": 30,
+            "skill": "local",
+            "required_transport": null,
+            "priority": "normal",
+            "equipment": {
+              "router": 1,
+              "tv_box": 1
+            },
+            "source_line": 54,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 871,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 871,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-04",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 871,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-05",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 871,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 871,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 871,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-09",
+              "transport": "public",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 1111,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-10",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 23,
+              "earliest_arrival": 803,
+              "relaxed_minutes": 23,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 23,
+              "earliest_arrival": 803,
+              "relaxed_minutes": 23,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 23,
+              "earliest_arrival": 803,
+              "relaxed_minutes": 23,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-14",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 331,
+              "earliest_arrival": 1111,
+              "relaxed_minutes": 331,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Юго-восток-15",
+              "transport": "bicycle",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 114,
+              "earliest_arrival": 894,
+              "relaxed_minutes": 114,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        },
+        {
+          "request": {
+            "id": "3151",
+            "region": "Юго-восток",
+            "address": "Кашира, ул.Ленина, д. 11 к 3",
+            "locality": "Кашира",
+            "date": "2026-08-17",
+            "bk_type": "Локальная заявка",
+            "hd_type": "Нет линка",
+            "windows": [
+              {
+                "start": 720,
+                "end": 840
+              }
+            ],
+            "duration_minutes": 30,
+            "skill": "local",
+            "required_transport": null,
+            "priority": "normal",
+            "equipment": {
+              "router": 1,
+              "tv_box": 1
+            },
+            "source_line": 70,
+            "provenance": {
+              "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Юго-восток-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2048,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2048,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-04",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2048,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-05",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2048,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2048,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2048,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-09",
+              "transport": "public",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2288,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-10",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 81,
+              "earliest_arrival": 861,
+              "relaxed_minutes": 81,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 81,
+              "earliest_arrival": 861,
+              "relaxed_minutes": 81,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 81,
+              "earliest_arrival": 861,
+              "relaxed_minutes": 81,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-14",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 1508,
+              "earliest_arrival": 2288,
+              "relaxed_minutes": 1507,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Юго-восток-15",
+              "transport": "bicycle",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 444,
+              "earliest_arrival": 1224,
+              "relaxed_minutes": 444,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [],
+          "impossible_under_relaxed_travel": true,
+          "saved_route_insertions": []
+        }
+      ],
+      "experiments": {
+        "original": {
+          "metrics": {
+            "assigned": 71,
+            "unassigned": 12,
+            "engineers_used": 15,
+            "distance_m": 482036,
+            "travel_minutes": 2155,
+            "service_minutes": 3850
+          },
+          "status": "feasible_search_completed",
+          "objective_key": [
+            0,
+            7,
+            12,
+            15,
+            482036
+          ],
+          "unassigned": [
+            "20362",
+            "23094",
+            "3151",
+            "40111",
+            "46199",
+            "57353",
+            "62011",
+            "63577",
+            "65268",
+            "66944",
+            "75745",
+            "78876"
+          ],
+          "assigned_by_priority": {
+            "urgent": 12,
+            "high": 29,
+            "normal": 30
+          },
+          "elapsed_seconds": 20.048679249997804,
+          "wall_seconds": 20.049637459000223,
+          "requested_budget_seconds": 20,
+          "diagnostics": {
+            "routing_status": 1,
+            "time_limit_seconds": 14.0,
+            "objective": "emergency_unassigned, connection_unassigned, unassigned, engineers_used, distance_m",
+            "profile": null,
+            "priority_tiers": {
+              "emergency": [
+                "urgent"
+              ],
+              "connection": [
+                "high"
+              ],
+              "other": [
+                "normal"
+              ]
+            },
+            "emergency_coverage_floor": 12,
+            "search_distance_unit_metres": 1,
+            "optimality_proven": false,
+            "warm_start": true,
+            "weights": {
+              "start_minute": 0,
+              "reassignment": 0,
+              "engineer": 12276265,
+              "high_priority_bonus": 16499300160,
+              "drop": 196420240
+            }
+          },
+          "saved_missing_recovered": [],
+          "newly_missing": []
+        },
+        "home_at_saved_first_client": {
+          "metrics": {
+            "assigned": 72,
+            "unassigned": 11,
+            "engineers_used": 14,
+            "distance_m": 215103,
+            "travel_minutes": 1120,
+            "service_minutes": 3920
+          },
+          "status": "feasible_search_completed",
+          "objective_key": [
+            0,
+            6,
+            11,
+            14,
+            215103
+          ],
+          "unassigned": [
+            "3151",
+            "40111",
+            "46199",
+            "53552",
+            "57353",
+            "62011",
+            "63577",
+            "66944",
+            "75745",
+            "78876",
+            "89067"
+          ],
+          "assigned_by_priority": {
+            "urgent": 12,
+            "high": 30,
+            "normal": 30
+          },
+          "elapsed_seconds": 20.052978249997977,
+          "wall_seconds": 20.055509583002276,
+          "requested_budget_seconds": 20,
+          "diagnostics": {
+            "routing_status": 1,
+            "time_limit_seconds": 14.0,
+            "objective": "emergency_unassigned, connection_unassigned, unassigned, engineers_used, distance_m",
+            "profile": null,
+            "priority_tiers": {
+              "emergency": [
+                "urgent"
+              ],
+              "connection": [
+                "high"
+              ],
+              "other": [
+                "normal"
+              ]
+            },
+            "emergency_coverage_floor": 12,
+            "search_distance_unit_metres": 1,
+            "optimality_proven": false,
+            "warm_start": true,
+            "weights": {
+              "start_minute": 0,
+              "reassignment": 0,
+              "engineer": 12276265,
+              "high_priority_bonus": 16499300160,
+              "drop": 196420240
+            }
+          },
+          "saved_missing_recovered": [
+            "20362",
+            "23094",
+            "65268"
+          ],
+          "newly_missing": [
+            "53552",
+            "89067"
+          ]
+        },
+        "existing_cars_09_18": {
+          "metrics": {
+            "assigned": 70,
+            "unassigned": 13,
+            "engineers_used": 15,
+            "distance_m": 419278,
+            "travel_minutes": 1788,
+            "service_minutes": 3920
+          },
+          "status": "feasible_search_completed",
+          "objective_key": [
+            0,
+            5,
+            13,
+            15,
+            419278
+          ],
+          "unassigned": [
+            "13404",
+            "20362",
+            "2427",
+            "36961",
+            "45778",
+            "46199",
+            "53552",
+            "57353",
+            "62011",
+            "63577",
+            "65268",
+            "78876",
+            "89067"
+          ],
+          "assigned_by_priority": {
+            "urgent": 12,
+            "high": 31,
+            "normal": 27
+          },
+          "elapsed_seconds": 20.03713887500271,
+          "wall_seconds": 20.038397249998525,
+          "requested_budget_seconds": 20,
+          "diagnostics": {
+            "routing_status": 1,
+            "time_limit_seconds": 14.0,
+            "objective": "emergency_unassigned, connection_unassigned, unassigned, engineers_used, distance_m",
+            "profile": null,
+            "priority_tiers": {
+              "emergency": [
+                "urgent"
+              ],
+              "connection": [
+                "high"
+              ],
+              "other": [
+                "normal"
+              ]
+            },
+            "emergency_coverage_floor": 12,
+            "search_distance_unit_metres": 1,
+            "optimality_proven": false,
+            "warm_start": true,
+            "weights": {
+              "start_minute": 0,
+              "reassignment": 0,
+              "engineer": 12276265,
+              "high_priority_bonus": 16499300160,
+              "drop": 196420240
+            }
+          },
+          "saved_missing_recovered": [
+            "23094",
+            "3151",
+            "40111",
+            "66944",
+            "75745"
+          ],
+          "newly_missing": [
+            "13404",
+            "2427",
+            "36961",
+            "45778",
+            "53552",
+            "89067"
+          ]
+        },
+        "all_engineers_car_same_shifts": {
+          "metrics": {
+            "assigned": 83,
+            "unassigned": 0,
+            "engineers_used": 13,
+            "distance_m": 1005653,
+            "travel_minutes": 1106,
+            "service_minutes": 4490
+          },
+          "status": "feasible_search_completed",
+          "objective_key": [
+            0,
+            0,
+            0,
+            13,
+            1005653
+          ],
+          "unassigned": [],
+          "assigned_by_priority": {
+            "urgent": 12,
+            "high": 36,
+            "normal": 35
+          },
+          "elapsed_seconds": 20.038326083002175,
+          "wall_seconds": 20.03919208300067,
+          "requested_budget_seconds": 20,
+          "diagnostics": {
+            "routing_status": 1,
+            "time_limit_seconds": 14.0,
+            "objective": "emergency_unassigned, connection_unassigned, unassigned, engineers_used, distance_m",
+            "profile": null,
+            "priority_tiers": {
+              "emergency": [
+                "urgent"
+              ],
+              "connection": [
+                "high"
+              ],
+              "other": [
+                "normal"
+              ]
+            },
+            "emergency_coverage_floor": 12,
+            "search_distance_unit_metres": 1,
+            "optimality_proven": false,
+            "warm_start": true,
+            "weights": {
+              "start_minute": 0,
+              "reassignment": 0,
+              "engineer": 11561943,
+              "high_priority_bonus": 15539251392,
+              "drop": 184991088
+            }
+          },
+          "saved_missing_recovered": [
+            "20362",
+            "23094",
+            "3151",
+            "40111",
+            "46199",
+            "57353",
+            "62011",
+            "63577",
+            "65268",
+            "66944",
+            "75745",
+            "78876"
+          ],
+          "newly_missing": []
+        }
+      },
+      "home_start_aliases": {
+        "audit-home-Юго-восток-01": "876",
+        "audit-home-Юго-восток-02": "79144",
+        "audit-home-Юго-восток-03": "14494",
+        "audit-home-Юго-восток-04": "11899",
+        "audit-home-Юго-восток-05": "88209",
+        "audit-home-Юго-восток-06": "95692",
+        "audit-home-Юго-восток-07": "58129",
+        "audit-home-Юго-восток-08": "44117",
+        "audit-home-Юго-восток-09": "19216",
+        "audit-home-Юго-восток-10": "97168",
+        "audit-home-Юго-восток-11": "81698",
+        "audit-home-Юго-восток-12": "55454",
+        "audit-home-Юго-восток-13": "79450",
+        "audit-home-Юго-восток-14": "60886",
+        "audit-home-Юго-восток-15": "12329"
+      },
+      "idle_engineer_skill_witnesses": []
+    },
+    {
+      "source": "data/demo-road/Югоцентр.json",
+      "sha256": "dbd04aca8e43f37b2b9d06817879765fff863829f83add0e1054226edd0ba9f1",
+      "region": "Югоцентр",
+      "request_count": 56,
+      "engineers": [
+        {
+          "id": "Югоцентр-01",
+          "name": "Инженер 01",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection",
+            "emergency"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-02",
+          "name": "Инженер 02",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-03",
+          "name": "Инженер 03",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-04",
+          "name": "Инженер 04",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-05",
+          "name": "Инженер 05",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "emergency"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-06",
+          "name": "Инженер 06",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection",
+            "emergency"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-07",
+          "name": "Инженер 07",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "local",
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-08",
+          "name": "Инженер 08",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 540,
+            "end": 1080
+          },
+          "skills": [
+            "connection"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-09",
+          "name": "Инженер 09",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local"
+          ],
+          "transport": "public",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-10",
+          "name": "Инженер 10",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "emergency"
+          ],
+          "transport": "car",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-11",
+          "name": "Инженер 11",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "connection",
+            "emergency"
+          ],
+          "transport": "car",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-12",
+          "name": "Инженер 12",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "connection"
+          ],
+          "transport": "car",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-13",
+          "name": "Инженер 13",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "connection"
+          ],
+          "transport": "walk",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-14",
+          "name": "Инженер 14",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local"
+          ],
+          "transport": "walk",
+          "stock": null
+        },
+        {
+          "id": "Югоцентр-15",
+          "name": "Инженер 15",
+          "region": "Югоцентр",
+          "start_location": "office",
+          "start_address": null,
+          "shift": {
+            "start": 780,
+            "end": 1320
+          },
+          "skills": [
+            "local",
+            "emergency"
+          ],
+          "transport": "bicycle",
+          "stock": null
+        }
+      ],
+      "travel_modes": {
+        "car": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-car",
+          "profile": "car",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 39.71092039
+        },
+        "walk": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-foot",
+          "profile": "walk",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 39.71092039
+        },
+        "bicycle": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-bike",
+          "profile": "bicycle",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 39.71092039
+        },
+        "public": {
+          "kind": "estimate",
+          "model": "multimodal-v3",
+          "network_signature": "a76977baf7925f0876de135574c86633cd7db7ca7ea5191f06f6b4a3ddecfb9f",
+          "pedestrian_access": "road-to-station-point",
+          "source": "HH open metro directory 2026-09-20; corrected service topology for demo 2026-08-17, see METRO-SOURCE.txt; GTFS Moscow, MobilityDatabase mdb-3226, snapshot 2026-06-30",
+          "service_date": "2026-08-17",
+          "description": "Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. Рельсовые поездки оценочные. Автобусы/трамваи: максимальное наблюдаемое время сегмента и полный максимальный интервал из GTFS за рабочий день, частое движение с 09:00 до 22:00. Нет расчёта под минуту отправления; вне подтверждённой сети используется только пеший маршрут.",
+          "assumptions": {
+            "walk_kmh": null,
+            "walk_detour_factor": null,
+            "max_access_straight_metres": 2500,
+            "nearest_stations": 6,
+            "nearest_surface_stops": 3,
+            "max_surface_access_straight_metres": 800,
+            "metro_kmh": 35,
+            "stop_minutes": 1,
+            "wait_minutes": 3,
+            "entry_exit_minutes": 2,
+            "transfer_radius_metres": 700,
+            "max_approach_minutes": 45,
+            "max_transfer_walk_minutes": 20
+          },
+          "journey_counts": {
+            "walk": 787,
+            "multimodal": 2462
+          }
+        }
+      },
+      "saved": {
+        "metrics": {
+          "assigned": 55,
+          "unassigned": 1,
+          "engineers_used": 10,
+          "distance_m": 183168,
+          "travel_minutes": 1198,
+          "service_minutes": 2810
+        },
+        "status": "feasible_search_completed",
+        "objective_key": [
+          0,
+          0,
+          1,
+          10,
+          183168
+        ],
+        "unassigned": [
+          "78036"
+        ],
+        "assigned_by_priority": {
+          "urgent": 1,
+          "high": 28,
+          "normal": 26
+        },
+        "elapsed_seconds": 5.019626207998954
+      },
+      "requests": [
+        {
+          "request": {
+            "id": "78036",
+            "region": "Югоцентр",
+            "address": "Город Москва, пр-кт.60-летия Октября, д. 17",
+            "locality": "Академический",
+            "date": "2026-08-17",
+            "bk_type": "Дозаказ",
+            "hd_type": "Конвергенция абонента",
+            "windows": [
+              {
+                "start": 1200,
+                "end": 1320
+              }
+            ],
+            "duration_minutes": 20,
+            "skill": "connection",
+            "required_transport": null,
+            "priority": "normal",
+            "equipment": {
+              "router": 1,
+              "tv_box": 1
+            },
+            "source_line": 30,
+            "provenance": {
+              "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+              "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+              "equipment": "A09/I04: seeded synthetic demand",
+              "coordinates": "Photon / OpenStreetMap; building_match",
+              "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+              "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+              "order": "I01: CSV row order"
+            }
+          },
+          "eligible_engineers": [
+            {
+              "engineer": "Югоцентр-01",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 68,
+              "earliest_arrival": 608,
+              "relaxed_minutes": 68,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Югоцентр-02",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 68,
+              "earliest_arrival": 608,
+              "relaxed_minutes": 68,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Югоцентр-03",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 68,
+              "earliest_arrival": 608,
+              "relaxed_minutes": 68,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Югоцентр-06",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 68,
+              "earliest_arrival": 608,
+              "relaxed_minutes": 68,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Югоцентр-07",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 68,
+              "earliest_arrival": 608,
+              "relaxed_minutes": 68,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Югоцентр-08",
+              "transport": "public",
+              "shift": {
+                "start": 540,
+                "end": 1080
+              },
+              "stock_ok": true,
+              "direct_minutes": 68,
+              "earliest_arrival": 608,
+              "relaxed_minutes": 68,
+              "singleton_feasible": false,
+              "relaxed_singleton_feasible": false,
+              "zero_initial_travel_feasible": false
+            },
+            {
+              "engineer": "Югоцентр-11",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 10,
+              "earliest_arrival": 790,
+              "relaxed_minutes": 10,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Югоцентр-12",
+              "transport": "car",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 10,
+              "earliest_arrival": 790,
+              "relaxed_minutes": 10,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            },
+            {
+              "engineer": "Югоцентр-13",
+              "transport": "walk",
+              "shift": {
+                "start": 780,
+                "end": 1320
+              },
+              "stock_ok": true,
+              "direct_minutes": 69,
+              "earliest_arrival": 849,
+              "relaxed_minutes": 69,
+              "singleton_feasible": true,
+              "relaxed_singleton_feasible": true,
+              "zero_initial_travel_feasible": true
+            }
+          ],
+          "singleton_feasible_engineers": [
+            "Югоцентр-11",
+            "Югоцентр-12",
+            "Югоцентр-13"
+          ],
+          "impossible_under_relaxed_travel": false,
+          "saved_route_insertions": []
+        }
+      ],
+      "experiments": {
+        "original": {
+          "metrics": {
+            "assigned": 55,
+            "unassigned": 1,
+            "engineers_used": 10,
+            "distance_m": 174476,
+            "travel_minutes": 1255,
+            "service_minutes": 2810
+          },
+          "status": "feasible_search_completed",
+          "objective_key": [
+            0,
+            0,
+            1,
+            10,
+            174476
+          ],
+          "unassigned": [
+            "78036"
+          ],
+          "assigned_by_priority": {
+            "urgent": 1,
+            "high": 28,
+            "normal": 26
+          },
+          "elapsed_seconds": 20.021554209000897,
+          "wall_seconds": 20.02241850000064,
+          "requested_budget_seconds": 20,
+          "diagnostics": {
+            "routing_status": 1,
+            "time_limit_seconds": 14.0,
+            "objective": "emergency_unassigned, connection_unassigned, unassigned, engineers_used, distance_m",
+            "profile": null,
+            "priority_tiers": {
+              "emergency": [
+                "urgent"
+              ],
+              "connection": [
+                "high"
+              ],
+              "other": [
+                "normal"
+              ]
+            },
+            "emergency_coverage_floor": 1,
+            "search_distance_unit_metres": 1,
+            "optimality_proven": false,
+            "warm_start": true,
+            "weights": {
+              "start_minute": 0,
+              "reassignment": 0,
+              "engineer": 1598992,
+              "high_priority_bonus": 1458280704,
+              "drop": 25583872
+            }
+          },
+          "saved_missing_recovered": [],
+          "newly_missing": []
+        },
+        "home_at_saved_first_client": {
+          "metrics": {
+            "assigned": 55,
+            "unassigned": 1,
+            "engineers_used": 10,
+            "distance_m": 127336,
+            "travel_minutes": 847,
+            "service_minutes": 2810
+          },
+          "status": "feasible_search_completed",
+          "objective_key": [
+            0,
+            0,
+            1,
+            10,
+            127336
+          ],
+          "unassigned": [
+            "78036"
+          ],
+          "assigned_by_priority": {
+            "urgent": 1,
+            "high": 28,
+            "normal": 26
+          },
+          "elapsed_seconds": 20.028351541997836,
+          "wall_seconds": 20.02909479200025,
+          "requested_budget_seconds": 20,
+          "diagnostics": {
+            "routing_status": 1,
+            "time_limit_seconds": 14.0,
+            "objective": "emergency_unassigned, connection_unassigned, unassigned, engineers_used, distance_m",
+            "profile": null,
+            "priority_tiers": {
+              "emergency": [
+                "urgent"
+              ],
+              "connection": [
+                "high"
+              ],
+              "other": [
+                "normal"
+              ]
+            },
+            "emergency_coverage_floor": 1,
+            "search_distance_unit_metres": 1,
+            "optimality_proven": false,
+            "warm_start": true,
+            "weights": {
+              "start_minute": 0,
+              "reassignment": 0,
+              "engineer": 1598992,
+              "high_priority_bonus": 1458280704,
+              "drop": 25583872
+            }
+          },
+          "saved_missing_recovered": [],
+          "newly_missing": []
+        }
+      },
+      "home_start_aliases": {
+        "audit-home-Югоцентр-01": "80308",
+        "audit-home-Югоцентр-02": "12263",
+        "audit-home-Югоцентр-03": "6957",
+        "audit-home-Югоцентр-04": "office",
+        "audit-home-Югоцентр-05": "office",
+        "audit-home-Югоцентр-06": "94447",
+        "audit-home-Югоцентр-07": "5406",
+        "audit-home-Югоцентр-08": "office",
+        "audit-home-Югоцентр-09": "86864",
+        "audit-home-Югоцентр-10": "office",
+        "audit-home-Югоцентр-11": "10776",
+        "audit-home-Югоцентр-12": "51133",
+        "audit-home-Югоцентр-13": "93544",
+        "audit-home-Югоцентр-14": "office",
+        "audit-home-Югоцентр-15": "18023"
+      },
+      "idle_engineer_skill_witnesses": [
+        {
+          "request_id": "78036",
+          "engineer": "Югоцентр-10",
+          "added_skill": "connection",
+          "result": {
+            "metrics": {
+              "assigned": 56,
+              "unassigned": 0,
+              "engineers_used": 11,
+              "distance_m": 189322,
+              "travel_minutes": 1208,
+              "service_minutes": 2830
+            },
+            "status": "skill_counterfactual_witness",
+            "objective_key": [
+              0,
+              0,
+              0,
+              11,
+              189322
+            ],
+            "unassigned": [],
+            "assigned_by_priority": {
+              "urgent": 1,
+              "high": 28,
+              "normal": 27
+            },
+            "elapsed_seconds": 0.0
+          }
+        },
+        {
+          "request_id": "78036",
+          "engineer": "Югоцентр-14",
+          "added_skill": "connection",
+          "result": {
+            "metrics": {
+              "assigned": 56,
+              "unassigned": 0,
+              "engineers_used": 11,
+              "distance_m": 188329,
+              "travel_minutes": 1267,
+              "service_minutes": 2830
+            },
+            "status": "skill_counterfactual_witness",
+            "objective_key": [
+              0,
+              0,
+              0,
+              11,
+              188329
+            ],
+            "unassigned": [],
+            "assigned_by_priority": {
+              "urgent": 1,
+              "high": 28,
+              "normal": 27
+            },
+            "elapsed_seconds": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

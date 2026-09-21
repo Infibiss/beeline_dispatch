@@ -120,6 +120,7 @@
     map = window.L.map('map',{scrollWheelZoom:false}).setView([55.75,37.62],10);
     mapLayer = window.L.layerGroup().addTo(map);
     const tiles = window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      referrerPolicy:'strict-origin-when-cross-origin',
       maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openstreetmap.org/fixthemap">Исправить карту</a>'}).addTo(map);
     tiles.on('tileerror',()=>{ tileState='Подложка недоступна. Точки и маршруты сохранены; для карты нужен интернет.'; updateMapStatus(); });
     tiles.on('tileload',()=>{ tileState='Подложка © OpenStreetMap · нужна сеть.'; updateMapStatus(); });

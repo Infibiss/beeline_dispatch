@@ -1,5 +1,14 @@
 (function () {
   'use strict';
+  function uniqueEventId() {
+    // randomUUID is unavailable on http://LAN-IP in mobile browsers.
+    const source = globalThis.crypto;
+    if (source && typeof source.randomUUID === 'function') return source.randomUUID();
+    if (source && typeof source.getRandomValues === 'function') {
+      return 'event-' + Array.from(source.getRandomValues(new Uint32Array(4)), n => n.toString(16).padStart(8, '0')).join('');
+    }
+    return 'event-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  }
   function minute(value) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('Укажите корректное время события.');
     const [h, m] = value.split(':').map(Number);
@@ -10,14 +19,24 @@
     return String(Math.floor(value / 60)).padStart(2, '0') + ':' + String(value % 60).padStart(2, '0');
   }
   function eventPayload(version, input) {
-    if (input.type !== 'replan' && !input.target) throw new Error('Выберите заявку или инженера.');
+    if (!['replan','unavailable'].includes(input.type) && !input.target) throw new Error('Выберите заявку или инженера.');
     const event = {id: input.id, type: input.type, time: minute(input.time)};
     if (input.type === 'emergency') {
       const duration = Number(input.duration), router = Number(input.router);
       if (!Number.isInteger(duration) || duration < 1 || duration > 1440 || !Number.isInteger(router) || router < 0) throw new Error('Проверьте длительность и количество роутеров.');
       Object.assign(event, {anchor_id: input.target, duration_minutes: duration, router});
     } else if (input.type === 'cancel') event.request_id = input.target;
-    else if (input.type === 'unavailable') event.engineer_id = input.target;
+    else if (input.type === 'unavailable') {
+      if (input.engineerIds !== undefined) {
+        if (!Array.isArray(input.engineerIds) || !input.engineerIds.length ||
+            input.engineerIds.some(id=>typeof id!=='string' || !id) || new Set(input.engineerIds).size!==input.engineerIds.length)
+          throw new Error('Выберите одного или нескольких инженеров.');
+        event.engineer_ids = [...input.engineerIds];
+      } else {
+        if (!input.target) throw new Error('Выберите инженера.');
+        event.engineer_id = input.target;
+      }
+    }
     else if (input.type !== 'replan') throw new Error('Неизвестный тип события.');
     return {version, event, allow_redirect: input.type === 'emergency' && !!input.redirect, preserve_in_progress: !!input.preserve};
   }
@@ -51,10 +70,11 @@
     if (visit.start <= now) return 'В работе';
     return visit.arrival > now ? 'В пути · работа закреплена' : 'Ожидание · работа закреплена';
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {requestsForEngineer, eventPayload, factPayload, minute, time, frozenStatus};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {requestsForEngineer, eventPayload, factPayload, minute, time, frozenStatus, uniqueEventId};
   if (typeof document === 'undefined') return;
-  const regionURL = path => new URL(path.replace(/^\//, ''), new URL('.', location.href)).href;
   const $ = id => document.getElementById(id);
+  const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
+  const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
   let state = null, batch = null, selected = null, busy = false;
   const strategyNames = {sla:'Раньше приоритетные', stable:'Меньше изменений', cost:'Меньше ресурсов'};
   function strategyName(c) { return strategyNames[c.id] || c.label; }
@@ -67,7 +87,7 @@
     return node;
   }
   function controls() {
-    $('region-select').disabled=busy || $('region-select').options.length<2;
+    window.dispatchEvent(new CustomEvent('planning-busy',{detail:{busy}}));
     $('event-fields').disabled = busy || !state;
     $('facts-fields').disabled = busy || !state;
     $('plan-version').disabled = busy || !state;
@@ -78,6 +98,7 @@
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
   }
   function resetCandidates(message) {
+    $('excluded-summary').hidden=true;
     batch = null; selected = null; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('observation-warnings').textContent = ''; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
     $('candidates').replaceChildren(element('div', message || 'Задайте событие и рассчитайте варианты.', 'empty'));
     $('diff-title').textContent = 'Изменения выбранного варианта';
@@ -99,7 +120,7 @@
     controls();
   }
   async function request(path, payload) {
-    const response = await fetch(regionURL(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
+    const response = await appFetch(appUrl(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
     let data;
     try { data = await response.json(); } catch { throw new Error('Сервер вернул некорректный ответ. Откройте страницу через локальный сервер.'); }
     if (!response.ok) { const error = new Error((response.status === 409 ? 'Версия изменилась. ' : '') + (data.error || 'Ошибка сервера.')); error.httpStatus = response.status; throw error; }
@@ -108,8 +129,17 @@
   function targets() {
     if (!state) return;
     const engineer = $('event-type').value === 'unavailable', emergency = $('event-type').value === 'emergency', replan = $('event-type').value === 'replan';
-    $('event-target').hidden = replan; $('target-label').hidden = replan;
-    $('event-target').disabled = replan; $('event-target').required = !replan;
+    $('event-target').hidden = replan || engineer; $('target-label').hidden = replan || engineer;
+    $('event-target').disabled = replan || engineer; $('event-target').required = !replan && !engineer;
+    $('event-engineers-group').hidden = !engineer;
+    const chosen = new Set([...$('event-engineers').querySelectorAll('input:checked')].map(input=>input.value));
+    $('event-engineers').replaceChildren(...state.engineers.map(item=>{
+      const label=element('label');label.className='check';
+      const checkbox=element('input');checkbox.type='checkbox';checkbox.value=item.id;
+      checkbox.disabled=(state.excluded_engineer_ids || []).includes(item.id);
+      checkbox.checked=!checkbox.disabled && chosen.has(item.id);
+      label.append(checkbox,element('span',item.name+(checkbox.disabled?' · уже исключён':'')));return label;
+    }));
     $('emergency-fields').hidden = !emergency;
     $('duration').disabled = !emergency; $('router').disabled = !emergency;
     $('target-label').textContent = engineer ? 'Недоступный инженер' : emergency ? 'Место аварии' : 'Отменяемая заявка';
@@ -121,7 +151,8 @@
   function renderState(data) {
     if (!data || data.version == null || !Array.isArray(data.requests) || !Array.isArray(data.engineers)) throw new Error('Сервер вернул неполное состояние.');
     state = data;
-    $('region').textContent = data.region || '—'; $('version').textContent = '№ ' + data.version;
+    $('remote-update').hidden = true;
+    $('region').textContent = data.region || '—'; $('status').classList.toggle('attention', !!data.needs_replanning); $('version').textContent = data.version;
     $('clock').textContent = time(data.time); $('event-time').value = time(data.time); $('event-time').min = time(data.time);
     const count = (data.plan && data.plan.routes || []).reduce((sum, route) => sum + (route.visits || []).length, 0);
     $('coverage').textContent = count + ' / ' + data.requests.length;
@@ -145,6 +176,8 @@
     $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', '№ ' + item.version + ' · ' + time(item.time) + ' · ' + (item.label || 'План') + (item.version === data.version ? ' · текущий' : '')); option.value = item.version; return option; }));
     $('plan-version').value = String(data.version); showPlan();
     renderFacts(); factFields(); targets(); resetCandidates();
+    window.dispatchEvent(new CustomEvent('planning-state',{detail:{version:data.version,time:data.time,
+      engineers:data.engineers,excludedEngineerIds:data.excluded_engineer_ids || []}}));
   }
   function populateSelect(id, values, label, empty) {
     const options = values.map(item => { const option = element('option', label(item)); option.value = item.id; return option; });
@@ -154,8 +187,8 @@
   function showPlan() {
     if (!state) return;
     const version = $('plan-version').value, historical = String(state.version) !== version;
-    $('plan-frame').src = regionURL('/dispatcher?version=' + encodeURIComponent(version));
-    $('plan-context').textContent = historical ? 'Просмотр истории · текущий план № ' + state.version : state.needs_replanning ? 'План требует пересчёта по новым статусам.' : '';
+    $('plan-frame').src = appUrl('/dispatcher?version=' + encodeURIComponent(version));
+    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : 'Текущий утверждённый план · версия ' + version + '.';
     $('plan-context').classList.toggle('attention', !historical && !!state.needs_replanning);
   }
   function factRequests() {
@@ -205,9 +238,11 @@
     const rows = (state.fact_journal || state.statuses || []).map(fact => {
       const row = element('tr'), location = (state.locations || []).find(item => item.id === fact.location_id);
       [engineerName(fact.engineer_id), factLabels[fact.status] || fact.status, requestName(fact.request_id), time(fact.time), location ? location.label : fact.location_id || '—', fact.remaining_minutes ?? '—', fact.recorded_at && !fact.recorded_at.startsWith('unknown') ? new Date(fact.recorded_at).toLocaleString('ru-RU') : '—'].forEach(value => row.append(element('td', value)));
+      const report = element('td', (fact.source === 'engineer' ? 'Инженер' : 'Диспетчер') + (fact.comment ? ': ' + fact.comment : ''));
+      report.className = 'fact-comment'; row.append(report);
       return row;
     });
-    fillTable('facts-body', rows, 7, 'Фактические статусы ещё не записаны.');
+    fillTable('facts-body', rows, 8, 'Фактические статусы ещё не записаны.');
     const revisions=(state.fact_audit || []).filter(r=>r.replaces);
     $('fact-audit').replaceChildren(...revisions.map(r=>element('p',engineerName(r.fact.engineer_id)+' · '+time(r.previous.time)+' '+factLabels[r.previous.status]+' → '+time(r.fact.time)+' '+factLabels[r.fact.status]+'. '+r.reason)));
     if(!revisions.length)$('fact-audit').textContent='Исправлений нет.';
@@ -296,6 +331,11 @@
   function renderBatch(data) {
     if (!data || !Array.isArray(data.candidates) || data.version !== state.version) throw new Error('Варианты не соответствуют текущей версии.');
     batch = data; selected = null;
+    const excluded=data.excluded_engineers || [];
+    $('excluded-summary').hidden=!excluded.length;
+    $('excluded-summary').textContent=excluded.length
+      ? 'Расчёт с '+time(data.event.time)+' без: '+excluded.map(item=>item.name).join(', ')+'. Проверьте переназначения и заявки без исполнителя. Изменения вступят в силу после «Применить план».'
+      : '';
     $('ai-panel').hidden=!data.llm_enabled || !data.candidates.length;
     $('ai-recommend').disabled=false;
     $('ai-result').textContent='ИИ сравнит варианты и предложит план. Утверждение остаётся за вами.';
@@ -351,7 +391,7 @@
     const point=addressCandidates.find(p=>p.id===$('address-candidates').value);
     $('address-map').hidden = !point;
     $('address-context').textContent = point ? (point.quality==='approximate' ? 'Приблизительное совпадение — проверьте точку. ' : 'Совпадение здания. ') + point.lat + ', ' + point.lon : '';
-    if(point) $('address-map').src=regionURL('/address-preview?version='+state.version+'&candidate_id='+encodeURIComponent(point.id));
+    if(point) $('address-map').src=appUrl('/address-preview?version='+state.version+'&candidate_id='+encodeURIComponent(point.id));
     controls();
   }
   $('address-candidates').addEventListener('change',addressSelection);
@@ -374,11 +414,13 @@
   $('event-form').addEventListener('submit', async event => {
     event.preventDefault(); if (busy || !state) return;
     let payload;
-    try { payload = eventPayload(state.version, {id: crypto.randomUUID(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value, duration: $('duration').value, router: $('router').value, redirect: $('redirect').checked, preserve: $('preserve').checked}); }
+    try { payload = eventPayload(state.version, {id: uniqueEventId(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value,
+      engineerIds:[...$('event-engineers').querySelectorAll('input:checked:not(:disabled)')].map(input=>input.value),
+      duration: $('duration').value, router: $('router').value, redirect: $('redirect').checked, preserve: $('preserve').checked}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Расчёт может занять несколько секунд…';
     try { renderBatch(await request('/api/preview', payload)); $('status').textContent = 'Расчёт завершён. Выберите вариант и проверьте изменения.'; }
-    catch (error) { failure(error); }
+    catch (error) { failure(error); $('error').scrollIntoView({block:'center'}); }
     finally { busy = false; controls(); }
   });
   $('approve').addEventListener('click', async () => {
@@ -389,10 +431,40 @@
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   });
-  const tabs = ['plan', 'events', 'facts'];
+  const tabs = ['plan', 'risk', 'events', 'facts', 'gps'];
   function activateTab(name) {
     tabs.forEach(tab => { const active = tab === name; $('tab-' + tab).setAttribute('aria-selected', String(active)); $('tab-' + tab).tabIndex = active ? 0 : -1; $('panel-' + tab).hidden = !active; });
+    if (name === 'plan') requestAnimationFrame(() => $('plan-frame').resizePlan?.());
+    window.dispatchEvent(new CustomEvent('workbench-tab', {detail: {name}}));
   }
+  window.addEventListener('gps-intent', event => {
+    if (!state || busy) return;
+    if (event.detail.action === 'facts') {
+      activateTab('facts');
+      if ([...$('fact-engineer').options].some(o => o.value === event.detail.engineerId)) $('fact-engineer').value = event.detail.engineerId;
+      factRequests(); factFields(); $('fact-engineer').focus();
+    } else if (event.detail.action === 'replan') {
+      $('event-type').value = 'replan'; targets(); resetCandidates(); activateTab('events'); $('preview').focus();
+    } else if (event.detail.action === 'exclude') {
+      const ids=event.detail.engineerIds || [];
+      if (event.detail.version!==state.version) {
+        $('error').textContent='Версия плана изменилась. Обновите страницу и выберите инженеров заново.';
+        $('error').hidden=false;$('error').scrollIntoView({block:'center'});return;
+      }
+      if(!ids.length || ids.some(id=>!state.engineers.some(e=>e.id===id) || (state.excluded_engineer_ids || []).includes(id)))return;
+      $('event-type').value='unavailable';targets();
+      $('event-engineers').querySelectorAll('input').forEach(input=>{input.checked=ids.includes(input.value);});
+      $('event-time').value=event.detail.time;
+      $('preserve').checked=true;resetCandidates();activateTab('events');
+      $('panel-events').scrollIntoView({block:'start'});
+      $('event-form').requestSubmit();
+    }
+  });
+  window.addEventListener('risk-intent', event => {
+    if (!state || busy) return;
+    if (event.detail?.action === 'facts') {activateTab('facts');$('fact-engineer').focus();}
+    if (event.detail?.action === 'replan') {activateTab('events');$('event-type').focus();}
+  });
   tabs.forEach((name, index) => {
     $('tab-' + name).addEventListener('click', () => activateTab(name));
     $('tab-' + name).addEventListener('keydown', event => {
@@ -433,11 +505,22 @@
     finally { busy = false; controls(); }
   });
   $('reload').addEventListener('click', reload);
-  request('/api/regions').then(data=>{
-    $('region-select').replaceChildren(...data.regions.map(r=>{const o=element('option',r.name);o.value=r.url;o.selected=r.id===data.current;return o;}));
-    controls();
-  }).catch(()=>{ $('region-select').replaceChildren(element('option','Регион недоступен')); });
-  $('region-select').addEventListener('change',()=>{if(!busy) location.href=$('region-select').value;});
+  $('load-remote').addEventListener('click', reload);
+  let polling = false;
+  setInterval(async () => {
+    if (!state || busy || polling || document.hidden) return;
+    polling = true;
+    try {
+      const revision = await request('/api/revision');
+      if (state && revision.version !== state.version) {
+        $('remote-update-text').textContent = 'Есть новые факты или назначения с другого устройства (версия ' + revision.version + '). Загрузите изменения перед продолжением.';
+        $('remote-update').hidden = false;
+      }
+    } catch {
+      $('remote-update-text').textContent = 'Связь с сервером потеряна. Показанные данные могут быть устаревшими.';
+      $('remote-update').hidden = false;
+    } finally { polling = false; }
+  }, 5000);
   reload();
 })();
 
@@ -446,6 +529,12 @@ if (typeof document !== 'undefined') document.getElementById('plan-frame')?.addE
   const frame = this, body = frame.contentDocument?.body;
   if (!body) return;
   if (frame.planObserver) frame.planObserver.disconnect();
-  const resize = () => { frame.style.height = Math.ceil(body.getBoundingClientRect().height + 24) + 'px'; };
+  const resize = () => {
+    // Hidden tabs report zero height; do not collapse a working plan to 24px.
+    if (!frame.getClientRects().length) return;
+    const height = Math.ceil(body.getBoundingClientRect().height + 24);
+    if (height > 24 && frame.style.height !== height + 'px') frame.style.height = height + 'px';
+  };
+  frame.resizePlan = resize;
   frame.planObserver = new ResizeObserver(resize); frame.planObserver.observe(body); resize();
 });

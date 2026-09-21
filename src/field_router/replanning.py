@@ -22,6 +22,7 @@ class Event(Model):
     time: int = Field(ge=0,le=1440,strict=True)
     request_id: str | None = None
     engineer_id: str | None = None
+    engineer_ids: list[str] = Field(default_factory=list,max_length=100)
     anchor_id: str | None = None
     duration_minutes: int = Field(default=80,gt=0,le=1440,strict=True)
     router: int = Field(default=0,ge=0,le=100,strict=True)
@@ -204,6 +205,7 @@ class ScenarioSession:
     def state(self):
         return {'historical_requests':self.historical_requests(),'fact_journal':deepcopy(self.fact_log),'fact_audit':deepcopy(self.fact_audit),'execution_mode':self.execution_mode,'version':self.version,'time':self.time,'region':self.scenario.region,'approximate_locations':sum(p.quality=='approximate' for p in self.geography.locations.values()) if self.geography else 0,'simulation':not bool(self.statuses),'geography_mode':'road' if self.geography else 'synthetic',
             'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values())),'needs_replanning':self.needs_replanning,
+            'excluded_engineer_ids':sorted(self.excluded_engineers()),
             'locations':[{'id':k,'label':self.catalog[k].address if k in self.catalog else ('Офис' if k=='office' else (self.geo_locations[k].original_address or self.geo_locations[k].label) if k in self.geo_locations else k)} for k in (self.geo_locations if self.geography else self.scenario.points) if not k.startswith(('start:','position:','resume:','closed:','observed:'))],
             'versions':[{'version':v,'time':p['operations']['time'],'label':p['operations']['label']} for v,p in self.views.items()],
             'requests':[{'id':r.id,'address':r.address,'priority':r.priority,'duration_minutes':r.duration_minutes} for r in self.scenario.requests],
@@ -212,9 +214,30 @@ class ScenarioSession:
             'plan':self.plan.model_dump(mode='json'),'history':deepcopy(self.history),
             'frozen':deepcopy(self.frozen),'inventory':deepcopy(self.inventory)}
 
+    def excluded_engineers(self):
+        """Approved exclusions survive later replans and factual projections.
+
+        A newer explicit 'available' fact returns a worker to planning.
+        The roster and mobile identity are never removed.
+        """
+        excluded={}
+        for entry in self.history:
+            event=entry['event']
+            if event['type']=='unavailable':
+                for eid in event.get('engineer_ids') or [event.get('engineer_id')]:
+                    if eid in self.initial_engineers:excluded[eid]=event['time']
+        for fact in self.fact_log:
+            eid=fact['engineer_id']
+            if fact['status']=='available' and eid in excluded and fact['time']>excluded[eid]:
+                excluded.pop(eid)
+        return set(excluded)
+
     def _residual(self,event,allow_redirect,preserve):
         s=self.scenario
         now=event.time
+        unavailable=self.excluded_engineers()
+        if event.type=='unavailable':
+            unavailable.update(event.engineer_ids or [event.engineer_id])
         if self.execution_mode=='manual':
             s=s.model_copy(update={'engineers':[e.model_copy(update={'shift':TimeWindow(start=min(now,e.shift.end),end=min(now,e.shift.end))}) if e.id not in self.statuses else e for e in s.engineers]})
         for route in self.frozen:
@@ -222,8 +245,9 @@ class ScenarioSession:
             for visit in route['visits']:
                 if visit['start']<=now<visit['end']:
                     if not preserve:raise ValueError('Есть начатая закрепленная работа: явно включите сохранение до завершения')
-                    if event.type=='unavailable' and event.engineer_id==route['engineer_id']:
-                        raise ValueError('Инженер выполняет закрепленную работу: уточните фактическое завершение/прерывание')
+                    if route['engineer_id'] in unavailable:
+                        name=self.initial_engineers[route['engineer_id']].name
+                        raise ValueError(name+': выполняет закрепленную работу. Сначала отметьте завершение или прерывание во вкладке «Статусы инженеров».')
         routes={r.engineer_id:r for r in self.plan.routes if self.execution_mode!='manual' or r.engineer_id in self.statuses}
         prior_frozen=deepcopy(self.frozen)
         if self.statuses:s,routes,prior_frozen=apply_observations(self,s,routes,prior_frozen,now,
@@ -235,7 +259,7 @@ class ScenarioSession:
         for route in prior_frozen:
             released=[]
             for visit in list(route['visits']):
-                can_release=(event.type=='emergency' and allow_redirect) or (event.type=='unavailable' and event.engineer_id==route['engineer_id'])
+                can_release=(event.type=='emergency' and allow_redirect) or route['engineer_id'] in unavailable
                 if visit['start']<=now or not can_release:continue
                 origin=route['origins'][visit['request_id']]
                 e=updated_engineers[route['engineer_id']]
@@ -272,8 +296,8 @@ class ScenarioSession:
                 freeze=v.end<=now or in_work or (on_road and not (allow_redirect and event.type=='emergency'))
                 # A failed engineer cannot finish the trip. Work already started
                 # needs an explicit actual-state update, not a fictional finish.
-                if event.type=='unavailable' and event.engineer_id==e.id:
-                    if in_work:raise ValueError('Инженер выполняет работу: сначала требуется уточнить фактическое завершение/прерывание')
+                if e.id in unavailable:
+                    if in_work:raise ValueError(self.initial_engineers[e.id].name+': выполняет работу. Сначала отметьте завершение или прерывание во вкладке «Статусы инженеров».')
                     if v.end>now:freeze=False
                 if freeze:
                     origins[v.request_id]={'location':location,'departure':departure}
@@ -282,10 +306,7 @@ class ScenarioSession:
                     location=v.request_id
                     ready=max(ready,v.end)
                 else:
-                    # This engineer is removed, not rerouted. Its current position
-                    # is unnecessary; release future work without inventing GPS.
-                    if event.type=='unavailable' and event.engineer_id==e.id:break
-                    if on_road:
+                    if on_road and e.id not in unavailable:
                         observation=self.statuses.get(e.id,{})
                         if observation.get('status')=='traveling' and observation.get('time')==now:
                             location=observation['location_id']
@@ -302,7 +323,7 @@ class ScenarioSession:
                 departure=v.end
             if keep:frozen.append({'engineer_id':e.id,'visits':keep,'origins':origins})
             if any(v<0 for v in stock.values()):raise ValueError('Отрицательный остаток оборудования')
-            if event.type=='unavailable' and event.engineer_id==e.id:continue
+            if e.id in unavailable:continue
             ready=min(ready,e.shift.end)  # Retain identity for later release of a frozen trip.
             alias=f'start:{self.version}:{e.id}:{now}'
             points[alias]=points[location]
@@ -360,7 +381,16 @@ class ScenarioSession:
             anchors=set(self.catalog)|set(self.geo_locations)
             if 'office' in self.scenario.points:anchors.add('office')
             if event.anchor_id not in anchors:raise ValueError('Неизвестная точка новой аварии')
-        if event.type=='unavailable' and event.engineer_id not in {e.id for e in self.scenario.engineers}:raise ValueError('Неизвестный инженер')
+        if event.type=='unavailable':
+            if event.engineer_id is not None and event.engineer_ids:
+                raise ValueError('Укажите engineer_id или engineer_ids, не оба поля')
+            selected=event.engineer_ids or ([event.engineer_id] if event.engineer_id is not None else [])
+            if not selected:raise ValueError('Выберите хотя бы одного инженера')
+            if len(selected)!=len(set(selected)):raise ValueError('Инженеры в списке не должны повторяться')
+            if set(selected)-set(self.initial_engineers):raise ValueError('Неизвестный инженер в выбранном районе')
+            if set(selected) & self.excluded_engineers():raise ValueError('Один из инженеров уже исключён из планирования; обновите список')
+        elif event.engineer_ids:
+            raise ValueError('Список инженеров поддерживается только для события недоступности')
         for key in ('allow_redirect','preserve_in_progress'):
             if type(payload.get(key,False)) is not bool:raise ValueError('Ожидается явный переключатель '+key)
         s,frozen,inventory=self._residual(event,payload.get('allow_redirect',False),payload.get('preserve_in_progress',False))
@@ -403,6 +433,9 @@ class ScenarioSession:
             seen.setdefault(signature,profile)
         batch={'request_labels':labels,'observation_warnings':[f"{self.initial_engineers[eid].name}: последний ручной факт в {f['time']//60:02}:{f['time']%60:02}; последующее выполнение не подтверждено." for eid,f in self.statuses.items() if f['time']<event.time],'id':uuid4().hex,'version':self.version,'event':event.model_dump(),'candidates':candidates,'frozen':frozen,'inventory':inventory,
             'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам.'}
+        excluded=self.excluded_engineers()
+        if event.type=='unavailable':excluded.update(event.engineer_ids or [event.engineer_id])
+        batch['excluded_engineers']=[{'id':eid,'name':self.initial_engineers[eid].name} for eid in sorted(excluded)]
         # Internal payload never trusts a plan sent back from the browser.
         self.batches[batch['id']]={'batch':deepcopy(batch),'scenario':s,'hash':fingerprint(batch),'policy':{'allow_redirect':payload.get('allow_redirect',False),'preserve_in_progress':payload.get('preserve_in_progress',False)}}
         return batch

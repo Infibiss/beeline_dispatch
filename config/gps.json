@@ -1,0 +1,16 @@
+{
+  "max_accuracy_m": 100,
+  "stale_seconds": 90,
+  "offline_seconds": 120,
+  "stationary_seconds": 120,
+  "moving_away_m": 300,
+  "near_target_m": 80,
+  "shift_grace_minutes": 10,
+  "utc_offset_minutes": 180,
+  "model_timeout_seconds": 1,
+  "startup_timeout_seconds": 8,
+  "failure_threshold": 3,
+  "cooldown_seconds": 20,
+  "max_points": 120,
+  "max_engineers": 100
+}

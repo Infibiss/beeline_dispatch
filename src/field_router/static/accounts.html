@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Доступ сотрудников · Выездная служба</title><link rel="stylesheet" href="/auth.css"><script src="/accounts.js" defer></script></head>
+<body><main class="accounts"><a href="/">← Диспетчерская</a><h1>Доступ сотрудников</h1><p>Учётная запись привязывается к сохранённому инженеру. Сотрудник видит только свои задачи и передаёт свои статусы и GPS.</p>
+<section class="account-panel"><h2>Выдать доступ</h2><p class="muted">Сначала добавьте инженера в разделе «Бригады и запас» и нажмите «Сохранить состав и пересчитать».</p>
+<form id="account-form"><div class="account-grid">
+<div><label for="account-region">Район</label><select id="account-region" required></select></div>
+<div><label for="account-engineer">Инженер</label><select id="account-engineer" required></select></div>
+<div><label for="account-login">Логин</label><input id="account-login" autocomplete="off" pattern="[a-zA-Z0-9._-]{3,64}" required placeholder="engineer16"></div>
+<div><label for="account-password">Начальный пароль · от 12 символов</label><input id="account-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></div>
+</div><button id="account-create" type="submit">Создать учётную запись</button></form><p id="account-message" role="status"></p></section>
+<section class="account-panel"><h2>Учётные записи</h2><p class="muted">Смена пароля и блокировка закрывают открытые сеансы. Удаление инженера из состава также прекращает его доступ.</p><div id="account-list"></div></section>
+</main></body></html>

@@ -88,6 +88,27 @@ def test_recommended_roster_uses_control_count_and_remote_starts():
  assert all(e['stock_mode']=='plan' and e['router']==1 for e in a)
 
 
+def test_all_home_starts_can_apply_restore_and_return_to_office():
+ import json
+ from pathlib import Path
+ from field_router.models import Scenario,Plan
+ p=json.loads(Path('data/demo-road/Восток.json').read_text(encoding='utf-8'))
+ original=ScenarioSession(Scenario.model_validate(p['scenario']),Plan.model_validate(p['plans'][1]),p['geography'])
+ service=CrewService();rows=service.settings(original)['engineers']
+ for row in rows:row['start_location']='35675'
+ draft=service.preview(original,{'version':1,'engineers':rows},time_limit=.03)
+ home=service.selected(original,{'version':1,'id':draft['id']})
+ restored=ScenarioSession.restore(home.dump())
+ assert all(e.start_location.startswith('home:') for e in restored.initial_engineers.values())
+ assert restored.geography.locations['office']==original.geography.locations['office']
+ assert any(p['id']=='office' for p in service.settings(restored)['locations'])
+ rows=service.settings(restored)['engineers'];rows[0]['start_location']='office'
+ draft=service.preview(restored,{'version':restored.version,'engineers':rows},time_limit=.03)
+ mixed=service.selected(restored,{'version':restored.version,'id':draft['id']})
+ assert mixed.scenario.engineers[0].start_location=='office'
+ assert original.version==1
+
+
 def test_crew_api_persists_only_apply_and_keeps_old_view(make_scenario,tmp_path,monkeypatch):
  import json,threading
  from urllib.request import Request,urlopen
@@ -112,6 +133,14 @@ def test_crew_api_persists_only_apply_and_keeps_old_view(make_scenario,tmp_path,
   with urlopen(url+'/api/crew') as r:assert json.load(r)['version']==1
   monkeypatch.setattr(Path,'replace',original)
   result=post('/api/crew/apply',{'version':1,'id':draft['id']});assert result['version']==2
+  # Crew replacement must be published consistently to dispatcher, mobile and GPS.
+  with urlopen(url+'/api/engineers') as r:mobile=json.load(r)
+  with urlopen(url+'/api/gps') as r:gps=json.load(r)
+  assert mobile['version']==gps['plan_version']==2
+  assert {e['id'] for e in mobile['engineers']}=={e['engineer_id'] for e in gps['rows']}
+  for engineer in mobile['engineers']:
+   with urlopen(url+'/api/engineer?engineer_id='+engineer['id']) as r:
+    assert json.load(r)['version']==2
   saved=json.loads(path.read_text());assert set(saved['views'])=={'1','2'}
   with pytest.raises(HTTPError):post('/api/crew/apply',{'version':1,'id':draft['id']})
  finally:server.shutdown();server.server_close();thread.join()

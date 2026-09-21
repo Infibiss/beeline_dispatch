@@ -119,7 +119,11 @@ def geocode_scenario(scenario,client,*,endpoint='https://photon.komoot.io/api/',
 
 def attach_geography(scenario:Scenario,geo:GeographyBundle):
     if scenario_signature(scenario)!=geo.scenario_signature: raise ValueError('География относится к другим адресам/участку')
-    if set(geo.locations)!=set(addresses(scenario)) or geo.unresolved:
+    expected=set(addresses(scenario))
+    # Keep the known office available for observations and later roster edits
+    # even when every engineer currently starts from home. No other spare IDs
+    # are permitted, and all required request/start coordinates remain mandatory.
+    if not expected <= set(geo.locations) <= expected | {'office'} or geo.unresolved:
         raise ValueError('Неполные или непроверенные координаты: исправьте географию до расчета')
     requests=[r.model_copy(update={'provenance':{**r.provenance,'coordinates':geo.locations[r.id].source+'; '+geo.locations[r.id].quality}}) for r in scenario.requests]
     return scenario.model_copy(update={'points':{},'requests':requests,

@@ -37,7 +37,11 @@ def record(session,payload):
         if old is None:raise ValueError('Исправляемая запись не найдена')
         if not isinstance(reason,str) or len(reason.strip())<3:raise ValueError('Укажите причину исправления')
         if payload.get('engineer_id')!=old['engineer_id']:raise ValueError('Исправление не может менять инженера записи')
-    raw={k:payload[k] for k in ('time','engineer_id','status','request_id','location_id','remaining_minutes','consumed_router','consumed_tv_box') if k in payload}
+    raw={k:payload[k] for k in ('time','engineer_id','status','request_id','location_id','remaining_minutes','consumed_router','consumed_tv_box','source','comment') if k in payload}
+    if old:
+        # A dispatcher correction retains the author's report unless explicitly edited.
+        raw.setdefault('source',old.get('source','dispatcher'))
+        raw.setdefault('comment',old.get('comment',''))
     if type(raw.get('time')) is not int or not 0<=raw['time']<=1439:raise ValueError('Время факта должно быть в пределах текущего дня')
     entry={'id':identity or uuid4().hex,'recorded_at':datetime.now(timezone.utc).isoformat(),'input':raw}
     records=[deepcopy(f) for f in session.fact_log if f['id']!=identity]+[entry]

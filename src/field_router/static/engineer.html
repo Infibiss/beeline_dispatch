@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffdc00">
+  <title>Мой день · Выездной инженер</title>
+  <link rel="stylesheet" href="/assets/leaflet.css">
+  <link rel="stylesheet" href="/engineer.css">
+  <link rel="stylesheet" href="/gps.css">
+  <script src="/assets/leaflet.js" defer></script>
+  <script src="/engineer.js" defer></script>
+  <script src="/gps-engineer.js" defer></script>
+</head>
+<body>
+  <a href="#main" class="skip-link">К заданиям</a>
+  <header class="app-header">
+    <a class="brand" href="/engineer" aria-label="Мой день инженера"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span>Инженер</span></a>
+    <a class="dispatcher-link" href="/">Диспетчер ↗</a>
+  </header>
+  <main id="main">
+    <section class="identity" aria-label="Рабочий профиль">
+      <div class="identity-select"><label for="engineer-select">Демо-профиль инженера</label><select id="engineer-select" disabled><option>Загрузка инженеров…</option></select></div>
+      <button type="button" class="icon-button" id="refresh" aria-label="Обновить задания">↻</button>
+    </section>
+    <div class="sync-line"><span id="connection" role="status">Подключение…</span><span id="plan-version">—</span></div>
+    <p id="error" class="notice error" role="alert" hidden></p>
+    <p id="updates" class="notice" role="status" hidden></p>
+    <p id="replan-note" class="notice" hidden>Диспетчер получил новые факты. Пока показаны назначения из последнего утверждённого плана.</p>
+    <section id="panel-tasks" class="tab-panel" aria-labelledby="tab-tasks">
+      <div class="page-heading"><div><p id="work-date" class="eyebrow">РАБОЧИЙ ДЕНЬ</p><h1>Мои задачи</h1></div><span id="region" class="region"></span></div>
+      <div class="stats" aria-label="Итоги дня"><div><strong id="pending-count">—</strong><span>осталось</span></div><div><strong id="done-count">—</strong><span>выполнено</span></div><div><strong id="distance">—</strong><span>км по плану</span></div></div>
+      <article id="next-task" class="next-card" hidden></article>
+      <label class="sr-only" for="search">Найти заявку по номеру или адресу</label><input id="search" type="search" placeholder="Номер заявки или адрес" autocomplete="off">
+      <div class="filters" role="group" aria-label="Фильтр заданий"><button type="button" data-filter="pending" aria-pressed="true">В работе дня</button><button type="button" data-filter="completed" aria-pressed="false">Выполненные</button><button type="button" data-filter="all" aria-pressed="false">Все</button></div>
+      <div id="task-list" class="task-list" aria-live="polite"><p class="empty">Загружаем маршрут…</p></div>
+    </section>
+    <section id="panel-map" class="tab-panel" aria-labelledby="tab-map" hidden>
+      <div class="page-heading"><div><p class="eyebrow">ТОЧКИ ВЫЕЗДОВ</p><h1>Мой маршрут</h1></div><button type="button" id="fit-map" class="secondary">Все точки</button></div>
+      <div id="engineer-map" aria-label="Карта назначенных заявок"></div>
+      <p id="map-note" class="muted"></p>
+      <p class="muted">На карте — адреса заявок, не GPS-позиция телефона. Нажмите на точку, чтобы открыть задание.</p>
+      <div id="map-tasks" class="map-tasks"></div>
+    </section>
+    <section id="panel-shift" class="tab-panel" aria-labelledby="tab-shift" hidden>
+      <div class="page-heading"><div><p class="eyebrow">РАБОЧИЙ ПРОФИЛЬ</p><h1>Моя смена</h1></div></div>
+      <article class="surface"><div class="section-top"><h2 id="engineer-name">Инженер</h2><span id="engineer-status" class="pill">Нет отметки</span></div><dl id="shift-details" class="detail-grid"></dl><div class="button-row"><button type="button" class="primary" id="shift-start">На смене / свободен</button><button type="button" class="secondary" id="shift-problem">Сообщить о недоступности</button></div></article>
+      <article class="surface gps-box" aria-labelledby="gps-title">
+        <div class="section-top"><h2 id="gps-title">Геолокация</h2><span id="gps-state" class="pill">Выключена</span></div>
+        <p id="gps-explanation">Включите передачу координат, чтобы диспетчер видел ваше положение и мог уточнить задержку.</p>
+        <div class="button-row"><button id="gps-start" class="primary" type="button" disabled>Включить GPS</button><button id="gps-stop" class="secondary" type="button" disabled>Выключить</button></div>
+        <p id="gps-feedback" role="status" class="gps-message">Передача начинается только с вашего разрешения.</p>
+        <dl class="detail-grid"><dt>Последняя точка</dt><dd id="gps-fix">Ещё нет</dd><dt>Передано серверу</dt><dd id="gps-sent">Ещё нет</dd></dl>
+        <p class="muted">GPS работает при открытой странице. При блокировке телефона или сворачивании браузера передача может остановиться. Статусы работ подтверждайте отдельно.</p>
+      </article>
+      <article class="surface"><h2>Оборудование</h2><p class="muted">Выдано утром, использовано и доступно с учётом резерва текущей работы.</p><div id="equipment" class="equipment"></div></article>
+      <article class="surface"><h2>Мои отметки</h2><p class="muted">Отправленные статусы и комментарии видны диспетчеру.</p><div id="fact-list"></div></article>
+      <p class="demo-note">Данные относятся к дате плана; время события задаётся при отправке. GPS включается в этой вкладке. Фоновый трекинг и push-уведомления не подключены.</p>
+    </section>
+  </main>
+  <nav class="bottom-nav" aria-label="Разделы инженера">
+    <button id="tab-tasks" type="button" aria-current="page" aria-controls="panel-tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M3 6h1M3 12h1M3 18h1"/></svg>Задачи</button>
+    <button id="tab-map" type="button" aria-controls="panel-map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/></svg>Карта</button>
+    <button id="tab-shift" type="button" aria-controls="panel-shift"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Смена</button>
+  </nav>
+  <dialog id="task-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-top"><span id="dialog-kicker" class="eyebrow">ЗАДАНИЕ</span><button id="close-dialog" class="icon-button" type="button" aria-label="Закрыть карточку">×</button></div>
+    <h2 id="dialog-title"></h2>
+    <div id="task-detail"></div>
+    <div id="task-actions" class="task-actions"></div>
+    <form id="action-form" hidden>
+      <fieldset id="action-fields">
+        <h3 id="action-title"></h3>
+        <p id="action-day" class="muted"></p>
+        <label for="action-time">Время факта</label><input id="action-time" type="time" step="60" required>
+        <p class="muted">Проверьте время перед отправкой. Это отметка в демонстрационном дне, а не часы телефона.</p>
+        <div id="location-field"><label for="action-location">Где вы сейчас</label><select id="action-location"></select></div>
+        <div id="remaining-field"><label for="action-remaining" id="remaining-label">Осталось работы, мин</label><input id="action-remaining" type="number" inputmode="numeric" min="1" max="1440" step="1"></div>
+        <div id="consumed-fields"><p class="field-label">Фактически использовано</p><div class="input-pair"><div><label for="action-router">Роутеров</label><input id="action-router" type="number" inputmode="numeric" min="0" step="1"></div><div><label for="action-tv">ТВ-приставок</label><input id="action-tv" type="number" inputmode="numeric" min="0" step="1"></div></div></div>
+        <label for="action-comment">Комментарий диспетчеру</label><textarea id="action-comment" rows="3" maxlength="1000" placeholder="Результат работы или описание проблемы"></textarea>
+        <p id="action-error" role="alert" class="notice error" hidden></p>
+        <div class="button-row"><button id="send-action" type="submit" class="primary">Отправить диспетчеру</button><button id="cancel-action" type="button" class="secondary">Отмена</button></div>
+      </fieldset>
+    </form>
+  </dialog>
+  <noscript><p class="notice">Для работы приложения включите JavaScript в браузере.</p></noscript>
+</body>
+</html>

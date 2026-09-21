@@ -87,6 +87,7 @@ class CrewService:
                 start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
                 for e in session.initial_engineers.values()]
         return {'version':session.version,'region':session.scenario.region,'editable':editable(session),
+            'assignments':{r.engineer_id:len(r.visits) for r in session.plan.routes},
             'control_count':CONTROL_COUNTS.get(session.scenario.region),'recommended_engineers':recommended(session),'engineers':deepcopy(saved),
             'locations':session.state()['locations'],'network':self.address_service is not None,
             'metrics':session.plan.metrics.model_dump()}
@@ -144,6 +145,8 @@ class CrewService:
         candidate._save_view('Бригады, старты и утренняя выдача')
         token=uuid4().hex;self.draft=(token,session.version,candidate)
         return {'id':token,'version':session.version,'before':session.plan.metrics.model_dump(),'after':plan.metrics.model_dump(),
+            'engineers':[{'id':e.id,'name':e.name,'region':e.region,
+                'assigned':next((len(r.visits) for r in plan.routes if r.engineer_id==e.id),0)} for e in issued],
             'unassigned':[u.model_dump() for u in plan.unassigned],
             'issue':[{'name':e.name,'router':e.stock.router,'tv_box':e.stock.tv_box} for e in issued]}
 

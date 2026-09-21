@@ -4,6 +4,10 @@ from .models import Equipment, TimeWindow, Visit, Route
 
 
 def validate_fact(session,payload):
+    source=payload.get('source','dispatcher')
+    comment=payload.get('comment','')
+    if source not in ('dispatcher','engineer'):raise ValueError('Неизвестный источник факта')
+    if not isinstance(comment,str) or len(comment)>1000:raise ValueError('Комментарий должен быть текстом до 1000 символов')
     if payload.get('version')!=session.version:raise ValueError('Устаревшая версия плана')
     now=payload.get('time')
     if type(now) is not int or not session.time<=now<=1440:raise ValueError('Недопустимое время факта')
@@ -52,7 +56,7 @@ def validate_fact(session,payload):
         for k in spent:
             if spent[k]+getattr(consumed,k)>getattr(session.initial_stock[eid],k):raise ValueError('Расход превышает утренний запас')
     return {'time':now,'engineer_id':eid,'status':kind,'request_id':key,'location_id':location,
-            'remaining_minutes':remaining,'consumed':consumed.model_dump(),'source':'dispatcher'}
+            'remaining_minutes':remaining,'consumed':consumed.model_dump(),'source':source,'comment':comment.strip()}
 
 
 def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):

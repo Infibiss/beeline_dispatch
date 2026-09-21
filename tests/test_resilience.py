@@ -1,6 +1,7 @@
 """Stress evaluator must expose lateness rather than silently repair routes."""
 import importlib.util
 from pathlib import Path
+import pytest
 
 from conftest import engineer, job
 from field_router.planning import make_plan
@@ -61,13 +62,14 @@ def test_independent_inventory_invariant_rejects_created_stock(make_scenario):
         resilience.assert_invariants(session)
 
 
-def test_real_demo_dynamic_day_has_every_event_and_restores():
+@pytest.mark.parametrize('solver', ['hybrid', 'alns'])
+def test_real_demo_dynamic_day_has_every_event_and_restores(solver):
     import json
     from field_router.models import Plan, Scenario
     payload = json.loads((resilience.ROOT / 'data/demo-road/Восток.json').read_text())
     result = resilience.dynamic_day(Scenario.model_validate(payload['scenario']),
                                   next(Plan.model_validate(p) for p in payload['plans'] if p['solver'] == 'ortools'),
-                                  payload['geography'], .03)
+                                  payload['geography'], .03, solver=solver)
     assert result['restore_equal']
     assert result['delay_fact']['extra_service_minutes'] == 20
     stages = result['stages']

@@ -20,7 +20,7 @@ from field_router.models import Plan, Scenario
 from field_router.geo_models import GeographyBundle
 from field_router.road_travel import bundle_travel
 from field_router.replanning import ScenarioSession
-from field_router.solvers.ortools_solver import OrToolsSolver
+from field_router.solvers.selection import get_solver
 from field_router.validation import require_valid
 
 
@@ -96,14 +96,14 @@ def assert_invariants(session, previous_frozen=(), mutable=frozenset()):
     return True
 
 
-def dynamic_day(scenario, plan, geography, time_limit):
+def dynamic_day(scenario, plan, geography, time_limit, solver='hybrid'):
     session = ScenarioSession(scenario.model_copy(deep=True), plan.model_copy(deep=True), deepcopy(geography))
     stages = []
 
     def apply(event, mutable=frozenset()):
         before = deepcopy(session.frozen)
         batch = session.preview({'version': session.version, 'event': event,
-                                 'preserve_in_progress': True, 'allow_redirect': False}, time_limit=time_limit)
+                                 'preserve_in_progress': True, 'allow_redirect': False}, time_limit=time_limit, solver=solver)
         residual = session.batches[batch['id']]['scenario']
         for candidate in batch['candidates']:
             require_valid(residual, session._travel(residual), Plan.model_validate(candidate['plan']))
@@ -167,7 +167,7 @@ def dynamic_day(scenario, plan, geography, time_limit):
             'note': 'Frozen includes simulated execution and explicit facts; these are not observed field outcomes.'}
 
 
-def evaluate(path, time_limit):
+def evaluate(path, time_limit, solver=None):
     raw = path.read_bytes()
     payload = json.loads(raw)
     scenario = Scenario.model_validate(payload['scenario'])
@@ -184,12 +184,12 @@ def evaluate(path, time_limit):
             stressed = stocked.model_copy(update={'requests': [r.model_copy(update={
                 'duration_minutes': math.ceil(r.duration_minutes * sf)}) for r in stocked.requests]})
             stress_travel = ScaledTravel(travel, tf)
-            replacement = OrToolsSolver().solve(stressed, stress_travel, time_limit_seconds=time_limit)
+            replacement = get_solver(solver or 'ortools').solve(stressed, stress_travel, time_limit_seconds=time_limit)
             require_valid(stressed, stress_travel, replacement)
             row['morning_reoptimization'] = {'valid': True, 'assigned': replacement.metrics.assigned,
                                              'pending': replacement.metrics.unassigned}
         rows.append(row)
-    day = dynamic_day(scenario, plan, payload['geography'], time_limit)
+    day = dynamic_day(scenario, plan, payload['geography'], time_limit, solver=solver or 'hybrid')
     assert path.read_bytes() == raw, 'source demo modified'
     return {'region': scenario.region, 'source': str(path.relative_to(ROOT)),
             'sha256': hashlib.sha256(raw).hexdigest(), 'requests': len(scenario.requests),
@@ -201,7 +201,9 @@ def render_report(results):
              'При увеличении времени пути или обслуживания исходные маршруты начинают нарушать ограничения. '
              'Перепланирование сохраняет допустимость, но часть заявок может остаться без назначения. '
              'Это проверка заданных сценариев, а не оценка вероятности успешного дня.', '',
-             f"Reproduce offline: `.venv/bin/python scripts/check_resilience.py --time-limit {results['solver_limit_seconds']}`.", '',
+             f"Reproduce offline: `.venv/bin/python scripts/check_resilience.py --time-limit {results['solver_limit_seconds']}"
+             + (f" --solver {results['solver']}" if results.get('solver') else '') + '`.', '',
+             f"Morning backend: {results.get('solver') or 'ortools'}; dynamic backend: {results.get('solver') or 'hybrid'}.", '',
              f"Solver limit: {results['solver_limit_seconds']} seconds per solve/profile (preparation and fallback add overhead). "
              'Inputs and event selection are reproducible; wall-clock solver choices can vary. '
              'All source demo SHA-256 hashes are recorded in `day-resilience.json` and verified unchanged.', '',
@@ -247,13 +249,15 @@ def render_report(results):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--time-limit', type=float, default=3)
+    parser.add_argument('--solver', choices=['ortools', 'alns', 'hybrid'],
+                        help='Use this backend for both morning stress and dynamic events')
     parser.add_argument('--output-dir', type=Path, default=ROOT / 'docs/planning')
     args = parser.parse_args()
     if not math.isfinite(args.time_limit) or args.time_limit <= 0:
         parser.error('--time-limit must be positive and finite')
-    results = {'solver_limit_seconds': args.time_limit, 'regions': []}
+    results = {'solver_limit_seconds': args.time_limit, 'solver': args.solver, 'regions': []}
     for path in sorted((ROOT / 'data/demo-road').glob('*.json')):
-        results['regions'].append(evaluate(path, args.time_limit))
+        results['regions'].append(evaluate(path, args.time_limit, solver=args.solver))
         print(f"Validated resilience: {results['regions'][-1]['region']}", flush=True)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / 'day-resilience.json').write_text(json.dumps(results, ensure_ascii=False, indent=2) + '\n')

@@ -27,6 +27,7 @@
     const result = {version, mode: 'manual', time: minute(input.time), engineer_id: input.engineer_id, status: input.status};
     const requiresRequest = ['working', 'completed', 'interrupted', 'traveling'].includes(input.status);
     if (requiresRequest && !input.request_id) throw new Error('Для этого статуса выберите заявку.');
+    if (['available', 'traveling', 'unavailable'].includes(input.status) && !input.location_id) throw new Error('Укажите текущее местоположение инженера.');
     if (requiresRequest && input.request_id) result.request_id = input.request_id;
     if (input.location_id && !['working', 'completed', 'interrupted'].includes(input.status)) result.location_id = input.location_id;
     for (const name of ['remaining_minutes', 'consumed_router', 'consumed_tv_box']) {
@@ -34,12 +35,12 @@
       if (!applies) continue;
       const raw = input[name];
       if (raw == null || raw === '') {
-        if (name === 'remaining_minutes' && input.status === 'traveling') throw new Error('Укажите оставшееся время пути.');
+        if (name === 'remaining_minutes' && ['working', 'traveling'].includes(input.status)) throw new Error(input.status === 'traveling' ? 'Укажите оставшееся время пути.' : 'Укажите оставшееся время работы.');
         if (input.status === 'interrupted') throw new Error('При прерывании укажите остаток работы и оба количества списанного оборудования, включая нули.');
         continue;
       }
       const value = Number(raw), minimum = name === 'remaining_minutes' ? 1 : 0;
-      if (!Number.isInteger(value) || value < minimum) throw new Error('Проверьте остаток работы и списание оборудования.');
+      if (!Number.isInteger(value) || value < minimum || (name === 'remaining_minutes' && value > 1440)) throw new Error('Проверьте остаток работы и списание оборудования.');
       result[name] = value;
     }
     return result;
@@ -72,12 +73,12 @@
     $('plan-version').disabled = busy || !state;
     $('address-search').disabled = busy || !state || state.geography_mode !== 'road';
     $('address-confirm').disabled = busy || !state || !$('address-candidates').value;
-    $('reload').disabled = busy; $('mode-apply').disabled = busy || !state;
+    $('reload').disabled = busy; $('execution-mode').disabled = busy || !state; $('mode-apply').disabled = busy || !state || $('execution-mode').value === (state.execution_mode || 'simulation');
     $('approve').disabled = busy || !state || !batch || !selected || batch.version !== state.version;
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
   }
   function resetCandidates(message) {
-    batch = null; selected = null; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
+    batch = null; selected = null; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('observation-warnings').textContent = ''; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
     $('candidates').replaceChildren(element('div', message || 'Задайте событие и рассчитайте варианты.', 'empty'));
     $('diff-title').textContent = 'Изменения выбранного варианта';
     const row = element('tr'), cell = element('td', 'Выберите вариант для просмотра изменений.', 'muted');
@@ -94,7 +95,7 @@
     resetCandidates('Варианты сброшены. Обновите состояние перед новым расчётом.');
     $('error').textContent = error.message || 'Не удалось выполнить запрос.';
     $('error').hidden = false;
-    $('status').textContent = 'Состояние не подтверждено сервером. Нажмите «Обновить состояние».';
+    $('status').textContent = 'Состояние не подтверждено. Нажмите «Обновить».';
     controls();
   }
   async function request(path, payload) {
@@ -111,27 +112,28 @@
     $('event-target').disabled = replan; $('event-target').required = !replan;
     $('emergency-fields').hidden = !emergency;
     $('duration').disabled = !emergency; $('router').disabled = !emergency;
-    $('target-label').textContent = engineer ? 'Недоступный инженер' : emergency ? 'Адрес по существующей заявке' : 'Отменяемая заявка';
+    $('target-label').textContent = engineer ? 'Недоступный инженер' : emergency ? 'Место аварии' : 'Отменяемая заявка';
     $('event-target').replaceChildren(...(engineer ? state.engineers : emergency ? (state.locations || []).map(item => ({id:item.id,address:item.label})) : state.requests).map(item => {
-      const option = element('option', engineer ? item.name + ' · ' + item.id : requestName(item.id) + ' · ' + item.address);
+      const option = element('option', engineer ? item.name + ' · ' + item.id : emergency ? item.address : requestName(item.id) + ' · ' + item.address);
       option.value = item.id; return option;
     }));
   }
   function renderState(data) {
     if (!data || data.version == null || !Array.isArray(data.requests) || !Array.isArray(data.engineers)) throw new Error('Сервер вернул неполное состояние.');
     state = data;
-    $('region').textContent = data.region || '—'; $('status').classList.toggle('attention', !!data.needs_replanning); $('version').textContent = data.version;
-    $('clock').textContent = time(data.time); $('event-time').value = time(data.time);
+    $('region').textContent = data.region || '—'; $('version').textContent = '№ ' + data.version;
+    $('clock').textContent = time(data.time); $('event-time').value = time(data.time); $('event-time').min = time(data.time);
     const count = (data.plan && data.plan.routes || []).reduce((sum, route) => sum + (route.visits || []).length, 0);
     $('coverage').textContent = count + ' / ' + data.requests.length;
     const mode = data.mode || 'simulation';
-    $('mode-badge').textContent = mode === 'mixed' ? 'РУЧНЫЕ СТАТУСЫ + СИМУЛЯЦИЯ' : mode === 'manual' ? 'РУЧНОЙ УЧЁТ' : 'СИМУЛЯЦИЯ';
+    $('mode-badge').textContent = mode === 'mixed' ? 'Смешанный учёт' : mode === 'manual' ? 'Ручной учёт' : 'Симуляция';
     $('clock-label').textContent = mode === 'simulation' ? 'Время симуляции' : 'Время состояния';
     $('mode-notice').textContent = mode === 'simulation' ? (data.geography_mode === 'road' ? 'Дорожные матрицы; исполнение по времени плана моделируется, без GPS.' : 'Условная география и время по утверждённому плану. Это симуляция, без GPS и реальных дорожных маршрутов.') : mode === 'mixed' ? 'Ручные статусы + симуляция остальных. Для инженеров с записанными фактами время само по себе не подтверждает завершение. Местоположение вводится вручную, без GPS.' : 'Ручной учёт: завершение подтверждается записанным фактом. Местоположение вводится вручную, без GPS.';
     if (data.approximate_locations) $('mode-notice').textContent += ' Приблизительных точек: ' + data.approximate_locations + '. Исходный и выбранный адрес сохранены в карточке.';
     $('execution-mode').value=data.execution_mode || 'simulation';
     populateSelect('fact-edit',data.fact_journal || [],f=>engineerName(f.engineer_id)+' · '+time(f.time)+' · '+factLabels[f.status],'Новый факт');
-    $('fact-edit').value=''; $('correction-reason').value=''; $('correction-fields').hidden=true;
+    $('fact-edit').value=''; $('fact-late').checked=false; $('correction-reason').value=''; $('correction-fields').hidden=true;
+    $('fact-remaining').value=''; $('fact-router').value=''; $('fact-tv').value='';
     $('fact-time').value = time(data.time);
     const previousEngineer = $('fact-engineer').value;
     populateSelect('fact-engineer', data.engineers, item => item.name + ' · ' + item.id);
@@ -140,7 +142,7 @@
     $('replan-needed').hidden = !data.needs_replanning; $('go-replan').hidden = !data.needs_replanning;
     populateSelect('fact-location', data.locations || [], item => item.label || item.id, 'Без уточнения места');
     const versions = data.versions && data.versions.length ? data.versions : [{version: data.version, time: data.time, label: 'Текущий план'}];
-    $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', 'Версия ' + item.version + ' · ' + time(item.time) + ' · ' + (item.label || '') + (item.version === data.version ? ' · текущая' : '')); option.value = item.version; return option; }));
+    $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', '№ ' + item.version + ' · ' + time(item.time) + ' · ' + (item.label || 'План') + (item.version === data.version ? ' · текущий' : '')); option.value = item.version; return option; }));
     $('plan-version').value = String(data.version); showPlan();
     renderFacts(); factFields(); targets(); resetCandidates();
   }
@@ -153,7 +155,8 @@
     if (!state) return;
     const version = $('plan-version').value, historical = String(state.version) !== version;
     $('plan-frame').src = regionURL('/dispatcher?version=' + encodeURIComponent(version));
-    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : 'Текущий утверждённый план · версия ' + version + '.';
+    $('plan-context').textContent = historical ? 'Просмотр истории · текущий план № ' + state.version : state.needs_replanning ? 'План требует пересчёта по новым статусам.' : '';
+    $('plan-context').classList.toggle('attention', !historical && !!state.needs_replanning);
   }
   function factRequests() {
     const previous = $('fact-request').value;
@@ -170,7 +173,7 @@
     const workingNow = !historical && previous?.status === 'working';
     for (const option of $('fact-status').options) option.disabled = (workingNow && ['available','traveling','unavailable'].includes(option.value)) || (option.value === 'interrupted' && !workingNow && !historical);
     if ($('fact-status').selectedOptions[0]?.disabled) $('fact-status').value = workingNow ? 'working' : 'available';
-    $('engineer-fact-context').textContent = previous ? 'Последний факт: ' + factLabels[previous.status] + ' · ' + time(previous.time) + (workingNow ? '. Сначала завершите или прервите эту работу.' : '') : 'Фактов нет: выполнение пока моделируется по расписанию.';
+    $('engineer-fact-context').textContent = previous ? 'Последний статус: ' + factLabels[previous.status] + ' · ' + time(previous.time) + (workingNow ? '. Сначала завершите или прервите работу.' : '') : state?.execution_mode === 'manual' ? 'Нет статуса — инженер недоступен для назначений.' : 'Статус определяется по плану.';
     const earliest = historical ? 0 : Math.max(state?.time || 0, previous ? previous.time + 1 : 0);
     $('fact-engineer').disabled=!!$('fact-edit').value;
     $('correction-fields').hidden=!$('fact-edit').value; $('correction-reason').required=!!$('fact-edit').value;
@@ -180,11 +183,15 @@
     const status = $('fact-status').value, interrupted = status === 'interrupted', working = status === 'working', traveling = status === 'traveling';
     $('fact-request').required = ['working', 'completed', 'interrupted', 'traveling'].includes(status);
     $('fact-request').disabled = !$('fact-request').required;
+    $('fact-request').hidden = !$('fact-request').required;
+    document.querySelector('label[for="fact-request"]').hidden = !$('fact-request').required;
     if (workingNow) { for (const option of $('fact-request').options) option.disabled = option.value !== previous.request_id; }
     $('fact-location').required = ['available','traveling','unavailable'].includes(status);
     const atRequest = ['working', 'completed', 'interrupted'].includes(status);
     $('fact-location').disabled = atRequest;
-    $('fact-location-note').textContent = atRequest ? 'Местоположение определяется адресом выбранной заявки.' : 'Выберите известное место вручную.';
+    $('fact-location').hidden = atRequest;
+    document.querySelector('label[for="fact-location"]').hidden = atRequest;
+    $('fact-location-note').textContent = atRequest ? 'Местоположение — адрес выбранной заявки.' : '';
     $('fact-remaining-group').hidden = !working && !interrupted && !traveling;
     $('fact-remaining').disabled = $('fact-remaining-group').hidden;
     document.querySelector('label[for="fact-remaining"]').textContent = traveling ? 'Осталось пути, мин' : 'Осталось работы, мин';
@@ -207,7 +214,7 @@
   }
   async function reload() {
     busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Загрузка состояния…';
-    try { renderState(await request('/api/state')); $('status').textContent = state.needs_replanning ? 'Факты изменились — требуется перепланирование.' : ''; }
+    try { renderState(await request('/api/state')); $('status').textContent = ''; }
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   }
@@ -255,7 +262,7 @@
       const active = card.dataset.id === candidate.id;
       card.classList.toggle('selected', active);
       const button = card.querySelector('button'); button.setAttribute('aria-pressed', String(active));
-      button.textContent = active ? 'Выбран для сравнения' : 'Выбрать вариант';
+      button.textContent = active ? 'Выбран' : 'Посмотреть изменения';
     });
     $('diff-title').textContent = 'Изменения · ' + strategyName(candidate);
     const rows = (candidate.diff || []).map(diff => {
@@ -267,7 +274,7 @@
     if (!rows.length) { const row = element('tr'), cell = element('td', 'Назначения и время начала не изменились.'); cell.colSpan = 3; row.append(cell); rows.push(row); }
     $('diff-body').replaceChildren(...rows);
     for (const item of candidate.unassigned_details || []) { const row = element('tr'); row.className = item.lost_assignment ? 'lost-assignment' : ''; const reason = element('td', (item.lost_assignment ? 'Потеря назначения. ' : 'Без назначения. ') + item.reason); reason.colSpan = 2; row.append(element('td', requestName(item.request_id) + ' · ' + item.address), reason); $('diff-body').append(row); }
-    $('approval-note').textContent = 'К применению: ' + strategyName(candidate) + '. Потеряно назначений: ' + (candidate.facts.lost_assignments || 0) + '. Проверьте список выше.';
+    $('approval-note').textContent = strategyName(candidate) + (candidate.facts.lost_assignments ? ' · Потеряно назначений: ' + candidate.facts.lost_assignments : '') + '. План изменится после применения.';
     controls();
   }
   $('ai-recommend').addEventListener('click', async () => {
@@ -293,6 +300,7 @@
     $('ai-recommend').disabled=false;
     $('ai-result').textContent='ИИ сравнит варианты и предложит план. Утверждение остаётся за вами.';
     $('comparison-tools').hidden = false;
+    $('comparison-metrics').hidden = !data.candidates.length;
     $('replan-needed').hidden = true;
     $('observation-warnings').textContent = (data.observation_warnings || []).join(' ');
     const order = $('candidate-sort').value;
@@ -322,12 +330,14 @@
         card.append(element('p', 'Совпадает с ' + (duplicate ? strategyName(duplicate) : candidate.duplicate_of), 'duplicate'));
       }
       const f = candidate.facts || {}, dl = element('dl');
-      const metrics = [['Потеряно назначений', f.lost_assignments], ['Сдвиги начала, мин', f.time_shift_minutes]];
+      card.append(element('p', 'Назначено: аварии ' + f.emergency_assigned + '/' + f.emergency_total + ' · подключения ' + f.connection_assigned + '/' + f.connection_total, 'priority-coverage'));
+      const metrics = [['Без назначения', f.unassigned], ['Инженеров', f.engineers_used], ['Смена инженера', f.reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Дорога, км', ((f.distance_m || 0) / 1000).toFixed(1)]];
+      if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
       if (candidate.emergency) { const e = candidate.emergency; card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + ' · ' + time(e.start) + '–' + time(e.end) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary')); }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
       card.append(dl); const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
 
-      const button = element('button', 'Выбрать вариант', 'secondary'); button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.addEventListener('click', () => select(candidate)); card.append(button);
+      const button = element('button', 'Посмотреть изменения', 'secondary'); button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.addEventListener('click', () => select(candidate)); card.append(button);
       return card;
     });
     $('candidates').replaceChildren(...cards);
@@ -359,7 +369,7 @@
     catch(error){failure(error);}finally{busy=false;controls();}
   });
   $('candidate-sort').addEventListener('change', () => { if (batch) { const choice=selected; renderBatch(batch); if (choice) select(choice); } });
-  $('event-form').addEventListener('input', () => { resetCandidates('Событие изменено. Рассчитайте варианты заново.'); });
+  $('event-form').addEventListener('input', () => { const hadBatch = !!batch; resetCandidates('Параметры изменены. Рассчитайте варианты.'); if (hadBatch) $('status').textContent = 'Параметры изменены — предыдущий расчёт сброшен.'; });
   $('event-type').addEventListener('change', targets);
   $('event-form').addEventListener('submit', async event => {
     event.preventDefault(); if (busy || !state) return;
@@ -396,7 +406,7 @@
   $('plan-version').addEventListener('change', showPlan);
   $('fact-status').addEventListener('change', () => { factRequests(); factFields(); });
   $('fact-engineer').addEventListener('change', () => { factRequests(); factFields(); });
-  $('go-replan').addEventListener('click', () => { $('event-type').value='replan'; targets(); resetCandidates(); activateTab('events'); $('preview').focus(); });
+  $('go-replan').addEventListener('click', () => { $('event-type').value='replan'; targets(); resetCandidates(); $('status').textContent=''; activateTab('events'); $('preview').focus(); });
   $('fact-late').addEventListener('change',()=>{factRequests();factFields();});
   $('fact-edit').addEventListener('change',()=>{
     const f=(state.fact_journal || []).find(f=>f.id===$('fact-edit').value);
@@ -410,6 +420,7 @@
     try{renderState(await request('/api/mode',{version:state.version,mode:$('execution-mode').value}));$('status').textContent='Режим изменён. Пересчитайте план по фактам.';}
     catch(error){failure(error);}finally{busy=false;controls();}
   });
+  $('execution-mode').addEventListener('change', controls);
   $('facts-form').addEventListener('submit', async event => {
     event.preventDefault(); if (busy || !state) return;
     let payload;
@@ -417,7 +428,7 @@
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     if($('fact-edit').value){payload.fact_id=$('fact-edit').value;payload.correction_reason=$('correction-reason').value;}
     busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Запись фактического статуса…';
-    try { renderState(await request('/api/facts', payload)); $('event-type').value='replan'; targets(); $('status').textContent = 'Факт записан. Нажмите «Перейти к пересчёту», затем «Рассчитать варианты».'; }
+    try { renderState(await request('/api/facts', payload)); $('event-type').value='replan'; targets(); $('status').textContent = 'Статус сохранён.'; }
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   });

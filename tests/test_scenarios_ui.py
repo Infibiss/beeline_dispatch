@@ -59,7 +59,7 @@ def test_interruption_requires_explicit_remaining_and_consumption():
 
 
 def test_working_location_is_resolved_from_request_on_server():
-    result = client("console.log(JSON.stringify(core.factPayload(4,{engineer_id:'E-1',status:'working',request_id:'R-1',location_id:'wrong',time:'11:00'})))")
+    result = client("console.log(JSON.stringify(core.factPayload(4,{engineer_id:'E-1',status:'working',request_id:'R-1',location_id:'wrong',time:'11:00',remaining_minutes:'30'})))")
     assert 'location_id' not in result
     assert result['request_id'] == 'R-1'
 
@@ -74,3 +74,13 @@ def test_fact_request_filter_and_clear_irrelevant_fields():
     assert [r['id'] for r in result]==['a']
     result=client("console.log(JSON.stringify(core.factPayload(1,{engineer_id:'e1',time:'10:00',status:'available',request_id:'a',location_id:'office',remaining_minutes:'5'})))")
     assert 'request_id' not in result
+
+
+def test_fact_input_requires_known_location_for_mobile_and_available_statuses():
+    result = client("console.log(JSON.stringify(['available','traveling','unavailable'].map(status=>{try{core.factPayload(1,{engineer_id:'e1',time:'10:00',status,request_id:'r1',remaining_minutes:'15'});return false}catch{return true}})))")
+    assert result == [True, True, True]
+
+
+def test_fact_input_requires_bounded_remaining_time_before_submission():
+    result = client("console.log(JSON.stringify(['', ' ', '0', '1441'].map(remaining_minutes=>{try{core.factPayload(1,{engineer_id:'e1',time:'10:00',status:'working',request_id:'r1',remaining_minutes});return false}catch{return true}})))")
+    assert result == [True, True, True, True]

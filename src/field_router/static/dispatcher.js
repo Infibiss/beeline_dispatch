@@ -7,8 +7,8 @@
   const STATUS = {FEASIBLE:'Допустимое решение',OPTIMAL:'Оптимальное решение',INFEASIBLE:'Решение не найдено',
     empty:'Нет заявок',sequential_complete:'Последовательное назначение завершено',
     feasible_search_completed:'Допустимый план после поиска',fallback_baseline_no_solution:'Резервный базовый план',
-    fallback_baseline_better:'Выбран лучший базовый план'};
-  const SOLVERS = {baseline:'Базовый алгоритм',greedy:'Жадный алгоритм',ortools:'OR-Tools · поиск улучшений'};
+    fallback_baseline_better:'Выбран лучший базовый план',incumbent_retained:'Сохранён лучший допустимый план',fallback_alns_error:'Сохранён проверенный допустимый план',budget_exhausted_before_search:'Сохранён допустимый план: лимит расчёта'};
+  const SOLVERS = {baseline:'Базовый алгоритм',greedy:'Жадный алгоритм',ortools:'OR-Tools · поиск улучшений',alns:'ALNS · поиск улучшений',hybrid:'Совместный поиск OR-Tools + ALNS'};
   const KINDS = {travel:'Переезд',wait:'Ожидание',work:'Работа'};
   function timelineSegments(visit) {
     return [{kind:'travel',start:visit.arrival-visit.travel_minutes,end:visit.arrival},
@@ -103,7 +103,7 @@
   const notice = $('notice');
   notice.classList.toggle('geo',realGeography);
   notice.textContent = realGeography
-    ? 'Географические координаты из указанных источников. Сплошные линии — дорожная геометрия; пунктир — оценка. Время передвижения зависит от модели и не гарантирует актуальные пробки или расписание транспорта.'
+    ? 'Время в пути расчётное, без живых пробок. Пунктир на карте — приблизительный маршрут.'
     : 'Демо: условные координаты и время в пути. Реальные дороги и пробки не учтены.';
   if (!plans.length) notice.textContent += ' Планы отсутствуют: доступны исходные заявки.';
   if (plans.length) plans.forEach((item,index) => {
@@ -133,7 +133,7 @@
       stat(m.engineers_used ?? 0,'Инженеров на линии'),stat(km(m.distance_m),'Километров по модели'),
       stat(number(m.travel_minutes)+' мин','Время в пути'),stat(number(plan.elapsed_seconds).toFixed(2)+' с','Расчёт плана'));
     $('plan-status').textContent = STATUS[plan.status] || plan.status || 'Расчёт не выполнен';
-    if (plan.solver === 'ortools') $('plan-status').textContent += ' · Оптимальность не гарантируется';
+    if (['ortools','alns','hybrid'].includes(plan.solver)) $('plan-status').textContent += ' · Оптимальность не гарантируется';
     const top=prioritySummary(scenario,plan);
     $('plan-status').textContent += ' · Аварии и подключения: '+top.served+' / '+top.total+'. Приоритет: авария → подключение → ремонт / дозаказ.';
   }
@@ -163,7 +163,7 @@
     const request=record.request, visit=record.visit;
     container.append(node('div',requestName(request.id),'card-id'),node('h3',request.address || 'Адрес не указан','card-address'),
       node('div',visit?'Назначена · '+(record.engineer?.name || record.route.engineer_id):'Без назначения','card-state'+(visit?'':' unassigned')));
-    const list=node('dl',null,'facts');
+    const list=node('dl',null,'facts'), technical=node('dl',null,'facts');
     fact(list,'Окно клиента',windows(request));
     fact(list,'Продолжительность / тип работ',number(request.duration_minutes)+' мин · '+(SKILL[request.skill] || request.skill || '—'));
     if (visit) {
@@ -181,20 +181,23 @@
           fact(list,'Точность транспорта',trip.kind==='walk'?'Пеший путь по дорожной матрице':trip.kind==='fallback'?'Вне покрытия метро: усреднённая оценка без известного маршрута':(geo.modes?.public?.pedestrian_access==='road-to-station-point'?'Пешие участки по дорожной сети. Наземный транспорт — оценки из GTFS, рельсовый — модель. Нет актуальных пробок и точного расписания отправления; входы не подтверждены.':'Неполная сеть метро; время, подходы и пересадки — оценки без расписания'));
         } else fact(list,'Состав переезда','Для этого участка детализация отсутствует; время указано по модели плана.');
       }
-      fact(list,'Обоснование назначения',visit.explanation || 'Допустимо по ограничениям модели');
+      fact(technical,'Проверка назначения',visit.explanation || 'Допустимо по ограничениям модели');
     } else fact(list,'Причина',record.unassigned?.reason || (plans.length?'В плане нет назначения этой заявки.':'План ещё не рассчитан.'),'reason');
     const equipment=request.equipment || {};
     fact(list,'Оборудование для заявки','Роутеры: '+number(equipment.router)+' · ТВ-приставки: '+number(equipment.tv_box));
     fact(list,'Приоритет / обязательный транспорт',priorityLabel(request.priority)+' / '+(TRANSPORT[request.required_transport] || request.required_transport || 'Любой'));
     const location=locations[request.id];
-    if (validLocation(location)) fact(list,'Координаты / качество',location.lat.toFixed(5)+', '+location.lon.toFixed(5)+' · '+({approximate:'Приблизительное расположение',manual:'Ручной выбор',building_match:'Совпадение здания'}[location.quality] || 'не указано'));
+    if (validLocation(location)) fact(technical,'Координаты / качество',location.lat.toFixed(5)+', '+location.lon.toFixed(5)+' · '+({approximate:'Приблизительное расположение',manual:'Ручной выбор',building_match:'Совпадение здания'}[location.quality] || 'не указано'));
     if (location?.quality === 'approximate') { fact(list,'Использованная точка',location.label); fact(list,'Допущение',location.approximation_reason,'reason'); }
-    fact(list,'Источник координат',location?.source || (realGeography?'Координаты этой заявки отсутствуют':'Синтетические точки сценария'));
-    if (request.source_line != null) fact(list,'Строка исходных данных',request.source_line);
+    fact(technical,'Источник координат',location?.source || (realGeography?'Координаты этой заявки отсутствуют':'Синтетические точки сценария'));
+    if (request.source_line != null) fact(technical,'Строка исходных данных',request.source_line);
     container.append(list);
+    const details=node('details',null,'provenance');
+    details.append(node('summary','Источники и проверка'),technical);
     if (request.provenance && Object.keys(request.provenance).length) {
-      const details=node('details',null,'provenance');details.append(node('summary','Происхождение полей'),node('pre',JSON.stringify(request.provenance,null,2)));container.append(details);
+      details.append(node('pre',JSON.stringify(request.provenance,null,2)));
     }
+    container.append(details);
   }
   function renderSchedule() {
     const target=$('schedule');target.replaceChildren();
@@ -250,7 +253,7 @@
   function renderProvenance() {
     const target=$('provenance');target.replaceChildren();
     target.append(node('p','Возвращение в офис не включено в маршруты MVP. Загрузка показана для всего выбранного плана и не меняется при поиске заявки.'));
-    if(plan.solver==='ortools')target.append(node('p','Математическая оптимальность не гарантируется: поиск ограничен по времени.'));
+    if(['ortools','alns','hybrid'].includes(plan.solver))target.append(node('p','Математическая оптимальность не гарантируется: поиск ограничен по времени.'));
     const assumptions=node('ul');(scenario.assumptions || []).forEach(value=>assumptions.append(node('li',value)));target.append(assumptions);
     for(const [label,value] of [['Проверка плана',payload.validation || {}],['Источники передвижения',geo.modes || {}],
       ['Параметры передвижения',scenario.travel_config || {}],['Метаданные',scenario.metadata || {}],

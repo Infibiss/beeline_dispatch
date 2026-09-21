@@ -95,6 +95,19 @@ class Instance:
         self.km = next(iter(self.km_mode.values()), np.zeros((n, n)))
         self.ttl = {m: a.tolist() for m, a in self.tt.items()}
         self.kml = {m: a.tolist() for m, a in self.km_mode.items()}
+        # Optimistic closure only: service and intermediate eligibility are
+        # ignored. Unlike a direct-start filter this is safe on nonmetric input.
+        self.reachable = {}
+        for mode, matrix in self.tt.items():
+            shortest = matrix.copy()
+            for k in range(n):
+                np.minimum(shortest, shortest[:, k, None] + shortest[None, k, :], out=shortest)
+            for e in self.engineers:
+                if e.mode == mode:
+                    self.reachable[e.idx] = [any(
+                        max(e.shift_start + int(shortest[e.idx, self.node(t.idx)]), a)
+                        <= min(b, e.shift_end - t.service)
+                        for a, b in t.service_windows) for t in self.tasks]
         return self
 
     def compatible(self, e: Engineer, t: Task) -> bool:

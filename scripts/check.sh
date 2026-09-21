@@ -12,7 +12,7 @@ python - <<'PY'
 from pathlib import Path
 from zipfile import ZipFile
 wheel = max(Path('dist').glob('field_router-*.whl'), key=lambda p: p.stat().st_mtime)
-required = {'field_router/_alns/PROVENANCE.md', 'field_router/_alns/solver.py', 'field_router/solvers/alns_solver.py', 'field_router/solvers/selection.py', 'field_router/static/crew.html', 'field_router/static/crew.js', 'field_router/static/crew.css', 'field_router/data/metro.json', 'field_router/data/surface.json', 'field_router/data/SURFACE-SOURCE.txt', 'field_router/data/METRO-LICENSE.txt', 'field_router/static/scenarios.html', 'field_router/static/scenarios.js',
+required = {'field_router/_alns/PROVENANCE.md', 'field_router/_alns/solver.py', 'field_router/_alns/scheduling.py', 'field_router/solvers/alns_solver.py', 'field_router/solvers/selection.py', 'field_router/static/crew.html', 'field_router/static/crew.js', 'field_router/static/crew.css', 'field_router/data/metro.json', 'field_router/data/surface.json', 'field_router/data/SURFACE-SOURCE.txt', 'field_router/data/METRO-LICENSE.txt', 'field_router/static/scenarios.html', 'field_router/static/scenarios.js',
             'field_router/static/dispatcher.js', 'field_router/static/vendor/leaflet.js',
             'field_router/static/vendor/images/marker-icon.png'}
 with ZipFile(wheel) as archive:

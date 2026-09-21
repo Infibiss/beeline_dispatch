@@ -2,18 +2,27 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from .instance import Instance
+from .scheduling import stable_starts
 
 EPS = 1e-9
 
 
 def earliest(task, arrival):
-    return min((max(arrival, a) for a, b in task.service_windows if max(arrival, a) <= b + EPS),
-               default=float('inf'))
+    best = float('inf')
+    for a, b in task.service_windows:
+        start = arrival if arrival >= a else a
+        if start <= b + EPS and start < best:
+            best = start
+    return best
 
 
 def latest(task, limit):
-    return max((min(limit, b) for a, b in task.service_windows if min(limit, b) >= a - EPS),
-               default=-float('inf'))
+    best = -float('inf')
+    for a, b in task.service_windows:
+        start = limit if limit <= b else b
+        if start >= a - EPS and start > best:
+            best = start
+    return best
 
 
 class RouteEval:
@@ -22,13 +31,14 @@ class RouteEval:
     Backward starts are projected onto the union of start windows. No triangle
     inequality is assumed, including when removing a task from an existing route.
     """
-    __slots__ = ('e', 'seq', 'E', 'L', 'km', 'ok', 'used')
+    __slots__ = ('e', 'seq', 'E', 'L', 'km', 'ok', 'used', '_stable_starts', '_stable_reference')
 
     def __init__(self, inst: Instance, e: int, seq: list):
         self.e, self.seq = e, list(seq)
         self.recompute(inst)
 
     def recompute(self, inst: Instance):
+        self._stable_starts = self._stable_reference = None
         eng = inst.engineers[self.e]
         tt, kmm, tasks = inst.ttl[eng.mode], inst.kml[eng.mode], inst.tasks
         n = len(self.seq)
@@ -57,12 +67,32 @@ class RouteEval:
             self.L[k] = latest(tj, limit)
         return self
 
+    def copy(self):
+        """Clone evaluated state without recomputing unchanged route bounds."""
+        copied = object.__new__(RouteEval)
+        copied.e, copied.km, copied.ok = self.e, self.km, self.ok
+        copied.seq, copied.E, copied.L = self.seq.copy(), self.E.copy(), self.L.copy()
+        copied.used = self.used.copy()
+        # Cached schedules and reference snapshots are immutable tuples.
+        copied._stable_starts, copied._stable_reference = self._stable_starts, self._stable_reference
+        return copied
+
+    def start_times(self, inst):
+        """Actual schedule; E remains the earliest bound used by insertions."""
+        if inst.profile != 'stable' or not self.ok:
+            return self.E
+        reference = tuple(inst.prev_start.get(j) for j in self.seq)
+        if self._stable_starts is None or self._stable_reference != reference:
+            self._stable_starts = stable_starts(inst, self.e, self.seq, self.E, self.L, reference)
+            self._stable_reference = reference
+        return self._stable_starts
+
     def profile_key(self, inst):
         if inst.profile == 'sla':
             return (sum(s for j, s in zip(self.seq, self.E) if inst.tasks[j].priority >= 2),)
         if inst.profile == 'stable':
             return (sum(j in inst.prev_owner and inst.prev_owner[j] != self.e for j in self.seq),
-                    sum(abs(s - inst.prev_start[j]) for j, s in zip(self.seq, self.E)
+                    sum(abs(s - inst.prev_start[j]) for j, s in zip(self.seq, self.start_times(inst))
                         if j in inst.prev_start))
         return ()
 
@@ -107,7 +137,7 @@ class Solution:
     unassigned: set = field(default_factory=set)
 
     def copy(self, inst):
-        return Solution({e: RouteEval(inst, e, r.seq) for e, r in self.routes.items()}, set(self.unassigned))
+        return Solution({e: r.copy() for e, r in self.routes.items()}, set(self.unassigned))
 
     def objective_key(self, inst: Instance) -> tuple:
         coverage = (sum(inst.tasks[j].priority == 3 for j in self.unassigned),
@@ -167,11 +197,12 @@ def validate(inst: Instance, sol: Solution) -> list:
 
 def schedule(inst: Instance, e: int, seq: list):
     eng, route = inst.engineers[e], RouteEval(inst, e, seq)
+    starts = route.start_times(inst)
     result, prev, ready = [], eng.idx, eng.shift_start
     for k, j in enumerate(seq):
         node = inst.node(j)
         minutes, km = inst.ttl[eng.mode][prev][node], inst.kml[eng.mode][prev][node]
-        start = route.E[k]
+        start = starts[k]
         arrival = ready + minutes
         result.append(dict(task=j, arrival=arrival, start=start, end=start + inst.tasks[j].service,
                            leg_km=km, leg_min=minutes, wait=start - arrival))

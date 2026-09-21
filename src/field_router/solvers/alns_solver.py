@@ -58,6 +58,25 @@ def _reference_seed(scenario, travel, reference):
     return make_plan(scenario,travel,sequences,'alns','reference_seed')
 
 
+def _with_stable_schedule(plan, inst, solution):
+    """Export the same optimized starts used by the kernel objective."""
+    engineer_index = {e.id: i for i, e in enumerate(inst.engineers)}
+    rebuilt = []
+    for route in plan.routes:
+        e = engineer_index[route.engineer_id]
+        starts = solution.routes[e].start_times(inst)
+        ready, visits = inst.engineers[e].shift_start, []
+        for visit, start in zip(route.visits, starts):
+            arrival = ready + visit.travel_minutes
+            end = start + visit.end - visit.start
+            visits.append(visit.model_copy(update={'arrival':arrival,'start':start,'end':end,
+                'explanation':f'Дорога {visit.travel_minutes} мин, ожидание {start-arrival} мин. '
+                              'Время выбрано целью сохранения утвержденного расписания; допустимость проверена.'}))
+            ready = end
+        rebuilt.append(route.model_copy(update={'visits':visits}))
+    return plan.model_copy(update={'routes':rebuilt})
+
+
 class AlnsSolver:
     def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference: Plan | None = None, seed=0, initial_plan: Plan | None = None):
         if profile not in (None,'sla','stable','cost'):
@@ -86,6 +105,9 @@ class AlnsSolver:
         for route in incumbent.routes:
             e = eng_index[route.engineer_id]
             init.routes[e] = RouteEval(inst,e,[job_index[v.request_id] for v in route.visits])
+        if profile == 'stable':
+            incumbent = _with_stable_schedule(incumbent, inst, init)
+            candidates.append(incumbent)
         remaining = time_limit_seconds-(perf_counter()-started)
         status='budget_exhausted_before_search'
         if remaining > 0:
@@ -94,6 +116,8 @@ class AlnsSolver:
             candidate = make_plan(scenario,travel,
                 {scenario.engineers[e].id:[scenario.requests[j].id for j in route.seq] for e,route in solution.routes.items()},
                 'alns','feasible_search_completed')
+            if profile == 'stable':
+                candidate = _with_stable_schedule(candidate, inst, solution)
             require_valid(scenario,travel,candidate)
             candidates.append(candidate)
             incumbent=min(candidates,key=key)

@@ -17,6 +17,10 @@ class RoutePool:
     def add_solution(self, sol: Solution):
         for e, r in sol.routes.items():
             if r.ok and r.seq:
+                # Keep memory bounded during long interactive sessions. Existing
+                # columns and the final incumbent can always be overwritten.
+                if len(self.routes) >= 12000 and (e, tuple(r.seq)) not in self.routes:
+                    continue
                 self.routes[(e, tuple(r.seq))] = r.km
                 n = len(r.seq)
                 if n > 1 and len(self.routes) < 6000:     # подмаршруты — дешёвые дополнительные столбцы
@@ -42,11 +46,12 @@ class ALNS:
     def __init__(self, inst: Instance, seed=0, fixed=None, max_routes=None):
         """fixed: e -> список заявок, которые обязаны остаться первыми в маршруте (перепланирование)."""
         self.inst, self.rng = inst, random.Random(seed)
-        self.compat = [[e for e, eng in enumerate(inst.engineers) if inst.compatible(eng, t)] for t in inst.tasks]
+        self.compat = [[e for e, eng in enumerate(inst.engineers)
+                        if inst.compatible(eng, t) and inst.reachable[e][t.idx]] for t in inst.tasks]
         self.fixed = fixed or {}
         self.fixed_tasks = {j for seq in self.fixed.values() for j in seq}
         self.pool = RoutePool()
-        self.destroys = [self.d_random, self.d_shaw, self.d_worst, self.d_route, self.d_timeslice]
+        self.destroys = [self.d_random, self.d_shaw, self.d_worst, self.d_route, self.d_timeslice, self.d_conflict]
         self.repairs = [self.r_greedy, self.r_regret2, self.r_regret3]
         # нормированная «связанность» заявок для Shaw
         self.span = max(1.0, float(inst.km.max())) if inst.km.size else 1.0
@@ -95,6 +100,12 @@ class ALNS:
                 moves = sorted((move[0], e, move[1]) for e, move in cache[j].items() if move is not None)
                 if not moves:
                     continue
+                if noise:
+                    # Real diversification, not just random tie-breaking between
+                    # almost-never-equal kilometre deltas. Cached exact costs stay
+                    # intact; only the exploration ranking is perturbed.
+                    moves.sort(key=lambda m: m[0][:-1] +
+                               (m[0][-1] + self.rng.uniform(-noise, noise),))
                 if regret_k == 1:
                     preference = tuple(-v for v in moves[0][0])
                 else:
@@ -123,8 +134,8 @@ class ALNS:
         return sol
 
     def r_greedy(self, sol): return self._repair(sol, 1, 0.0)
-    def r_regret2(self, sol): return self._repair(sol, 2, 5.0 * self.rng.random())
-    def r_regret3(self, sol): return self._repair(sol, 3, 5.0 * self.rng.random())
+    def r_regret2(self, sol): return self._repair(sol, 2, 1.5 * self.rng.random())
+    def r_regret3(self, sol): return self._repair(sol, 3, 3.0 * self.rng.random())
 
     # ---------- разрушение ----------
     def _removable(self, sol):
@@ -182,6 +193,53 @@ class ALNS:
             if abs(self.inst.tasks[j].a - t0) <= 60:
                 sol.remove(self.inst, j)
 
+    def d_conflict(self, sol):
+        """Free time/stock on eligible routes near a pending important job."""
+        pending = [j for j in sorted(sol.unassigned) if self.compat[j]]
+        if not pending:
+            return self.d_shaw(sol)
+        priority = max(self.inst.tasks[j].priority for j in pending)
+        j = self.rng.choice([j for j in pending if self.inst.tasks[j].priority == priority])
+        job, inst = self.inst.tasks[j], self.inst
+        eligible = set(self.compat[j])
+        candidates = []
+        for e, route in sol.routes.items():
+            if e not in eligible:
+                continue
+            for k in route.seq:
+                if k in self.fixed_tasks:
+                    continue
+                t = inst.tasks[k]
+                overlap = max(0, min(job.b, t.b) - max(job.a, t.a))
+                distance = inst.kml[inst.engineers[e].mode][inst.node(j)][inst.node(k)]
+                candidates.append((distance / max(1, self.span) - overlap / 720
+                                   + self.rng.random() * .3, k))
+        for _, k in sorted(candidates)[:max(2, self._q(sol))]:
+            sol.remove(inst, k)
+
+    def accept(self, cost, current, best, temperature):
+        """Explore a bounded neighbourhood while the best uses exact ordering.
+
+        Temporarily opening a route or ejecting a job enables exchanges that
+        strict greedy acceptance cannot reach. No relaxed candidate is published
+        unless its complete lexicographic key improves the feasible incumbent.
+        """
+        if cost <= current:
+            return True
+        if any(cost[i] > best[i] + limit for i, limit in enumerate((1, 2, 3))):
+            return False
+        first = next(i for i, (a, b) in enumerate(zip(cost, current)) if a != b)
+        delta = cost[first] - current[first]
+        if first < 3:
+            penalty = delta * (6, 4, 3)[first]
+        elif first == len(cost) - 2:
+            penalty = delta * 3
+        elif first == len(cost) - 1:
+            penalty = delta
+        else:
+            penalty = delta * (2 if first == 3 and self.inst.profile == 'stable' else .04)
+        return self.rng.random() < math.exp(-penalty / max(temperature, 1e-6))
+
     # ---------- основной цикл ----------
     def initial(self) -> Solution:
         inst = self.inst
@@ -212,7 +270,7 @@ class ALNS:
         sd, sr = [0.0] * len(self.destroys), [0.0] * len(self.repairs)
         nd, nr = [0] * len(self.destroys), [0] * len(self.repairs)
         temperature = .05 * sum(r.km for r in cur.routes.values()) / max(1, len(cur.routes)) + 1.0
-        it, self.history = 0, []
+        it, last_improvement, self.restarts, self.history = 0, 0, 0, []
         while it < max_iter and inst.N and time.perf_counter() < self.deadline:
             it += 1
             di = rng.choices(range(len(self.destroys)), weights=wd)[0]
@@ -223,17 +281,18 @@ class ALNS:
             if any(not r.ok for r in cand.routes.values()):
                 continue
             cost = cand.objective_key(inst)
+            # A globally inferior plan may contain a route that completes the
+            # best partition; don't discard that useful column with the plan.
+            self.pool.add_solution(cand)
             score = 0
             if cost < best_cost:
                 best, best_cost, score = cand.copy(inst), cost, 33
+                last_improvement = it
                 self.pool.add_solution(cand)
             if cost < cur_cost:
                 cur, cur_cost, score = cand, cost, max(score, 9)
                 self.pool.add_solution(cand)
-            elif cost == cur_cost or (cost[:-1] == cur_cost[:-1]
-                    and rng.random() < math.exp(-(cost[-1]-cur_cost[-1])/max(temperature, 1e-6))):
-                # Anneal distance only. Incumbents use exact tuple comparisons,
-                # so no numeric ratio can trade away a priority tier.
+            elif self.accept(cost, cur_cost, best_cost, temperature):
                 cur, cur_cost, score = cand, cost, max(score, 3)
                 if rng.random() < .3:
                     self.pool.add_solution(cand)
@@ -244,9 +303,27 @@ class ALNS:
                         if counts[k]:
                             weights[k] = .8*weights[k] + .2*max(.1, scores[k]/counts[k])
                         scores[k], counts[k] = 0.0, 0
-                temperature = max(.01, temperature*.97)
+                temperature = max(.15, temperature*.96)
                 if rng.random() < .1:
                     cur, cur_cost = best.copy(inst), best_cost
+            if it - last_improvement >= 200:
+                # Alternate genuinely new construction and a large shake of
+                # the incumbent. Share all columns across basins of attraction.
+                self.restarts += 1
+                if self.restarts % 2:
+                    restart = self.initial()
+                else:
+                    restart = best.copy(inst)
+                    for _ in range(3):
+                        self.d_route(restart)
+                    self.r_regret3(restart)
+                if all(r.ok for r in restart.routes.values()):
+                    cur, cur_cost = restart, restart.objective_key(inst)
+                    self.pool.add_solution(restart)
+                    if cur_cost < best_cost:
+                        best, best_cost = cur.copy(inst), cur_cost
+                last_improvement = it
+                temperature = max(temperature, 1.0)
             if log and it % 200 == 0:
                 self.history.append((time.perf_counter()-t_start, best_cost))
         self.iterations = it

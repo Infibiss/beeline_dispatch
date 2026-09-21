@@ -95,7 +95,7 @@ def render_report(scenario: Scenario, plans: list[Plan]) -> str:
         parts.append('</nav>')
     for index, plan in enumerate(plans):
         parts.append(f'<section class="plan" id="plan-{index}"><h2>Маршруты · {_e(plan.solver)}</h2>')
-        if plan.solver.lower() == "ortools":
+        if plan.solver.lower() in ("ortools","alns","hybrid"):
             parts.append('<p class="notice">Математическая оптимальность не гарантируется. '
                          'Показан допустимый результат ограниченного поиска или резервный базовый план.</p>')
         parts.append('<h3>Утренняя загрузка</h3><div class="card scroll"><table><thead><tr>'

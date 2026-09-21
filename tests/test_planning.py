@@ -75,3 +75,13 @@ def test_invalid_matrices_fail_closed():
     with pytest.raises(ValueError):
         MatrixTravel(["office","a"], {t:[[0,-1],[1,0]] for t in Transport},
                      {t:[[0,1],[1,0]] for t in Transport})
+
+
+def test_unassigned_explanation_does_not_claim_impossibility_on_nonmetric_matrix(make_scenario):
+    from field_router.planning import explain_unassigned
+    s = make_scenario([job('a',start=540,end=600,duration=10),job('b',start=540,end=600,duration=10)])
+    t = MatrixTravel(['office','a','b'], {m:[[0,10,120],[10,0,10],[120,10,0]] for m in Transport},
+                     {m:[[0,1000,2000],[1000,0,1000],[2000,1000,0]] for m in Transport})
+    explanation = explain_unassigned(s.requests[1],s,t)
+    assert explanation.code == 'SEARCH_UNASSIGNED'
+    assert 'Глобальная невозможность не доказана' in explanation.reason

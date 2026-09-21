@@ -12,7 +12,8 @@ from .geography import attach_geography
 from .road_travel import bundle_travel
 from .operational_facts import validate_fact, apply_observations
 from .validation import require_valid
-from .solvers.ortools_solver import OrToolsSolver, objective_key
+from .solvers.ortools_solver import objective_key
+from .solvers.selection import get_solver
 
 
 class Event(Model):
@@ -225,7 +226,8 @@ class ScenarioSession:
                         raise ValueError('Инженер выполняет закрепленную работу: уточните фактическое завершение/прерывание')
         routes={r.engineer_id:r for r in self.plan.routes if self.execution_mode!='manual' or r.engineer_id in self.statuses}
         prior_frozen=deepcopy(self.frozen)
-        if self.statuses:s,routes,prior_frozen=apply_observations(self,s,routes,prior_frozen,now)
+        if self.statuses:s,routes,prior_frozen=apply_observations(self,s,routes,prior_frozen,now,
+            allow_redirect=allow_redirect and event.type=='emergency')
         points=dict(s.points)
         if self.geography:points={k:Point(x_km=v.lon,y_km=v.lat) for k,v in self.geo_locations.items()}
         restored_jobs=[]
@@ -310,7 +312,9 @@ class ScenarioSession:
             raise ValueError('Нельзя отменить завершенную или закрепленную текущую заявку')
         remaining=[r for r in s.requests if r.id not in locked and not (event.type=='cancel' and r.id==event.request_id)]
         if event.type=='emergency':
-            source_address=self.catalog[event.anchor_id].address if event.anchor_id in self.catalog else self.geo_locations[event.anchor_id].original_address or self.geo_locations[event.anchor_id].label
+            if event.anchor_id=='office':source_address=s.office_address
+            elif event.anchor_id in self.catalog:source_address=self.catalog[event.anchor_id].address
+            else:source_address=self.geo_locations[event.anchor_id].original_address or self.geo_locations[event.anchor_id].label
             key='emergency:'+event.id
             if key in self.catalog:raise ValueError('ID новой заявки уже существует')
             points[key]=points[event.anchor_id]
@@ -344,7 +348,7 @@ class ScenarioSession:
             inventory.append({'engineer_id':eid,'consumed':consumed,'reserved':reserved,'available':available,'dispatchable':any(e.id==eid and e.shift.end>now for e in engineers)})
         return residual,frozen,inventory
 
-    def preview(self,payload,*,time_limit=1):
+    def preview(self,payload,*,time_limit=1,solver='hybrid'):
         if payload.get('version')!=self.version:raise ValueError('Устаревшая версия плана; обновите состояние')
         event=Event.model_validate(payload.get('event',{}))
         if event.id in {h['event']['id'] for h in self.history}:raise ValueError('Запрещен повтор уже примененного события')
@@ -352,7 +356,10 @@ class ScenarioSession:
         if event.type not in ('emergency','cancel','unavailable','replan'):raise ValueError('Неизвестный тип события')
         ids={r.id for r in self.scenario.requests}
         if event.type=='cancel' and event.request_id not in ids:raise ValueError('Неизвестная или уже завершенная заявка')
-        if event.type=='emergency' and event.anchor_id not in (set(self.catalog)|set(self.geo_locations)):raise ValueError('Неизвестная точка новой аварии')
+        if event.type=='emergency':
+            anchors=set(self.catalog)|set(self.geo_locations)
+            if 'office' in self.scenario.points:anchors.add('office')
+            if event.anchor_id not in anchors:raise ValueError('Неизвестная точка новой аварии')
         if event.type=='unavailable' and event.engineer_id not in {e.id for e in self.scenario.engineers}:raise ValueError('Неизвестный инженер')
         for key in ('allow_redirect','preserve_in_progress'):
             if type(payload.get(key,False)) is not bool:raise ValueError('Ожидается явный переключатель '+key)
@@ -370,7 +377,8 @@ class ScenarioSession:
         labels=self.request_labels()
         if event.type=='emergency':labels['emergency:'+event.id]=f'Авария №{len(labels)+1}'
         candidates=[];seen={}
-        pool=[OrToolsSolver().solve(s,travel,time_limit_seconds=time_limit,profile=p,reference=reference) for p in ('sla','stable','cost')]
+        backend=get_solver(solver)
+        pool=[backend.solve(s,travel,time_limit_seconds=time_limit,profile=p,reference=reference) for p in ('sla','stable','cost')]
         for profile,label in [('sla','SLA-first'),('stable','Stable'),('cost','Cost-first')]:
             plan=min(pool,key=lambda candidate:objective_key(candidate,s,profile=profile,reference=reference))
             require_valid(s,travel,plan)

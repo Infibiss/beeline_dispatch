@@ -11,3 +11,6 @@ output/
 build/
 dist/
 test-results.xml
+
+# Teammate source clone; adapted runtime is tracked under src/field_router/_alns.
+ALNS-OptimizationKernel/

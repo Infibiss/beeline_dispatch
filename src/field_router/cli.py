@@ -15,6 +15,7 @@ from .report import render_report
 from .scenario import prepare_scenario
 from .solvers.baseline import BaselineSolver
 from .solvers.ortools_solver import OrToolsSolver
+from .solvers.selection import get_solver
 from .travel import synthetic_travel
 from .validation import require_valid
 from .export import write_dispatcher
@@ -53,6 +54,8 @@ def _calculate(scenario, output, time_limit, solver=None, geography=None, shape_
         plans.append(BaselineSolver().solve(scenario,travel))
     if solver in (None,"ortools"):
         plans.append(OrToolsSolver().solve(scenario,travel,time_limit_seconds=time_limit))
+    if solver in ('alns','hybrid'):
+        plans.append(get_solver(solver).solve(scenario,travel,time_limit_seconds=time_limit))
     for plan in plans:
         require_valid(scenario,travel,plan)
     if geography is not None and shape_client is not None:
@@ -93,9 +96,9 @@ def parser():
         cmd.add_argument("--route-shapes",action="store_true",help="Получить геометрию выбранных дорожных маршрутов")
         cmd.add_argument("--network",action="store_true",help="Разрешить внешние запросы; иначе только кэш")
         cmd.add_argument("--cache",type=Path,default=Path("output/geo-cache"))
-        cmd.add_argument("--time-limit",type=float,default=5,help="Лимит поиска OR-Tools на набор, секунды")
+        cmd.add_argument("--time-limit",type=float,default=5,help="Бюджет поиска на набор, секунды")
         if name=="solve":
-            cmd.add_argument("--solver",choices=["baseline","ortools"],required=True)
+            cmd.add_argument("--solver",choices=["baseline","ortools","alns","hybrid"],required=True)
     demo = commands.add_parser("demo",help="Подготовить и сравнить три исходных синтетических набора")
     demo.add_argument("--data-dir",type=Path,default=Path("data/Обезличивание"))
     demo.add_argument("--config",type=Path,default=Path("config/demo.json"))

@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "field-router"
 version = "0.1.0"
-description = "Explainable field engineer day planning: baseline and OR-Tools"
+description = "Explainable field engineer day planning: OR-Tools and ALNS"
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2,<3", "ortools>=9.12,<10"]
+dependencies = ["pydantic>=2,<3", "ortools>=9.12,<10", "numpy>=1.26,<3"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]
@@ -24,3 +24,5 @@ testpaths = ["tests"]
 
 [tool.setuptools.package-data]
 field_router = ["data/*.json", "data/*.txt", "static/*.html", "static/*.js", "static/*.css", "static/vendor/*", "static/vendor/images/*"]
+
+"field_router._alns" = ["PROVENANCE.md"]

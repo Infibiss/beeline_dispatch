@@ -1,0 +1,1501 @@
+{
+  "python": "3.11.9",
+  "platform": "macOS-27.0-arm64-arm-64bit",
+  "objective": "miss urgent, miss urgent+high, miss total, engineers, metres",
+  "conditions": "Identical input/fleet/windows/service/stock/matrices; no external services, no manual tuning. OR-Tools has no seed option; one run per budget. ALNS seed does not make wall-clock search bitwise deterministic. Hybrid spends40% of its budget on OR-Tools then uses the remainder on ALNS with that incumbent.",
+  "inputs": {
+    "Восток": {
+      "file": "data/demo-road/Восток.json",
+      "sha256": "b24f0e7c212a186dac616fb4709594a3bc85d867e83e3a5888a611e9692839a2",
+      "requests": 66,
+      "engineers": 15,
+      "fixed_stock": 0
+    },
+    "Юго-восток": {
+      "file": "data/demo-road/Юго-восток.json",
+      "sha256": "9a3603afedbaf5c1071912b894ff4919de325979b435dda412890e8eaaf2b9b2",
+      "requests": 83,
+      "engineers": 15,
+      "fixed_stock": 0
+    },
+    "Югоцентр": {
+      "file": "data/demo-road/Югоцентр.json",
+      "sha256": "dbd04aca8e43f37b2b9d06817879765fff863829f83add0e1054226edd0ba9f1",
+      "requests": 56,
+      "engineers": 15,
+      "fixed_stock": 0
+    }
+  },
+  "rows": [
+    {
+      "region": "Восток",
+      "solver": "ortools",
+      "seed": null,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.061,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        208951
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 208951,
+        "travel_minutes": 1525,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "alns",
+      "seed": 0,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        218469
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 218469,
+        "travel_minutes": 1589,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "alns",
+      "seed": 1,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        199057
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 199057,
+        "travel_minutes": 1427,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "alns",
+      "seed": 2,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        194824
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 194824,
+        "travel_minutes": 1358,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "hybrid",
+      "seed": 0,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.002,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        207140
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 207140,
+        "travel_minutes": 1473,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "hybrid",
+      "seed": 1,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        194795
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 194795,
+        "travel_minutes": 1444,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "hybrid",
+      "seed": 2,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.002,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        200877
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 200877,
+        "travel_minutes": 1530,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "ortools",
+      "seed": null,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.06,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        203835
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 203835,
+        "travel_minutes": 1539,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "alns",
+      "seed": 0,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        188463
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 188463,
+        "travel_minutes": 1449,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "alns",
+      "seed": 1,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        198890
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 198890,
+        "travel_minutes": 1407,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "alns",
+      "seed": 2,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        192601
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 192601,
+        "travel_minutes": 1362,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "hybrid",
+      "seed": 0,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        194566
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 194566,
+        "travel_minutes": 1517,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "hybrid",
+      "seed": 1,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.002,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        191823
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 191823,
+        "travel_minutes": 1466,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Восток",
+      "solver": "hybrid",
+      "seed": 2,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.001,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        189929
+      ],
+      "metrics": {
+        "assigned": 66,
+        "unassigned": 0,
+        "engineers_used": 13,
+        "distance_m": 189929,
+        "travel_minutes": 1407,
+        "service_minutes": 3560
+      },
+      "unassigned": [],
+      "assigned_by_priority": {
+        "urgent": 8,
+        "high": 31,
+        "normal": 27
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "ortools",
+      "seed": null,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.313,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        15,
+        482036
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 15,
+        "distance_m": 482036,
+        "travel_minutes": 2155,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "alns",
+      "seed": 0,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        486025
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 486025,
+        "travel_minutes": 2201,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "alns",
+      "seed": 1,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.071,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        8,
+        12,
+        14,
+        475448
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 475448,
+        "travel_minutes": 1884,
+        "service_minutes": 3810
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "53552",
+        "57353",
+        "62011",
+        "63577",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 28,
+        "normal": 31
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "alns",
+      "seed": 2,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.071,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        485524
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 485524,
+        "travel_minutes": 2046,
+        "service_minutes": 3860
+      },
+      "unassigned": [
+        "13404",
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "hybrid",
+      "seed": 0,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        498561
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 498561,
+        "travel_minutes": 1916,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "53552",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "hybrid",
+      "seed": 1,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        488745
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 488745,
+        "travel_minutes": 2191,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "hybrid",
+      "seed": 2,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        459120
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 459120,
+        "travel_minutes": 1867,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "ortools",
+      "seed": null,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.346,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        15,
+        482036
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 15,
+        "distance_m": 482036,
+        "travel_minutes": 2155,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "alns",
+      "seed": 0,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.071,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        458994
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 458994,
+        "travel_minutes": 1931,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "alns",
+      "seed": 1,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        457455
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 457455,
+        "travel_minutes": 1971,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "alns",
+      "seed": 2,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.071,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        484395
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 484395,
+        "travel_minutes": 2008,
+        "service_minutes": 3860
+      },
+      "unassigned": [
+        "13404",
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "hybrid",
+      "seed": 0,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        458112
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 458112,
+        "travel_minutes": 1965,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "hybrid",
+      "seed": 1,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        460850
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 460850,
+        "travel_minutes": 1916,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "solver": "hybrid",
+      "seed": 2,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.072,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        7,
+        12,
+        14,
+        493767
+      ],
+      "metrics": {
+        "assigned": 71,
+        "unassigned": 12,
+        "engineers_used": 14,
+        "distance_m": 493767,
+        "travel_minutes": 2167,
+        "service_minutes": 3850
+      },
+      "unassigned": [
+        "20362",
+        "23094",
+        "3151",
+        "40111",
+        "46199",
+        "57353",
+        "62011",
+        "63577",
+        "65268",
+        "66944",
+        "75745",
+        "78876"
+      ],
+      "assigned_by_priority": {
+        "urgent": 12,
+        "high": 29,
+        "normal": 30
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "ortools",
+      "seed": null,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.042,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        183168
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 183168,
+        "travel_minutes": 1198,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "alns",
+      "seed": 0,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        169947
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 169947,
+        "travel_minutes": 1101,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "alns",
+      "seed": 1,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        189390
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 189390,
+        "travel_minutes": 1478,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "alns",
+      "seed": 2,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        184459
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 184459,
+        "travel_minutes": 1301,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "hybrid",
+      "seed": 0,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        169947
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 169947,
+        "travel_minutes": 1101,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "hybrid",
+      "seed": 1,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        169947
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 169947,
+        "travel_minutes": 1101,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "hybrid",
+      "seed": 2,
+      "budget_seconds": 3.0,
+      "elapsed_seconds": 3.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        171158
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 171158,
+        "travel_minutes": 1102,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "ortools",
+      "seed": null,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.048,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        176867
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 176867,
+        "travel_minutes": 1265,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "alns",
+      "seed": 0,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        173159
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 173159,
+        "travel_minutes": 1291,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "alns",
+      "seed": 1,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        187308
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 187308,
+        "travel_minutes": 1481,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "alns",
+      "seed": 2,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        184459
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 184459,
+        "travel_minutes": 1301,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "hybrid",
+      "seed": 0,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        169947
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 169947,
+        "travel_minutes": 1101,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "hybrid",
+      "seed": 1,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        169947
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 169947,
+        "travel_minutes": 1101,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "solver": "hybrid",
+      "seed": 2,
+      "budget_seconds": 10.0,
+      "elapsed_seconds": 10.003,
+      "valid": true,
+      "status": "feasible_search_completed",
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        170991
+      ],
+      "metrics": {
+        "assigned": 55,
+        "unassigned": 1,
+        "engineers_used": 10,
+        "distance_m": 170991,
+        "travel_minutes": 1099,
+        "service_minutes": 2810
+      },
+      "unassigned": [
+        "78036"
+      ],
+      "assigned_by_priority": {
+        "urgent": 1,
+        "high": 28,
+        "normal": 26
+      }
+    }
+  ]
+}

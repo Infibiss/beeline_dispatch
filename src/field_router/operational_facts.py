@@ -55,7 +55,7 @@ def validate_fact(session,payload):
             'remaining_minutes':remaining,'consumed':consumed.model_dump(),'source':'dispatcher'}
 
 
-def apply_observations(session,s,routes,frozen,now):
+def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
     """Project a remaining-day problem from explicit latest observations.
 
     An observed worker remains busy for the declared remainder from the new
@@ -103,7 +103,7 @@ def apply_observations(session,s,routes,frozen,now):
                     'travel_minutes':0,'distance_m':0,'explanation':'Фактическое завершение' if f['status']=='completed' else 'Фактическое прерывание',
                     'fact_id':marker,'consumed_equipment':f['consumed'],'status':f['status']}
                 frozen.append({'engineer_id':eid,'visits':[visit],'origins':{}})
-            if f['status']=='completed':jobs.pop(key,None)
+            if f['status']=='completed' or key in cancelled:jobs.pop(key,None)
             else:
                 request=jobs.get(key,session.catalog[key])
                 jobs[key]=request.model_copy(update={'duration_minutes':f['remaining_minutes'],
@@ -124,6 +124,9 @@ def apply_observations(session,s,routes,frozen,now):
         kind=fact['status'];key=fact.get('request_id')
         if kind in ('working','traveling'):
             request=jobs.get(key,session.catalog[key]);jobs[key]=request
+            # A fresh confirmed position can release the original trip before
+            # checking its arrival; that trip is not part of the redirected plan.
+            if kind=='traveling' and allow_redirect and fact['time']==now:continue
             if kind=='working':
                 duration=fact['remaining_minutes']
                 jobs[key]=request.model_copy(update={'duration_minutes':duration})

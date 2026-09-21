@@ -1,4 +1,6 @@
 """Common schedule construction, metrics and bounded explanations."""
+from heapq import heappop, heappush
+
 from .models import Equipment, Metrics, Plan, Route, Unassigned, Visit
 
 
@@ -41,6 +43,33 @@ def build_route(engineer, requests, travel):
                  service_minutes=sum(v.end-v.start for v in visits),loadout=Equipment(router=routers,tv_box=boxes))
 
 
+def _optimistically_reachable(request, engineer, scenario, travel):
+    """A shortest-path relaxation is safe even for nonmetric transport matrices.
+
+    Intermediate service, skills, stock and windows are deliberately ignored.
+    Failure proves infeasibility; success only prevents an unsupported claim.
+    """
+    nodes = {r.id for r in scenario.requests} | {e.start_location for e in scenario.engineers}
+    best = {engineer.start_location: 0}
+    queue = [(0, engineer.start_location)]
+    pending = set(nodes)
+    while queue:
+        duration, node = heappop(queue)
+        if node not in pending:
+            continue
+        pending.remove(node)
+        if node == request.id:
+            arrival = engineer.shift.start + duration
+            return any(max(arrival,w.start) <= min(w.end,engineer.shift.end-request.duration_minutes)
+                       for w in request.windows)
+        for dest in pending:
+            value = duration + travel.minutes(node,dest,engineer.transport)
+            if value < best.get(dest,float('inf')):
+                best[dest] = value
+                heappush(queue,(value,dest))
+    return False
+
+
 def explain_unassigned(request, scenario, travel, *, baseline=False):
     same_region = [e for e in scenario.engineers if e.region==request.region]
     skilled = [e for e in same_region if request.skill in e.skills]
@@ -53,8 +82,8 @@ def explain_unassigned(request, scenario, travel, *, baseline=False):
         code, reason = "NO_TRANSPORT", "Среди инженеров с нужным навыком нет требуемого транспорта."
     elif not stocked:
         code, reason = "NO_EQUIPMENT", "У подходящих инженеров недостаточно устройств для этой заявки."
-    elif not any(build_route(e,[request],travel) is not None for e in stocked):
-        code, reason = "NO_TIME_WINDOW", "Даже отдельно от других работ заявка не помещается в окно и смену с учетом дороги."
+    elif not any(build_route(e,[request],travel) is not None or _optimistically_reachable(request,e,scenario,travel) for e in stocked):
+        code, reason = "NO_TIME_WINDOW", "При текущих стартах и сменах не успеть в окно даже с оптимистичной оценкой дороги."
     elif baseline:
         code, reason = "NO_APPEND_SLOT", "Нет допустимого добавления в конец текущих маршрутов. Baseline не меняет порядок уже назначенных работ."
     else:

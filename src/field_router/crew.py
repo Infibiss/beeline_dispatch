@@ -9,7 +9,7 @@ from .replanning import ScenarioSession
 from .geography import scenario_signature
 from .road_travel import build_matrices, bundle_travel, coordinates_signature
 from .travel import synthetic_travel
-from .solvers.ortools_solver import OrToolsSolver
+from .solvers.selection import get_solver
 
 CONTROL_COUNTS={'Восток':12,'Юго-восток':12,'Югоцентр':11}
 
@@ -91,7 +91,7 @@ class CrewService:
             'locations':session.state()['locations'],'network':self.address_service is not None,
             'metrics':session.plan.metrics.model_dump()}
 
-    def preview(self,session,payload,*,time_limit=3):
+    def preview(self,session,payload,*,time_limit=3,solver='hybrid'):
         request=CrewRequest.model_validate(payload)
         if request.version!=session.version:raise ValueError('Устаревшая версия')
         if not editable(session):raise ValueError('Бригады и утренний запас меняются только до начала дня')
@@ -129,7 +129,7 @@ class CrewService:
             else:geo=cloned_geography(geo,scenario,locations,origins)
             travel=bundle_travel(geo)
         else:travel=synthetic_travel(scenario)
-        plan=OrToolsSolver().solve(scenario,travel,time_limit_seconds=time_limit)
+        plan=get_solver(solver).solve(scenario,travel,time_limit_seconds=time_limit)
         loads={r.engineer_id:r.loadout for r in plan.routes}
         issued=[]
         for row,e in zip(request.engineers,engineers):

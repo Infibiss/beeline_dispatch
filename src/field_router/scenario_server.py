@@ -36,7 +36,9 @@ def _version(query):
     return int(versions[0])
 
 
-def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,regions=None):
+def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,regions=None,solver='hybrid'):
+    from .solvers.selection import get_solver
+    get_solver(solver)  # Reject invalid backend before serving requests.
     lock=threading.Lock()
     def entry(session,path,addresses):
         return {'holder':{'session':session},'path':Path(path),'addresses':addresses,'crews':CrewService(addresses),
@@ -174,7 +176,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         temporary.write_text(json.dumps(candidate.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
                         temporary.replace(path);holder['session']=candidate
                     elif self.path=='/api/crew/preview':
-                        result=crews.preview(holder['session'],payload,time_limit=time_limit)
+                        result=crews.preview(holder['session'],payload,time_limit=time_limit,solver=solver)
                     elif self.path=='/api/crew/apply':
                         candidate=crews.selected(holder['session'],payload)
                         path.parent.mkdir(parents=True,exist_ok=True)
@@ -183,7 +185,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         temporary.replace(path);holder['session']=candidate;crews.draft=None
                         result=candidate.state()
                     elif self.path=='/api/preview':
-                        result={**holder['session'].preview(payload,time_limit=time_limit),'llm_enabled':explainer is not None}
+                        result={**holder['session'].preview(payload,time_limit=time_limit,solver=solver),'llm_enabled':explainer is not None}
                     elif self.path in ('/api/approve','/api/facts','/api/mode'):
                         # Persist the candidate state before publishing it in memory.
                         candidate=deepcopy(holder['session'])
@@ -230,7 +232,8 @@ def main(argv=None):
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--network',action='store_true',help='Разрешить поиск адресов через Photon и координатные запросы OSRM')
     parser.add_argument('--cache',type=Path,default=Path('output/geo-cache'))
-    parser.add_argument('--time-limit',type=float,default=1)
+    parser.add_argument('--time-limit',type=float,default=3)
+    parser.add_argument('--solver',choices=['ortools','alns','hybrid'],default='hybrid',help='Оптимизатор; hybrid делит бюджет между OR-Tools и ALNS')
     args=parser.parse_args(argv)
     if args.state.resolve()==args.comparison.resolve():parser.error('Файл состояния не должен перезаписывать исходное сравнение')
     session=load_session(args.comparison,args.state)
@@ -243,7 +246,7 @@ def main(argv=None):
             regions[key]=(load_session(source,state_path),state_path)
     from .llm import configured
     explainer=configured()
-    server=create_server(session,args.state,regions=regions,port=args.port,time_limit=args.time_limit,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
+    server=create_server(session,args.state,regions=regions,port=args.port,time_limit=args.time_limit,solver=args.solver,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None)
     print(f'Scenario Center: http://127.0.0.1:{server.server_port} · локальный диспетчер, без GPS',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass

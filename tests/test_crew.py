@@ -140,3 +140,89 @@ def test_confirmed_new_home_builds_geography_without_publishing_on_failure():
  a.client.bad=True
  with pytest.raises(ValueError,match='provider unavailable'):service.preview(s,{'version':1,'engineers':rows},time_limit=.03)
  assert s.version==1 and len(s.geography.locations)==len(p['geography']['locations'])
+
+
+def road_session(region):
+ import json
+ from pathlib import Path
+ from field_router.models import Scenario,Plan
+ p=json.loads((Path('data/demo-road')/(region+'.json')).read_text())
+ return ScenarioSession(Scenario.model_validate(p['scenario']),Plan.model_validate(p['plans'][1]),p['geography'])
+
+
+def test_presets_change_only_the_selected_axis_and_keep_current_roster():
+ from field_router.crew import presets
+ s=road_session('Юго-восток');data=CrewService().settings(s)
+ variants={p['id']:p for p in presets(s,data['engineers'])}
+ assert set(variants)=={'current','homes','skills','reserve','combined','control'}
+ base={e['id']:e for e in data['engineers']}
+ for key,allowed in [('current',set()),('homes',{'start_location'}),('skills',{'skills'}),('reserve',{'stock_mode','router','tv_box'})]:
+  assert len(variants[key]['engineers'])==len(base)
+  for row in variants[key]['engineers']:
+   assert {k for k in row if row[k]!=base[row['id']][k]}<=allowed
+ assert variants['homes']['changes']
+ assert all(e['stock_mode']=='plan' and e['router']==1 for e in variants['reserve']['engineers'])
+ assert len(variants['control']['engineers'])==12
+ assert s.version==1 and not s.history
+
+
+def test_home_model_uses_known_medoid_points_and_is_deterministic():
+ from field_router.crew import home_starts
+ s=road_session('Юго-восток');rows=CrewService().settings(s)['engineers']
+ a=home_starts(s,rows);b=home_starts(s,list(reversed(rows)))
+ assert {e['id']:e['start_location'] for e in a}=={e['id']:e['start_location'] for e in b}
+ starts=[s.catalog[e['start_location']].locality for e in a if e['start_location']!='office']
+ assert set(starts)=={'Кашира','Домодедово','Ступино'}
+ assert any(e['start_location']=='office' for e in a)
+ assert home_starts(road_session('Восток'),CrewService().settings(road_session('Восток'))['engineers'])==CrewService().settings(road_session('Восток'))['engineers']
+
+
+def test_crew_preview_reports_actual_resource_and_coverage_changes(make_scenario):
+ s,service,p=setup(make_scenario);old=s.initial_engineers[p['engineers'][0]['id']]
+ p['engineers'][0].update(stock_mode='plan',router=2)
+ result=service.preview(s,p,time_limit=.03)
+ assert result['changes']
+ assert result['before_coverage']['urgent']['total']==sum(r.priority=='urgent' for r in s.scenario.requests)
+ assert sum(x['assigned'] for x in result['after_coverage'].values())==result['after']['assigned']
+ assert result['assumptions']
+ assert s.initial_engineers[old.id]==old
+
+
+def test_skill_suggestion_needs_equipment_and_combined_issues_it():
+ from field_router.crew import current_rows,skill_gaps,presets
+ from field_router.planning import build_route
+ from field_router.models import Skill
+ s=road_session('Югоцентр');rows=current_rows(s)
+ assert skill_gaps(s,rows)==rows  # 78036 needs a router AND a TV box.
+ issued=[{**e,'stock_mode':'plan','router':0,'tv_box':0} for e in rows]
+ proposal=skill_gaps(s,issued)
+ changed=[e for e,old in zip(proposal,issued) if e['skills']!=old['skills']]
+ assert len(changed)==1 and Skill.CONNECTION in changed[0]['skills']
+ e=s.initial_engineers[changed[0]['id']].model_copy(update={'skills':changed[0]['skills'],'stock':None})
+ old=next((r for r in s.plan.routes if r.engineer_id==e.id),None)
+ jobs=[s.catalog[v.request_id] for v in old.visits] if old else []
+ request=s.catalog['78036']
+ assert any(build_route(e,jobs[:i]+[request]+jobs[i:],s._travel(s.scenario)) for i in range(len(jobs)+1))
+ combined=next(p for p in presets(s,rows) if p['id']=='combined')
+ assert any('skills' in c['fields'] for c in combined['changes'])
+
+
+def test_homes_do_not_replace_manual_starts_or_grant_skills():
+ from field_router.crew import current_rows,home_starts
+ s=road_session('Юго-восток');rows=current_rows(s)
+ rows[0]['start_location']='62011'
+ proposed=home_starts(s,rows)
+ assert proposed[0]==rows[0]
+ assert all(a['skills']==b['skills'] and a['shift']==b['shift'] and a['transport']==b['transport'] for a,b in zip(rows,proposed))
+ assert not any(e['start_location']!='office' and e['start_location']!='62011' and s.catalog[e['start_location']].locality=='Кашира' for e in proposed)
+
+
+def test_manual_home_same_coordinates_different_provider_is_recognized():
+ from field_router.crew import current_rows,home_starts,cloned_geography
+ s=road_session('Юго-восток');rows=current_rows(s)
+ locations={**s.geography.locations,'manual-home':s.geography.locations['62011'].model_copy(update={'label':'Дом инженера','source':'manual'})}
+ s.geography=cloned_geography(s.geography,s.scenario,locations,{'manual-home':'62011'})
+ rows[0]['start_location']='manual-home'
+ proposed=home_starts(s,rows)
+ assert proposed[0]==rows[0]
+ assert not any(e['start_location'] in s.catalog and s.catalog[e['start_location']].locality=='Кашира' for e in proposed)

@@ -1,7 +1,43 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Бригады и запас · билайн</title><link rel="stylesheet" href="/scenarios.css"><link rel="stylesheet" href="/crew.css"><script src="/crew.js" defer></script></head><body>
-<header><div class="brand"><strong>билайн</strong><span>Бригады и запас</span></div><a href="/">← К диспетчеру</a></header>
-<main><h1>Подготовка дня</h1><p id="context"></p><p id="status" role="status"></p><p id="error" role="alert" hidden></p>
-<details><summary>Как выдаётся оборудование</summary><p>«Под план + резерв»: склад обеспечивает назначенные заявки, сверху выдаётся указанный резерв. «Фиксированный запас»: назначаются только обеспеченные этим запасом заявки. Запас уже у бригады к началу смены, в том числе при старте из дома.</p></details>
-<form id="crew-form"><fieldset id="fields" disabled><button id="recommend" type="button" class="secondary">Заполнить модель участка</button><p class="hint">Модель: контрольное число бригад, домашние старты удалённых городов, выдача под план + 1 запасной роутер. Можно изменить до расчёта.</p><div id="rows"></div><button id="add" type="button" class="secondary">Добавить бригаду</button><button type="submit" class="primary">Рассчитать новый план</button></fieldset></form>
-<section id="preview" hidden><h2>Новый план</h2><p id="comparison"></p><p id="unassigned"></p><details><summary>Утренняя выдача</summary><div id="issue"></div></details><a id="plan-link" target="_blank" rel="noopener">Посмотреть маршруты</a><button id="apply" class="primary" type="button">Применить состав и план</button></section>
-</main></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Бригады и запас · билайн</title>
+  <link rel="stylesheet" href="/scenarios.css">
+  <link rel="stylesheet" href="/crew.css">
+  <script src="/crew.js" defer></script>
+</head>
+<body>
+<header><div class="brand"><strong>билайн</strong><span>Бригады и запас</span></div><a id="back-link" href="/">← К диспетчеру</a></header>
+<main>
+  <h1>Подготовка дня</h1>
+  <p id="context"></p><p id="status" role="status"></p><p id="error" role="alert" hidden></p>
+  <details class="help"><summary>Как выдаётся оборудование</summary><p>«Под план + резерв»: склад обеспечивает назначенные заявки, сверху выдаётся указанный резерв. «Фиксированный запас»: назначаются только обеспеченные этим запасом заявки. Запас уже у бригады к началу смены, в том числе при старте из дома.</p></details>
+  <form id="crew-form">
+    <fieldset id="fields" disabled>
+      <div class="preset-panel">
+        <div class="preset-controls">
+          <div><label for="preset-select">Вариант настройки</label><select id="preset-select" aria-describedby="preset-description preset-hint"></select></div>
+          <button id="recommend" type="button" class="secondary">Заполнить форму</button>
+        </div>
+        <p id="preset-description"></p>
+        <p id="preset-hint" class="hint">Каждый вариант рассчитан от текущего состава. Заполнение заменит правки в форме; затем рассчитайте план.</p>
+        <details id="preset-details" class="change-details"><summary>Что изменит вариант</summary><div id="preset-changes"></div><ul id="preset-assumptions" class="assumptions"></ul></details>
+      </div>
+      <div id="rows"></div>
+      <div class="form-actions"><button id="add" type="button" class="secondary">Добавить бригаду</button><button type="submit" class="primary">Рассчитать новый план</button></div>
+    </fieldset>
+  </form>
+  <section id="preview" aria-labelledby="preview-title" hidden>
+    <h2 id="preview-title">Новый план</h2>
+    <div id="comparison" class="table-scroll"></div>
+    <details class="change-details"><summary>Изменения состава и допущения</summary><div id="changes"></div><ul id="assumptions" class="assumptions"></ul></details>
+    <details id="unassigned-details" class="change-details"><summary id="unassigned-summary">Без назначения</summary><div id="unassigned"></div></details>
+    <details class="change-details"><summary>Утренняя выдача</summary><div id="issue"></div></details>
+    <div class="preview-actions"><a id="plan-link" target="_blank" rel="noopener">Посмотреть маршруты</a><button id="apply" class="primary" type="button" disabled>Применить состав и план</button></div>
+  </section>
+  <noscript>Для настройки бригад включите JavaScript.</noscript>
+</main>
+</body>
+</html>

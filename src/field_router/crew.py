@@ -10,8 +10,149 @@ from .geography import scenario_signature
 from .road_travel import build_matrices, bundle_travel, coordinates_signature
 from .travel import synthetic_travel
 from .solvers.selection import get_solver
+from .planning import build_route
 
 CONTROL_COUNTS={'Восток':12,'Юго-восток':12,'Югоцентр':11}
+
+
+def current_rows(session):
+    saved=session.scenario.metadata.get('crew_inputs')
+    if saved is not None:return deepcopy(saved)
+    return [dict(id=e.id,name=e.name,shift=e.shift.model_dump(),skills=e.skills,transport=e.transport,
+        start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
+        for e in session.initial_engineers.values()]
+
+
+def _engineer(session,row,**changes):
+    return Engineer(id=row['id'],name=row['name'],region=session.scenario.region,
+        shift=row['shift'],skills=row['skills'],transport=row['transport'],
+        start_location=row['start_location'],stock=Equipment(router=row['router'],tv_box=row['tv_box'])
+        if row['stock_mode']=='fixed' else None).model_copy(update=changes)
+
+
+def _insert(engineer,sequence,request,travel):
+    choices=[]
+    for i in range(len(sequence)+1):
+        trial=sequence[:i]+[request]+sequence[i:]
+        route=build_route(engineer,trial,travel)
+        if route is not None:choices.append((route.travel_minutes,route.distance_m,i,trial))
+    return min(choices,key=lambda x:x[:3])[-1] if choices else None
+
+
+def _local_route(engineer,jobs,travel):
+    sequence=[]
+    for request in sorted(jobs,key=lambda r:({'urgent':0,'high':1,'normal':2}[r.priority],max(w.end for w in r.windows),r.id)):
+        trial=_insert(engineer,sequence,request,travel)
+        if trial is not None:sequence=trial
+    return sequence
+
+
+def home_starts(session,rows):
+    """A deterministic roster hypothesis, not a claimed optimal home location.
+
+    Only starts change. Known city points are medoids of saved travel times;
+    short feasible city routes match the existing skills, shifts and stock.
+    A quarter of a shift is reserved for travel/waiting in the staffing heuristic.
+    The full routing solver validates and compares this hypothesis afterwards.
+    """
+    result=deepcopy(rows);travel=session._travel(session.scenario)
+    jobs_by_city={city:sorted([r for r in session.scenario.requests if r.locality==city],key=lambda r:r.id)
+                  for city in ('Кашира','Домодедово','Ступино')}
+    available={e['id']:e for e in result if e['start_location']=='office' and not e.get('start_candidate_id')}
+    max_moves=max(0,len(available)-1)
+    for city,jobs in sorted(jobs_by_city.items(),key=lambda x:(-sum(r.duration_minutes for r in x[1]),x[0])):
+        if not jobs or not available or max_moves<=0:continue
+        # Do not pile another inferred crew on a city with a user-selected home.
+        points=session.geography.locations if session.geography else session.scenario.points
+        locations={key:(p.lat,p.lon) if session.geography else (p.x_km,p.y_km) for key,p in points.items()}
+        if any(e['start_location']!='office' and e['start_location'] in locations and
+               any(locations[e['start_location']]==locations[r.id] for r in jobs) for e in result):continue
+        span=max(e['shift']['end']-e['shift']['start'] for e in available.values())
+        quantity=max(1,math.ceil(sum(r.duration_minutes for r in jobs)/max(1,span*.75)))
+        if not any(all(any(max(e['shift']['start'],w.start)<=min(w.end,e['shift']['end']-r.duration_minutes)
+                              for w in r.windows) for r in jobs) for e in available.values()):
+            quantity=max(quantity,2)
+        medoids={mode:min(jobs,key=lambda a:(sum((travel.minutes(a.id,b.id,mode)+travel.minutes(b.id,a.id,mode))
+                        *b.duration_minutes for b in jobs),a.id)).id for mode in {e['transport'] for e in available.values()}}
+        remaining=list(jobs)
+        for _ in range(min(quantity,max_moves)):
+            choices=[]
+            for eid,row in sorted(available.items()):
+                start=medoids[row['transport']]
+                engineer=_engineer(session,row,start_location=start)
+                sequence=_local_route(engineer,remaining,travel)
+                if not sequence:continue
+                route=build_route(engineer,sequence,travel)
+                key=tuple(-sum(r.priority==p for r in sequence) for p in ('urgent','high','normal'))
+                choices.append((key+(route.travel_minutes,route.distance_m,eid),eid,start,sequence))
+            if not choices:break
+            _,eid,start,sequence=min(choices,key=lambda c:c[0])
+            available.pop(eid)['start_location']=start;max_moves-=1
+            assigned={r.id for r in sequence};remaining=[r for r in remaining if r.id not in assigned]
+            if not remaining:break
+    return result
+
+
+def skill_gaps(session,rows):
+    """Explicit qualification hypotheses with a feasible insertion witness.
+
+    Never grants skills to the operational roster; it only fills a preview form.
+    Existing request order is retained and every suggested addition has a valid
+    route under the current start, shift, transport and equipment policy.
+    """
+    result=deepcopy(rows);travel=session._travel(session.scenario)
+    sequences={route.engineer_id:[session.catalog[v.request_id] for v in route.visits] for route in session.plan.routes}
+    for u in sorted(session.plan.unassigned,key=lambda u:({'urgent':0,'high':1,'normal':2}[session.catalog[u.request_id].priority],u.request_id)):
+        request=session.catalog[u.request_id];choices=[]
+        for row in result:
+            if request.skill in row['skills'] or row.get('start_candidate_id'):continue
+            e=_engineer(session,row,skills=row['skills']+[request.skill])
+            old=sequences.get(e.id,[]);sequence=_insert(e,old,request,travel)
+            if sequence is not None:
+                route=build_route(e,sequence,travel);before=build_route(e,old,travel)
+                choices.append(((route.travel_minutes-before.travel_minutes,e.id),row,sequence))
+        if choices:
+            _,row,sequence=min(choices,key=lambda c:c[0]);row['skills'].append(request.skill)
+            sequences[row['id']]=sequence
+    return result
+
+
+def roster_changes(before,after):
+    old={r['id']:r for r in before};new={r['id']:r for r in after};changes=[]
+    fields=('name','shift','skills','transport','start_location','start_candidate_id','stock_mode','router','tv_box')
+    for eid in sorted(old.keys()|new.keys()):
+        a,b=old.get(eid),new.get(eid)
+        diff={'crew':{'before':a,'after':b}} if a is None or b is None else {
+            key:{'before':a.get(key),'after':b.get(key)} for key in fields if a.get(key)!=b.get(key)}
+        if diff:changes.append({'engineer_id':eid,'name':(b or a)['name'],'fields':diff})
+    return changes
+
+
+def coverage(session,plan):
+    assigned={v.request_id for route in plan.routes for v in route.visits}
+    return {p:{'assigned':sum(r.id in assigned for r in session.scenario.requests if r.priority==p),
+               'total':sum(r.priority==p for r in session.scenario.requests)} for p in ('urgent','high','normal')}
+
+
+CREW_ASSUMPTIONS=[
+    'Домашние старты моделируются по известным адресам заявок; фактические дома неизвестны.',
+    'Добавление навыка — гипотеза квалификации; перед применением подтвердите её у бригады.',
+    'Выдача под план предполагает достаточный склад. Оборудование у бригады до начала смены, включая домашний старт.',
+]
+
+
+def presets(session,rows):
+    homes=home_starts(session,rows);skills=skill_gaps(session,rows)
+    reserve=[{**deepcopy(e),'stock_mode':'plan','router':1,'tv_box':0} for e in rows]
+    combined=home_starts(session,skill_gaps(session,reserve))
+    variants=[('current','Текущий состав','Без изменения параметров.',rows),
+        ('homes','Только домашние старты','Те же бригады, смены, навыки, транспорт и запас. Старты — в удалённых городах.',homes),
+        ('skills','Только дополнительные навыки','Навыки для неназначенных работ, которые можно вставить при текущем запасе. Требуют подтверждения.',skills),
+        ('reserve','Только выдача и резерв','Выдача под новый план + один запасной роутер каждой бригаде.',reserve),
+        ('combined','Старты, навыки и резерв','Текущий штат и транспорт; домашние старты, предложенные навыки, выдача под план + резерв.',combined),
+        ('control','Контрольная численность','Отдельная модель 12/12/11: меняются также состав, смены и транспорт. Охват может снизиться.',recommended(session))]
+    return [dict(id=key,label=label,description=description,engineers=deepcopy(crew),
+        changes=roster_changes(rows,crew),assumptions=CREW_ASSUMPTIONS if key!='current' else []) for key,label,description,crew in variants]
 
 
 def recommended(session):
@@ -81,13 +222,10 @@ class CrewService:
         self.address_service=address_service;self.draft=None
 
     def settings(self,session):
-        saved=session.scenario.metadata.get('crew_inputs')
-        if saved is None:
-            saved=[dict(id=e.id,name=e.name,shift=e.shift.model_dump(),skills=e.skills,transport=e.transport,
-                start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
-                for e in session.initial_engineers.values()]
+        saved=current_rows(session)
         return {'version':session.version,'region':session.scenario.region,'editable':editable(session),
             'control_count':CONTROL_COUNTS.get(session.scenario.region),'recommended_engineers':recommended(session),'engineers':deepcopy(saved),
+            'presets':presets(session,saved) if editable(session) else [],
             'locations':session.state()['locations'],'network':self.address_service is not None,
             'metrics':session.plan.metrics.model_dump()}
 
@@ -144,6 +282,9 @@ class CrewService:
         candidate._save_view('Бригады, старты и утренняя выдача')
         token=uuid4().hex;self.draft=(token,session.version,candidate)
         return {'id':token,'version':session.version,'before':session.plan.metrics.model_dump(),'after':plan.metrics.model_dump(),
+            'before_coverage':coverage(session,session.plan),'after_coverage':coverage(session,plan),
+            'changes':roster_changes(current_rows(session),[r.model_dump(mode='json') for r in request.engineers]),
+            'assumptions':CREW_ASSUMPTIONS,
             'unassigned':[u.model_dump() for u in plan.unassigned],
             'issue':[{'name':e.name,'router':e.stock.router,'tv_box':e.stock.tv_box} for e in issued]}
 

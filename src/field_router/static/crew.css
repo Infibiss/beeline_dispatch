@@ -1,1 +1,32 @@
-#rows{display:grid;gap:14px;margin:20px 0}.crew-row{border:1px solid #ddd;border-radius:12px;padding:16px;background:white}.crew-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}.crew-row label{display:block;margin:0 0 5px}.crew-row .skills{display:flex;flex-wrap:wrap;gap:12px}.crew-row .skills label{display:flex;gap:5px;align-items:center}.crew-row input[type=checkbox]{width:auto}.crew-row button{margin:8px 8px 0 0}#error{color:#a00}#preview{padding:20px;background:#fff8d0;margin-top:20px}#fields{min-width:0}#fields>button{margin-right:12px}.address-results{max-width:100%}.crew-row details{margin-top:12px}
+#rows{display:grid;gap:14px;margin:20px 0}
+.crew-row{border:1px solid var(--line);border-radius:12px;padding:16px;background:white}
+.crew-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.crew-row label{display:block;margin:0 0 5px}
+.crew-row .skills{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.crew-row .skills label{display:flex;gap:5px;align-items:center}
+.crew-row input[type=checkbox]{width:16px;min-height:16px;accent-color:var(--ink)}
+.crew-row button{margin:8px 8px 0 0}
+.crew-row details{margin-top:12px}
+#error{color:#a00}
+#preview{padding:20px;background:#fffdf1;border:1px solid #e9dfb0;border-radius:12px;margin-top:20px}
+#fields{min-width:0}
+.address-results{max-width:100%}
+.preset-panel{padding:16px;background:white;border:1px solid var(--line);border-radius:12px}
+.preset-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:8px}
+.preset-controls>div{width:320px;max-width:100%}
+.preset-controls label{margin-top:0}
+#preset-description{font-size:13px}
+.change-details{margin-top:12px;font-size:12px}
+.change-details>summary{width:fit-content;color:var(--muted)}
+.change-details p{margin:8px 0;overflow-wrap:anywhere}
+.assumptions{margin:10px 0 0;padding-left:20px;color:var(--muted)}
+.assumptions:empty{display:none}
+#comparison{max-width:760px;margin-top:14px}
+#comparison table{background:white}
+#comparison caption{text-align:left;margin-bottom:8px;color:var(--muted)}
+#comparison th,#comparison td{padding:9px 12px}
+#comparison tbody th{background:white;color:var(--ink);font-size:12px}
+#comparison td{font-variant-numeric:tabular-nums;white-space:nowrap}
+.form-actions,.preview-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.preview-actions{margin-top:20px}
+@media(max-width:700px){.preset-controls>div{width:100%}.preview-actions{align-items:flex-start;flex-direction:column}#preview{padding:16px}}

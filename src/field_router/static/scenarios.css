@@ -74,7 +74,11 @@ input:disabled, select:disabled { color: var(--muted); background: #f5f5f5; }
 .comparison-controls label { margin: 0; font-weight: 400; }
 #candidate-sort { width: auto; max-width: 250px; min-height: 36px; padding: 6px 10px; }
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cards[data-count="0"], .cards[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.cards[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .candidate { display: flex; flex-direction: column; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+.candidate.recommended { border-color: #c8ad00; }
+.recommendation-badge { align-self: flex-start; padding: 2px 7px; margin-bottom: 8px; border-radius: 4px; background: var(--yellow); font-size: 11px; font-weight: 600; }
 .candidate.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--yellow); }
 .candidate h3 { font-size: 17px; line-height: 1.3; }
 .candidate .strategy { min-height: 38px; font-size: 12px; color: var(--muted); margin: 7px 0; }
@@ -93,6 +97,8 @@ input:disabled, select:disabled { color: var(--muted); background: #f5f5f5; }
 #comparison-table { margin-top: 12px; background: white; }
 #comparison-table th:first-child { min-width: 150px; }
 #comparison-table td { text-align: center; font-weight: 600; }
+.metric-delta { color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; }
+#variants-note:not(:empty) { margin: 0 0 14px; }
 #observation-warnings:not(:empty) { padding: 10px 12px; margin: 0 0 14px; background: #fff5d9; color: #655217; border-radius: 6px; }
 .comparison > .diff-panel { margin-top: 18px; }
 .table-scroll { overflow: auto; max-height: 480px; }
@@ -144,7 +150,7 @@ summary { cursor: pointer; }
   .state-strip { gap: 18px; }
   .state-strip > div:not(.region-context) { display: block; }
   .state-strip span { display: block; font-size: 11px; }
-  .cards { grid-template-columns: 1fr; }
+  .cards, .cards[data-count] { grid-template-columns: 1fr; }
   .candidate .strategy { min-height: 0; }
   .candidate dl { grid-template-columns: 1fr 1fr; column-gap: 20px; }
   .candidate button { width: auto; align-self: flex-start; }

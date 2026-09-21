@@ -8,26 +8,26 @@ from .ortools_solver import OrToolsSolver, objective_key
 
 
 class HybridSolver:
-    def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference=None, seed=0):
+    def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference=None, seed=0, focus_request_id=None):
         if not math.isfinite(time_limit_seconds) or time_limit_seconds<=0:
             raise ValueError('time_limit_seconds must be finite and positive')
         started=perf_counter()
         first=OrToolsSolver().solve(scenario,travel,time_limit_seconds=.4*time_limit_seconds,
-                                    profile=profile,reference=reference)
+                                    profile=profile,reference=reference,focus_request_id=focus_request_id)
         require_valid(scenario,travel,first)
         selected=first
-        key=lambda plan:objective_key(plan,scenario,profile=profile,reference=reference)
+        key=lambda plan:objective_key(plan,scenario,profile=profile,reference=reference,focus_request_id=focus_request_id)
         previous=_reference_seed(scenario,travel,reference)
         if previous is not None and key(previous)<key(selected):
             selected=previous
         diagnostics={'optimality_proven':False,'time_limit_seconds':time_limit_seconds,
-                     'profile':profile or 'cost','seed':seed,'ortools':first.diagnostics}
+                     'profile':profile or 'morning','focus_request_id':focus_request_id,'seed':seed,'ortools':first.diagnostics}
         remaining=time_limit_seconds-(perf_counter()-started)
         status='feasible_search_completed'
         if remaining>0 and scenario.requests:
             try:
                 second=AlnsSolver().solve(scenario,travel,time_limit_seconds=remaining,profile=profile,
-                                         reference=reference,initial_plan=selected,seed=seed)
+                                         reference=reference,initial_plan=selected,seed=seed,focus_request_id=focus_request_id)
                 require_valid(scenario,travel,second)
                 diagnostics['alns']=second.diagnostics
                 if key(second)<key(selected):

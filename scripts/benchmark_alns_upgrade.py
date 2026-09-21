@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare code revisions in sequential, isolated processes on frozen inputs.
 
-Defaults are a small morning sweep (3 seconds, seed 0, original fleet). Use
+Defaults are a small morning sweep (profile=None, 3 seconds, seed 0, original fleet). Use
 --seconds 3 10 --seeds 0 1 2 --stock morning issued for the full stock sweep.
 --fleet-seeds without values adds five variants; explicit values select a subset.
 """
@@ -210,8 +210,9 @@ def run_worker(spec):
     reference = Plan.model_validate(frozen["reference"]) if frozen["reference"] else None
     travel = bundle_travel(GeographyBundle.model_validate(payload["geography"]))
     solver = get_solver(job["solver"])
+    profile = None if job["profile"] == "morning" else job["profile"]
     kwargs = {"time_limit_seconds": job["budget_seconds"],
-              "profile": job["profile"], "reference": reference}
+              "profile": profile, "reference": reference}
     if job["seed"] is not None:
         kwargs["seed"] = job["seed"]
     started, cpu = perf_counter(), process_time()
@@ -227,7 +228,7 @@ def run_worker(spec):
         "solver_elapsed_seconds": plan.elapsed_seconds,
         "valid": not errors, "validation_errors": errors,
         "status": plan.status, "objective_key": list(objective_key(
-            plan, scenario, profile=job["profile"], reference=reference)),
+            plan, scenario, profile=profile, reference=reference)),
         "metrics": plan.metrics.model_dump(), "distance_km": plan.metrics.distance_m / 1000,
         "unassigned": sorted(missing),
         "assigned_by_priority": {p: sum(r.priority == p and r.id not in missing
@@ -282,7 +283,8 @@ def main(argv=None):
     parser.add_argument("--fleet-seeds", type=int, nargs="*", default=None,
                         help="Add modeled-fleet variants; bare flag uses seeds 0 through 4")
     parser.add_argument("--reference", choices=["none", "saved"], default="none")
-    parser.add_argument("--profiles", nargs="+", choices=["cost", "sla", "stable"], default=["cost"])
+    parser.add_argument("--profiles", nargs="+", choices=["morning", "cost", "sla", "stable"],
+                        default=["morning"], help="morning uses the unchanged solver default (profile=None)")
     parser.add_argument("--output", type=Path, default=ROOT / "docs/reviews/alns-upgrade.json")
     parser.add_argument("--resume", action="store_true", help="Resume an identical saved run, including errors")
     parser.add_argument("--dry-run", action="store_true", help="Freeze cases and save job manifest without solving")
@@ -329,7 +331,7 @@ def main(argv=None):
            "methodology": {
                "execution": "One fresh subprocess at a time; code order alternates within paired jobs.",
                "timing": "Solve wall and process CPU exclude imports/setup/validation; process CPU includes threads.",
-               "objective": "miss urgent, miss urgent+high, miss total, profile terms, engineers, metres",
+               "objective": "miss urgent, miss urgent+high, miss total, then profile-specific terms; morning uses engineers, metres",
                "reference": "Same saved OR-Tools plan if requested; no simulated events or completed jobs.",
                "fleets": "Independent permutations preserve skills, modes and start/shift bundle marginals; stock stays with engineer IDs.",
                "issued": "Stock from original published plan, fixed before fleet variants. Variants are a search stress, not an executed workday.",

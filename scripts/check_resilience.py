@@ -13,6 +13,7 @@ import json
 import math
 from pathlib import Path
 import sys
+from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
@@ -102,11 +103,20 @@ def dynamic_day(scenario, plan, geography, time_limit, solver='hybrid'):
 
     def apply(event, mutable=frozenset()):
         before = deepcopy(session.frozen)
+        started = perf_counter()
         batch = session.preview({'version': session.version, 'event': event,
                                  'preserve_in_progress': True, 'allow_redirect': False}, time_limit=time_limit, solver=solver)
+        preview_seconds = perf_counter() - started
         residual = session.batches[batch['id']]['scenario']
+        alternatives = []
         for candidate in batch['candidates']:
             require_valid(residual, session._travel(residual), Plan.model_validate(candidate['plan']))
+            # Retain every alternative, not only the one this simulated day applies.
+            row = {k: deepcopy(candidate[k]) for k in
+                   ('id', 'label', 'facts', 'emergency', 'objective_key', 'duplicate_of', 'strategy_ids')}
+            signature = {k: candidate['plan'][k] for k in ('routes', 'unassigned', 'metrics')}
+            row['plan_sha256'] = hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
+            alternatives.append(row)
         session.approve({'version': session.version, 'batch_id': batch['id'], 'candidate_id': 'stable'})
         assert_invariants(session, before, mutable)
         urgent = {r.id for r in session.scenario.requests if r.priority == 'urgent'}
@@ -115,6 +125,9 @@ def dynamic_day(scenario, plan, geography, time_limit, solver='hybrid'):
                        'urgent_pending': urgent_pending, 'assigned_remaining': session.plan.metrics.assigned,
                        'pending': session.plan.metrics.unassigned,
                        'frozen': sum(len(r['visits']) for r in session.frozen),
+                       'alternatives': alternatives, 'preview_seconds': round(preview_seconds, 3),
+                       'unique_plans': sum(not c['duplicate_of'] for c in alternatives),
+                       'recommended_candidate_id': batch['recommended_candidate_id'],
                        'all_three_candidates_valid': True, 'invariants_valid': True})
 
     start = session.time
@@ -236,6 +249,20 @@ def render_report(results):
     for region in results['regions']:
         for stage in region['dynamic_day']['stages']:
             lines.append(f"| {region['region']} | {stage['event']['id']} | {stage['event']['time']//60:02}:{stage['event']['time']%60:02} | {stage['assigned_remaining']} | {stage['pending']} | {stage['urgent_pending']} | {stage['frozen']} |")
+    lines += ['', '## Сравнение всех альтернатив', '',
+              'В JSON сохранены показатели, цели и хеши всех трёх вариантов до утверждения Stable. '
+              'Разница дороги — Cost минус Stable; отрицательное число означает экономию. '
+              'Реакция — минуты от поступления новой аварии до начала работ (Stable / SLA). '
+              'Утренние пересчёты выше используют прежнюю цель численности, а дневной Cost — минуты дороги.', '',
+              '| Регион | Событие | Уникальных планов | Реакция Stable / SLA | Разница дороги, мин | Рекомендация | Расчёт, с |',
+              '|---|---|---:|---|---:|---|---:|']
+    for region in results['regions']:
+        for stage in region['dynamic_day']['stages']:
+            candidates = {c['id']: c for c in stage['alternatives']}
+            stable, sla, cost = (candidates[key] for key in ('stable', 'sla', 'cost'))
+            response = ' / '.join(str((c.get('emergency') or {}).get('response_minutes', '—')) for c in (stable, sla))
+            delta = cost['facts']['travel_minutes'] - stable['facts']['travel_minutes']
+            lines.append(f"| {region['region']} | {stage['event']['id']} | {stage['unique_plans']} | {response} | {delta:+} | {stage['recommended_candidate_id']} | {stage['preview_seconds']} |")
     lines += ['', 'После ручного статуса инженер не возвращается автоматически к симуляции исполнения: его последующие работы требуют фактов завершения. Поэтому остаток на 22:00 включает неподтверждённые работы и не является числом потерь от стресс-событий; смотреть качество назначения нужно также на промежуточные строки. Столбец аварий относится к оставшимся заявкам, а не к доказанным фактическим пропускам выезда.', '', 'All listed assertions passed in this run. Frozen work primarily reflects the session simulation; '
               'only the deliberately injected delay/completion is a dispatcher fact. End-of-shift pending is therefore '
               'a modeled residual, not a claim that jobs were actually completed. The stress execution and dynamic '

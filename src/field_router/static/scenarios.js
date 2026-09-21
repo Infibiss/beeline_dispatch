@@ -55,11 +55,11 @@
   if (typeof document === 'undefined') return;
   const regionURL = path => new URL(path.replace(/^\//, ''), new URL('.', location.href)).href;
   const $ = id => document.getElementById(id);
-  let state = null, batch = null, selected = null, busy = false;
-  const strategyNames = {sla:'Раньше приоритетные', stable:'Меньше изменений', cost:'Меньше ресурсов'};
+  let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false;
+  const strategyNames = {sla:'Быстрее к аварии', stable:'Меньше изменений', cost:'Меньше дороги'};
   function strategyName(c) { return strategyNames[c.id] || c.label; }
   function requestName(id) { return ((batch && batch.request_labels) || (state && state.request_labels) || {})[id] || id || '—'; }
-  const strategies = ['Раннее начало приоритетных работ', 'Меньше изменений инженера и времени', 'Меньше инженеров и километров'];
+  const strategies = {sla:'Раньше начать аварийные работы', stable:'Сохранить назначения и клиентское время', cost:'Сократить оставшиеся минуты дороги'};
   function element(tag, text, className) {
     const node = document.createElement(tag);
     if (text != null) node.textContent = String(text);
@@ -75,10 +75,12 @@
     $('address-confirm').disabled = busy || !state || !$('address-candidates').value;
     $('reload').disabled = busy; $('execution-mode').disabled = busy || !state; $('mode-apply').disabled = busy || !state || $('execution-mode').value === (state.execution_mode || 'simulation');
     $('approve').disabled = busy || !state || !batch || !selected || batch.version !== state.version;
+    $('ai-recommend').disabled = busy || !batch || recommendationPending;
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
   }
   function resetCandidates(message) {
-    batch = null; selected = null; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('observation-warnings').textContent = ''; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
+    batch = null; selected = null; recommendation = null; recommendationPending = false; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('observation-warnings').textContent = ''; $('variants-note').textContent = ''; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
+    $('candidates').dataset.count = '0';
     $('candidates').replaceChildren(element('div', message || 'Задайте событие и рассчитайте варианты.', 'empty'));
     $('diff-title').textContent = 'Изменения выбранного варианта';
     const row = element('tr'), cell = element('td', 'Выберите вариант для просмотра изменений.', 'muted');
@@ -277,63 +279,130 @@
     $('approval-note').textContent = strategyName(candidate) + (candidate.facts.lost_assignments ? ' · Потеряно назначений: ' + candidate.facts.lost_assignments : '') + '. План изменится после применения.';
     controls();
   }
+  function canonicalCandidate(data, id) {
+    const candidate = data.candidates.find(c => c.id === id);
+    return candidate?.duplicate_of ? data.candidates.find(c => c.id === candidate.duplicate_of) : candidate;
+  }
+  function renderRecommendation() {
+    const choice = batch.candidates.find(c => c.id === recommendation?.candidate_id);
+    const canonical = canonicalCandidate(batch, choice?.id);
+    $('ai-panel').hidden = !batch.candidates.length;
+    $('ai-recommend').hidden = !batch.llm_enabled;
+    $('ai-result').textContent = recommendationPending ? 'Сравниваем варианты…' : choice
+      ? 'Рекомендуем «' + strategyName(choice) + '». ' + [recommendation.notice, recommendation.text].filter(Boolean).join(' ')
+      : 'Сравните показатели и проверьте изменения перед применением.';
+    document.querySelectorAll('.candidate').forEach(card => {
+      const recommended = card.dataset.id === canonical?.id;
+      card.classList.toggle('recommended', recommended);
+      card.querySelector('.recommendation-badge').hidden = !recommended;
+    });
+  }
   $('ai-recommend').addEventListener('click', async () => {
-    const current=batch;
-    if (!current || busy) return;
-    $('ai-recommend').disabled=true; $('ai-result').textContent='Сравниваем варианты…';
+    const current = batch;
+    if (!current?.llm_enabled || busy || recommendationPending) return;
+    recommendationPending = true; controls(); renderRecommendation();
     try {
-      const result=await request('/api/recommend',{version:current.version,batch_id:current.id});
-      if (batch!==current || state.version!==current.version) return;
-      const choice=current.candidates.find(c=>c.id===result.candidate_id);
-      if (!choice) throw new Error('Неизвестный вариант');
-      $('ai-result').textContent='Рекомендуем «'+strategyName(choice)+'». '+result.notice+' '+result.text;
+      const result = await request('/api/recommend', {version:current.version, batch_id:current.id});
+      if (batch !== current || state?.version !== current.version) return;
+      if (!canonicalCandidate(current, result.candidate_id)) throw new Error('Неизвестный вариант');
+      recommendation = result;
     } catch (_) {
-      if (batch===current) $('ai-result').textContent='ИИ недоступен. Сравните показатели и выберите вариант вручную.';
+      if (batch === current) recommendation = {candidate_id:current.recommended_candidate_id, text:'ИИ недоступен. Сравните показатели и проверьте изменения перед применением.'};
     } finally {
-      if (batch===current) $('ai-recommend').disabled=false;
+      if (batch === current) { recommendationPending = false; renderRecommendation(); controls(); }
     }
   });
+  function candidateOrder(candidate, order) {
+    const f = candidate.facts, preference = ['stable', 'sla', 'cost'].indexOf(candidate.id);
+    const stability = [f.lost_assignments ?? 0, f.avoidable_reassigned ?? f.reassigned, f.time_shift_minutes, f.travel_minutes, f.distance_m];
+    if (order === 'coverage') return [f.emergency_total - f.emergency_assigned, f.connection_total - f.connection_assigned, f.unassigned, preference];
+    if (order === 'response') return [f.response_unassigned ?? (candidate.emergency?.assigned === false ? 1 : 0), candidate.emergency ? (candidate.emergency.response_minutes ?? Infinity) : (f.priority_start_sum ?? Infinity), ...stability, preference];
+    if (order === 'stable') return [...stability, preference];
+    if (order === 'distance') return [f.travel_minutes, f.distance_m, ...stability, preference];
+    return [preference];
+  }
+  function compareCandidates(a, b, order) {
+    const left = candidateOrder(a, order), right = candidateOrder(b, order);
+    for (let i = 0; i < left.length; i++) {
+      if (left[i] < right[i]) return -1;
+      if (left[i] > right[i]) return 1;
+    }
+    return 0;
+  }
+  function metricCell(candidate, baseline, value, delta, format = String) {
+    const cell = element('td', value(candidate) ?? '—');
+    if (!delta || !baseline || candidate.id === baseline.id) return cell;
+    const current = delta(candidate), original = delta(baseline);
+    if (current == null || original == null || !Number.isFinite(current) || !Number.isFinite(original)) return cell;
+    const change = current - original;
+    const label = (change > 0 ? '+' : change < 0 ? '−' : '') + format(Math.abs(change));
+    cell.append(element('span', ' (' + label + ')', 'metric-delta'));
+    return cell;
+  }
   function renderBatch(data) {
     if (!data || !Array.isArray(data.candidates) || data.version !== state.version) throw new Error('Варианты не соответствуют текущей версии.');
+    if (batch !== data) {
+      recommendation = {candidate_id:data.recommended_candidate_id, text:'Проверьте изменения перед применением.'};
+      recommendationPending = false;
+    }
     batch = data; selected = null;
-    $('ai-panel').hidden=!data.llm_enabled || !data.candidates.length;
-    $('ai-recommend').disabled=false;
-    $('ai-result').textContent='ИИ сравнит варианты и предложит план. Утверждение остаётся за вами.';
-    $('comparison-tools').hidden = false;
-    $('comparison-metrics').hidden = !data.candidates.length;
     $('replan-needed').hidden = true;
     $('observation-warnings').textContent = (data.observation_warnings || []).join(' ');
     const order = $('candidate-sort').value;
-    const score = c => order === 'coverage' ? c.facts.unassigned : order === 'response' ? (c.emergency?.start ?? Infinity) : order === 'stable' ? c.facts.reassigned * 100000 + c.facts.time_shift_minutes : order === 'distance' ? c.facts.distance_m : ['sla','stable','cost'].indexOf(c.id);
-    const ordered = [...data.candidates].sort((a,b) => score(a)-score(b));
+    const ordered = data.candidates.filter(c => !c.duplicate_of).sort((a,b) => compareCandidates(a, b, order));
+    const baseline = data.candidates.find(c => c.id === 'stable');
+    const newEmergency = data.candidates.some(c => c.emergency);
+    const responseTargets = data.candidates.some(c => c.facts.response_target_count > 0);
+    $('comparison-tools').hidden = ordered.length < 2;
+    $('comparison-metrics').hidden = !ordered.length;
+    const merged = ordered.length < data.candidates.length;
+    const notes = [];
+    if (merged) notes.push(ordered.length === 1 ? 'Один уникальный план: все стратегии нашли одинаковые маршруты и время.' : 'Совпавшие планы объединены в одну карточку.');
+    if (!newEmergency && !responseTargets && merged) notes.push('Аварий в остатке дня нет: «Быстрее к аварии» совпадает с «Меньше изменений».');
+    $('variants-note').textContent = notes.join(' ');
     const table = element('table'), head = element('tr');
     ['Показатель', ...ordered.map(strategyName)].forEach(label => head.append(element('th', label))); table.append(head);
     const metricsRows = [
       ['Аварии назначены', c => c.facts.emergency_assigned + ' / ' + c.facts.emergency_total],
       ['Подключения назначены', c => c.facts.connection_assigned + ' / ' + c.facts.connection_total],
       ['Без назначения', c => c.facts.unassigned],
-      ['Потеряно назначений', c => c.facts.lost_assignments],
-      ['Начало новой аварии', c => c.emergency ? (c.emergency.assigned ? time(c.emergency.start) : 'Не назначена') : '—'],
-      ['Смена исполнителя', c => c.facts.reassigned],
+      ['Потеряно назначений', c => c.facts.lost_assignments]];
+    if (newEmergency) metricsRows.push(
+      ['Прибытие к новой аварии', c => c.emergency?.assigned ? time(c.emergency.arrival) : 'Не назначена'],
+      ['Начало новой аварии', c => c.emergency?.assigned ? time(c.emergency.start) : 'Не назначена'],
+      ['До начала новой аварии, мин', c => c.emergency?.assigned ? c.emergency.response_minutes : 'Не назначена', c => c.emergency?.assigned ? c.emergency.response_minutes : null]);
+    else if (responseTargets) metricsRows.push(
+      ['Аварий для ускорения', c => c.facts.response_target_count],
+      ['Из них без назначения', c => c.facts.response_unassigned],
+      ['Среднее начало оставшихся аварий', c => {
+        const assigned = c.facts.response_target_count - c.facts.response_unassigned;
+        return assigned > 0 ? time(Math.round(c.facts.priority_start_sum / assigned)) : '—';
+      }]);
+    metricsRows.push(
+      ['Смена исполнителя', c => c.facts.reassigned, c => c.facts.reassigned],
+      ['Из них предотвратимые', c => c.facts.avoidable_reassigned],
       ['Переносы по времени', c => c.facts.shifted],
-      ['Дорога, мин', c => c.facts.travel_minutes],
-      ['Расстояние, км', c => (c.facts.distance_m/1000).toFixed(1)],
-      ['Инженеров', c => c.facts.engineers_used]];
-    metricsRows.forEach(([label,value]) => { const row=element('tr');row.append(element('th',label));ordered.forEach(c => row.append(element('td',value(c))));table.append(row); });
+      ['Сдвиги начала, мин', c => c.facts.time_shift_minutes, c => c.facts.time_shift_minutes],
+      ['Дорога, мин', c => c.facts.travel_minutes, c => c.facts.travel_minutes],
+      ['Расстояние, км', c => c.facts.distance_m == null ? '—' : (c.facts.distance_m/1000).toFixed(1), c => c.facts.distance_m == null ? null : c.facts.distance_m/1000, n => n.toFixed(1)],
+      ['Инженеров', c => c.facts.engineers_used]);
+    metricsRows.forEach(([label, value, delta, format]) => {
+      const row = element('tr'); row.append(element('th', label));
+      ordered.forEach(c => row.append(metricCell(c, baseline, value, delta, format)));
+      table.append(row);
+    });
     $('comparison-table').replaceChildren(table);
     const cards = ordered.map(candidate => {
-      const index = ['sla','stable','cost'].indexOf(candidate.id);
       const card = element('article', null, 'candidate'); card.dataset.id = candidate.id;
-      card.append(element('h3', strategyName(candidate)), element('p', strategies[index] || '', 'strategy'));
-      if (candidate.duplicate_of) {
-        const duplicate = data.candidates.find(item => item.id === candidate.duplicate_of);
-        card.append(element('p', 'Совпадает с ' + (duplicate ? strategyName(duplicate) : candidate.duplicate_of), 'duplicate'));
-      }
+      const badge = element('span', 'Рекомендуем', 'recommendation-badge'); badge.hidden = true;
+      card.append(badge, element('h3', strategyName(candidate)), element('p', strategies[candidate.id] || '', 'strategy'));
+      const aliases = (candidate.strategy_ids || data.candidates.filter(c => c.duplicate_of === candidate.id).map(c => c.id)).filter(id => id !== candidate.id);
+      if (aliases.length) card.append(element('p', 'Совпадает с ' + aliases.map(id => '«' + strategyName({id}) + '»').join(', '), 'duplicate'));
       const f = candidate.facts || {}, dl = element('dl');
       card.append(element('p', 'Назначено: аварии ' + f.emergency_assigned + '/' + f.emergency_total + ' · подключения ' + f.connection_assigned + '/' + f.connection_total, 'priority-coverage'));
-      const metrics = [['Без назначения', f.unassigned], ['Инженеров', f.engineers_used], ['Смена инженера', f.reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Дорога, км', ((f.distance_m || 0) / 1000).toFixed(1)]];
+      const metrics = [['Без назначения', f.unassigned], ['Смена исполнителя', f.reassigned], ['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Дорога, мин', f.travel_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
       if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
-      if (candidate.emergency) { const e = candidate.emergency; card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + ' · ' + time(e.start) + '–' + time(e.end) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary')); }
+      if (candidate.emergency) { const e = candidate.emergency; card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + '. Прибытие ' + time(e.arrival) + ', начало ' + time(e.start) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary')); }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
       card.append(dl); const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
 
@@ -341,7 +410,9 @@
       return card;
     });
     $('candidates').replaceChildren(...cards);
+    $('candidates').dataset.count = String(cards.length);
     if (!cards.length) $('candidates').append(element('div', 'Нет допустимых вариантов для этого события.', 'empty'));
+    renderRecommendation();
     $('notice').textContent = data.notice || '';
     renderCommitments(data, true);
     controls();

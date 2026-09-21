@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -131,3 +132,55 @@ def test_worker_rejects_changed_code_before_importing_or_searching(benchmark, tm
     assert result["status"] == "worker_error"
     assert "Source code changed" in result["error"]
     assert result["valid"] is False
+
+
+@pytest.mark.parametrize("profiles", [None, ["morning", "cost", "sla", "stable"]])
+def test_cli_defaults_to_morning_and_accepts_explicit_day_profiles(benchmark, tmp_path, monkeypatch, profiles):
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "case.json").write_text("{}")
+    output = tmp_path / "manifest.json"
+    monkeypatch.setattr(benchmark, "code_metadata", lambda label, root, revision: {"label": label, "root": str(root)})
+    monkeypatch.setattr(benchmark, "select_code_root", lambda root: None)
+    monkeypatch.setattr(benchmark, "prepare_cases", lambda *args: [{"id": "case"}])
+    argv = ["--inputs", str(inputs), "--output", str(output), "--dry-run"]
+    if profiles:
+        argv += ["--profiles", *profiles, "--reference", "saved"]
+    assert benchmark.main(argv) == 0
+    manifest = json.loads(output.read_text())
+    assert {job["profile"] for job in manifest["jobs"]} == set(profiles or ["morning"])
+    assert len(manifest["jobs"]) == 3 * len(profiles or ["morning"])
+    assert manifest["rows"] == []
+
+
+@pytest.mark.parametrize("profile,solver_profile", [("morning", None), ("cost", "cost"), ("sla", "sla"), ("stable", "stable")])
+def test_worker_translates_morning_to_none_for_solve_and_objective(benchmark, tmp_path, monkeypatch, profile, solver_profile):
+    from field_router.models import Plan
+    from field_router.solvers import ortools_solver, selection
+
+    source = Path(__file__).resolve().parents[1] / "data/demo-road/Восток.json"
+    payload = json.loads(source.read_text())
+    saved = Plan.model_validate(next(p for p in payload["plans"] if p["solver"] == "ortools"))
+    case = benchmark.prepare_cases([source], ["morning"], [], "saved", tmp_path)[0]
+    calls = []
+
+    def solve(scenario, travel, **kwargs):
+        calls.append(("solve", kwargs["profile"]))
+        return saved
+
+    def objective(plan, scenario, **kwargs):
+        calls.append(("objective", kwargs["profile"]))
+        return (0, 0, 0)
+
+    monkeypatch.setattr(selection, "get_solver", lambda name: SimpleNamespace(solve=solve))
+    monkeypatch.setattr(ortools_solver, "objective_key", objective)
+    monkeypatch.setattr(benchmark, "source_hash", lambda root: "unchanged")
+    monkeypatch.setattr(benchmark, "select_code_root", lambda root: str(Path(root) / "src/field_router/__init__.py"))
+    result = benchmark.run_worker({
+        "root": {"root": str(benchmark.ROOT), "source_sha256": "unchanged"},
+        "case": case,
+        "job": {"id": "profile-contract", "solver": "ortools", "profile": profile, "budget_seconds": 3, "seed": None},
+    })
+    assert calls == [("solve", solver_profile), ("objective", solver_profile)]
+    assert result["profile"] == profile
+    assert result["objective_key"] == [0, 0, 0]

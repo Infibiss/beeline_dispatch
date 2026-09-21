@@ -105,7 +105,7 @@ def test_multiple_window_insertion_agrees_with_full_route_evaluation():
 
 
 def test_profile_keys_prioritize_start_or_owner_before_resource_cost():
-    inst = instance([task(0, priority=2)], engineers=2, matrix=[[0, 0, 20], [0, 0, 2], [0, 0, 0]])
+    inst = instance([task(0, priority=3)], engineers=2, matrix=[[0, 0, 20], [0, 0, 2], [0, 0, 0]])
     early, late = solution(inst, [0], 1), solution(inst, [0], 0)
     inst.profile = 'sla'
     assert early.objective_key(inst) < late.objective_key(inst)
@@ -173,7 +173,7 @@ def test_alns_and_sp_preserve_priority_when_many_low_jobs_compete(priority):
 def test_sp_and_search_use_same_profile_order(profile, expected):
     from field_router._alns.solver import solve
     from field_router._alns.sp import solve_sp
-    inst = instance([task(0, priority=2)], engineers=2,
+    inst = instance([task(0, priority=3)], engineers=2,
                     matrix=[[0, 0, 20], [0, 0, 2], [0, 0, 0]])
     inst.profile, inst.prev_owner, inst.prev_start = profile, {0: 0}, {0: 20}
     pool = {(0, (0,)): 20, (1, (0,)): 2}

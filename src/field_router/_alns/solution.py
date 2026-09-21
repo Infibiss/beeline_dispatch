@@ -31,7 +31,7 @@ class RouteEval:
     Backward starts are projected onto the union of start windows. No triangle
     inequality is assumed, including when removing a task from an existing route.
     """
-    __slots__ = ('e', 'seq', 'E', 'L', 'km', 'ok', 'used', '_stable_starts', '_stable_reference')
+    __slots__ = ('e', 'seq', 'E', 'L', 'km', 'travel_minutes', 'ok', 'used', '_stable_starts', '_stable_reference')
 
     def __init__(self, inst: Instance, e: int, seq: list):
         self.e, self.seq = e, list(seq)
@@ -43,6 +43,7 @@ class RouteEval:
         tt, kmm, tasks = inst.ttl[eng.mode], inst.kml[eng.mode], inst.tasks
         n = len(self.seq)
         self.E, self.L, self.km = [0] * n, [0] * n, 0.0
+        self.travel_minutes = 0
         self.ok = len(set(self.seq)) == n
         self.used = {'router': 0, 'tv_box': 0}
         prev_node, ready = eng.idx, eng.shift_start
@@ -55,6 +56,7 @@ class RouteEval:
                 self.used[device] += tj.equipment.get(device, 0)
             self.E[k] = start
             self.km += kmm[prev_node][node]
+            self.travel_minutes += tt[prev_node][node]
             ready, prev_node = start + tj.service, node
         if eng.stock is not None and any(v > eng.stock.get(k, 0) for k, v in self.used.items()):
             self.ok = False
@@ -71,6 +73,7 @@ class RouteEval:
         """Clone evaluated state without recomputing unchanged route bounds."""
         copied = object.__new__(RouteEval)
         copied.e, copied.km, copied.ok = self.e, self.km, self.ok
+        copied.travel_minutes = self.travel_minutes
         copied.seq, copied.E, copied.L = self.seq.copy(), self.E.copy(), self.L.copy()
         copied.used = self.used.copy()
         # Cached schedules and reference snapshots are immutable tuples.
@@ -79,22 +82,40 @@ class RouteEval:
 
     def start_times(self, inst):
         """Actual schedule; E remains the earliest bound used by insertions."""
-        if inst.profile != 'stable' or not self.ok:
+        if inst.profile is None or not self.ok:
             return self.E
         reference = tuple(inst.prev_start.get(j) for j in self.seq)
-        if self._stable_starts is None or self._stable_reference != reference:
-            self._stable_starts = stable_starts(inst, self.e, self.seq, self.E, self.L, reference)
-            self._stable_reference = reference
+        target_tasks = inst.target_tasks if inst.profile == 'sla' else set()
+        targets = tuple(j in target_tasks for j in self.seq) if inst.profile == 'sla' else ()
+        signature = (inst.profile, reference, targets)
+        if self._stable_starts is None or self._stable_reference != signature:
+            self._stable_starts = stable_starts(inst, self.e, self.seq, self.E, self.L, reference, targets)
+            self._stable_reference = signature
         return self._stable_starts
 
     def profile_key(self, inst):
         if inst.profile == 'sla':
-            return (sum(s for j, s in zip(self.seq, self.E) if inst.tasks[j].priority >= 2),)
-        if inst.profile == 'stable':
+            targets = inst.target_tasks
+            return (sum(s for j, s in zip(self.seq, self.start_times(inst)) if j in targets),)
+        if inst.profile in ('stable', 'cost'):
             return (sum(j in inst.prev_owner and inst.prev_owner[j] != self.e for j in self.seq),
                     sum(abs(s - inst.prev_start[j]) for j, s in zip(self.seq, self.start_times(inst))
                         if j in inst.prev_start))
         return ()
+
+    def objective_values(self, inst):
+        starts = self.start_times(inst)
+        targets = inst.target_tasks
+        return {'engineers': int(bool(self.seq)), 'distance_m': int(round(self.km * 1000)),
+                'travel_minutes': self.travel_minutes,
+                'reassigned': sum(j in inst.prev_owner and inst.prev_owner[j] != self.e for j in self.seq),
+                'absolute_start_shift': sum(abs(s - inst.prev_start[j]) for j, s in zip(self.seq, starts)
+                                            if j in inst.prev_start),
+                'response_score': sum(s for j, s in zip(self.seq, starts) if j in targets)}
+
+    def objective_key(self, inst):
+        values = self.objective_values(inst)
+        return tuple(values[tier] for tier in inst.objective_tiers)
 
     def insertion(self, inst: Instance, j: int, min_pos: int = 0):
         """Best feasible insertion (delta_km, position), including window gaps."""
@@ -123,9 +144,9 @@ class RouteEval:
             else:
                 delta = kmm[prev_node][nj]
             key = (delta,)
-            if inst.profile in ('sla', 'stable'):
+            if inst.profile is not None:
                 candidate = RouteEval(inst, self.e, self.seq[:p] + [j] + self.seq[p:])
-                key = candidate.profile_key(inst) + key
+                key = candidate.objective_key(inst)
             if best_key is None or key < best_key:
                 best, best_key = (delta, p), key
         return best
@@ -142,10 +163,11 @@ class Solution:
     def objective_key(self, inst: Instance) -> tuple:
         coverage = (sum(inst.tasks[j].priority == 3 for j in self.unassigned),
                     sum(inst.tasks[j].priority >= 2 for j in self.unassigned), len(self.unassigned))
-        profiles = [r.profile_key(inst) for r in self.routes.values()]
-        size = 2 if inst.profile == 'stable' else 1 if inst.profile == 'sla' else 0
-        profile = tuple(sum(p[i] for p in profiles) for i in range(size))
-        return coverage + profile + (len(self.routes), round(sum(r.km for r in self.routes.values()), 6))
+        values = [r.objective_values(inst) for r in self.routes.values()]
+        totals = {tier: sum(value[tier] for value in values) for tier in inst.objective_tiers}
+        if inst.profile == 'sla':
+            totals['response_score'] += 1441 * len(self.unassigned & inst.target_tasks)
+        return coverage + tuple(totals[tier] for tier in inst.objective_tiers)
 
     def cost(self, inst: Instance) -> tuple:
         """An exact ordering key; never a fixed-ratio priority penalty."""
@@ -157,6 +179,7 @@ class Solution:
                     unassigned_urgent=sum(inst.tasks[j].priority == 3 for j in self.unassigned),
                     unassigned_high=sum(inst.tasks[j].priority >= 2 for j in self.unassigned),
                     engineers=len(self.routes), km=round(sum(r.km for r in self.routes.values()), 3),
+                    travel_minutes=sum(r.travel_minutes for r in self.routes.values()),
                     km_per_engineer=per)
 
     def insert(self, inst, j, e, pos):

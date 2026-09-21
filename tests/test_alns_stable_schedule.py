@@ -67,11 +67,11 @@ def test_unreferenced_jobs_do_not_add_deviation_and_keep_earliest_feasible_ties(
     assert RouteEval(inst, 0, [0, 1]).profile_key(inst) == (0, 0)
 
 
-@pytest.mark.parametrize('profile', [None, 'cost', 'sla'])
-def test_other_profiles_keep_earliest_schedule(profile):
+@pytest.mark.parametrize('profile, expected', [(None, [0, 1]), ('cost', [20, 30]), ('sla', [20, 30])])
+def test_morning_starts_early_and_operational_profiles_preserve_nonurgent_promises(profile, expected):
     inst = instance([[(0, 35)], [(0, 35)]], {0: 20, 1: 30})
     inst.profile = profile
-    assert starts(inst) == [0, 1]
+    assert starts(inst) == expected
 
 
 def test_insertion_uses_earliest_bounds_and_recomputes_optimized_waiting():
@@ -153,6 +153,7 @@ def test_cached_schedule_observes_changed_reference_and_profile():
     inst.prev_start[0] = 12
     assert list(route.start_times(inst)) == [12]
     inst.profile = 'sla'
+    inst.tasks[0].priority = 3
     assert list(route.start_times(inst)) == [0]
     inst.profile = 'stable'
     assert route.profile_key(inst) == (0, 0)

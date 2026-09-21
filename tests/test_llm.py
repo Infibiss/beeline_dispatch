@@ -93,7 +93,48 @@ def test_recommendation_explains_advantage_and_tradeoff():
 def test_recommendation_prompt_has_one_unambiguous_schema():
     from field_router.llm import Explainer
     def send(body):
-        assert '"candidate_id":"stable"' in body['input']
+        assert '"candidate_id":"sla"' in body['input']
+        assert '"candidate_id":"stable"' not in body['input']
         assert '"selected"' not in body['input']
         return {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"sla","points":["coverage","changes"]}'}]}]}
     assert Explainer(send=send).recommend(batch())['source']=='yandexgpt'
+
+
+@pytest.mark.parametrize('fence', ['```', '```json'])
+def test_provider_literal_newline_fence_keeps_strict_choice_validation(fence):
+    from field_router.llm import Explainer
+    def response(choice):
+        text=fence+r'\n'+json.dumps({'candidate_id':choice,'points':['coverage','changes']})+r'\n```'
+        return {'output':[{'content':[{'type':'output_text','text':text}]}]}
+    assert Explainer(send=lambda _:response('sla')).recommend(batch())['source']=='yandexgpt'
+    assert Explainer(send=lambda _:response('invented')).recommend(batch())['source']=='rule'
+
+
+def test_recommendation_protects_total_coverage_before_response():
+ from field_router.llm import eligible_candidates
+ b=batch();fast=b['candidates'][0];slow=deepcopy(fast);slow['id']='stable'
+ fast['emergency']['response_minutes']=1
+ slow['facts'].update(assigned=6,unassigned=0)
+ slow['emergency']['response_minutes']=50
+ b['candidates'].append(slow)
+ assert [c['id'] for c in eligible_candidates(b)]==['stable']
+
+
+def test_normal_day_recommendation_prefers_stability_and_preserved_times():
+ from field_router.llm import eligible_candidates
+ b=batch();a=b['candidates'][0];a['id']='cost';a['emergency']=None
+ a['facts'].update(avoidable_reassigned=1,time_shift_minutes=0,travel_minutes=1)
+ stable=deepcopy(a);stable['id']='stable';stable['facts'].update(avoidable_reassigned=0,travel_minutes=100)
+ b['candidates'].append(stable)
+ assert [c['id'] for c in eligible_candidates(b)]==['stable']
+
+
+def test_llm_cannot_override_verified_recommendation_with_travel_tradeoff():
+ from field_router.llm import Explainer
+ b=batch();a=b['candidates'][0];a['id']='cost';a['emergency']=None
+ a['facts'].update(reassigned=2,travel_minutes=1,time_shift_minutes=0)
+ stable=deepcopy(a);stable['id']='stable';stable['facts'].update(reassigned=0,travel_minutes=100)
+ b['candidates'].append(stable)
+ e=Explainer(send=lambda _: {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"cost","points":["coverage","travel"]}'}]}]})
+ result=e.recommend(b)
+ assert result['candidate_id']=='stable' and result['source']=='rule'

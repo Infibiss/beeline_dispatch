@@ -84,10 +84,10 @@ def solve(inst: Instance, time_limit_seconds=5.0, seed=0, fixed=None,
     info['rounds'] = rounds
     remaining = deadline-time.perf_counter()
     if remaining > .002:
-        # Explicitly try to pack the same coverage into one fewer route.
-        # Retain the unconstrained incumbent if this attempt is unsuccessful.
+        # Morning planning tries one fewer route; operational profiles polish
+        # freely because fewer engineers may worsen their earlier priorities.
         polish = ALNS(inst, seed=seed+1, fixed=fixed,
-                      max_routes=max(0, len(best.routes)-1) if inst.profile in (None, 'cost') else None)
+                      max_routes=max(0, len(best.routes)-1) if inst.profile is None else None)
         candidate = polish.run(time_limit=max(0, deadline-time.perf_counter()), deadline=deadline, init=best)
         if not validate(inst, candidate) and better(inst, candidate, best):
             best = candidate

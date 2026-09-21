@@ -76,6 +76,13 @@ def test_real_demo_dynamic_day_has_every_event_and_restores(solver):
     assert [s['event']['type'] for s in stages] == ['emergency', 'emergency', 'cancel', 'unavailable',
                                                     'replan', 'replan', 'replan', 'replan']
     assert all(s['all_three_candidates_valid'] and s['invariants_valid'] for s in stages)
+    for stage in stages:
+        assert {c['id'] for c in stage['alternatives']} == {'stable', 'sla', 'cost'}
+        assert stage['recommended_candidate_id'] in {'stable', 'sla', 'cost'}
+        assert 1 <= stage['unique_plans'] <= 3
+        assert all(c['objective_key'] and len(c['plan_sha256']) == 64 for c in stage['alternatives'])
+        selected = next(c for c in stage['alternatives'] if c['id'] == 'stable')
+        assert selected['facts']['assigned'] == stage['assigned_remaining']
     assert stages[-1]['assigned_remaining'] == 0
 
 

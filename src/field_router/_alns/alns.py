@@ -72,12 +72,13 @@ class ALNS:
         if ins is None:
             return None
         delta, pos = ins
-        profile_delta = ()
-        if self.inst.profile in ('sla', 'stable'):
-            candidate = RouteEval(self.inst, e, route.seq[:pos] + [j] + route.seq[pos:])
-            profile_delta = tuple(a-b for a, b in zip(candidate.profile_key(self.inst),
-                                                     route.profile_key(self.inst)))
-        return profile_delta + (extra, delta), pos
+        if self.inst.profile is None:
+            return (extra, int(round(delta * 1000))), pos
+        candidate = RouteEval(self.inst, e, route.seq[:pos] + [j] + route.seq[pos:])
+        change = list(a-b for a, b in zip(candidate.objective_key(self.inst), route.objective_key(self.inst)))
+        if self.inst.profile == 'sla' and j in self.inst.target_tasks:
+            change[0] -= 1441
+        return tuple(change), pos
 
     def _repair(self, sol: Solution, regret_k: int, noise: float):
         """Cached greedy/regret insertion; coverage priority is always the first key."""
@@ -104,8 +105,12 @@ class ALNS:
                     # Real diversification, not just random tie-breaking between
                     # almost-never-equal kilometre deltas. Cached exact costs stay
                     # intact; only the exploration ranking is perturbed.
-                    moves.sort(key=lambda m: m[0][:-1] +
-                               (m[0][-1] + self.rng.uniform(-noise, noise),))
+                    distance_index = self.inst.objective_tiers.index('distance_m')
+                    def perturbed(move):
+                        key = list(move[0])
+                        key[distance_index] += self.rng.uniform(-noise * 1000, noise * 1000)
+                        return tuple(key)
+                    moves.sort(key=perturbed)
                 if regret_k == 1:
                     preference = tuple(-v for v in moves[0][0])
                 else:
@@ -232,12 +237,11 @@ class ALNS:
         delta = cost[first] - current[first]
         if first < 3:
             penalty = delta * (6, 4, 3)[first]
-        elif first == len(cost) - 2:
-            penalty = delta * 3
-        elif first == len(cost) - 1:
-            penalty = delta
         else:
-            penalty = delta * (2 if first == 3 and self.inst.profile == 'stable' else .04)
+            tier = self.inst.objective_tiers[first - 3]
+            scale = {'engineers': 3, 'distance_m': .001, 'reassigned': 2,
+                     'absolute_start_shift': .04, 'response_score': .04, 'travel_minutes': .04}[tier]
+            penalty = delta * scale
         return self.rng.random() < math.exp(-penalty / max(temperature, 1e-6))
 
     # ---------- основной цикл ----------

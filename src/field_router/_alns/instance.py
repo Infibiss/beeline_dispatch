@@ -59,6 +59,24 @@ class Instance:
     profile: str | None = None
     prev_owner: dict[int, int] = field(default_factory=dict)
     prev_start: dict[int, int] = field(default_factory=dict)
+    response_targets: set[int] | None = None
+
+    @property
+    def target_tasks(self):
+        return (self.response_targets if self.response_targets is not None
+                else {j for j, task in enumerate(self.tasks) if task.priority == 3})
+
+    @property
+    def objective_tiers(self):
+        if self.profile is None:
+            return ('engineers', 'distance_m')
+        stability = ('reassigned', 'absolute_start_shift')
+        travel = ('travel_minutes', 'distance_m')
+        if self.profile == 'cost':
+            return travel + stability + ('engineers',)
+        if self.profile == 'sla':
+            return ('response_score',) + stability + travel + ('engineers',)
+        return stability + travel + ('engineers',)
 
     @property
     def E(self):

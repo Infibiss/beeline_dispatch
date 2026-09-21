@@ -72,7 +72,7 @@ def solve_sp(inst: Instance, pool: dict, time_limit=30, hint: Solution | None = 
             # Their only contribution to a partition is their profile/distance;
             # later finishing alone is not an objective or inter-route resource.
             bucket = (e, frozenset(seq))
-            score = route.profile_key(inst) + (route.km,)
+            score = route.objective_key(inst)
             old = representatives.get(bucket)
             if old is None:
                 representatives[bucket] = (len(keys), score)
@@ -116,16 +116,16 @@ def solve_sp(inst: Instance, pool: dict, time_limit=30, hint: Solution | None = 
         for (e, _), c in zip(keys, costs):
             maxima[e] = max(maxima[e], c)
         return sum(maxima)
-    if inst.profile == 'sla':
-        costs = [int(r.profile_key(inst)[0]) for r in routes]
-        objectives.append(('high_tier_start_sum', sum(c*x[p] for p,c in enumerate(costs)), route_bound(costs), sum(costs)))
-    elif inst.profile == 'stable':
-        for i, name in enumerate(('reassigned', 'absolute_start_shift')):
-            costs = [int(r.profile_key(inst)[i]) for r in routes]
-            objectives.append((name, sum(c*x[p] for p,c in enumerate(costs)), route_bound(costs), sum(costs)))
-    distances = [int(round(r.km*1000)) for r in routes]
-    objectives += [('engineers', sum(x), inst.E, len(x)),
-                   ('distance_m', sum(c*x[p] for p,c in enumerate(distances)), route_bound(distances), sum(distances))]
+    values = [r.objective_values(inst) for r in routes]
+    for name in inst.objective_tiers:
+        costs = [int(value[name]) for value in values]
+        expression = sum(c*x[p] for p, c in enumerate(costs))
+        upper, domain_upper = route_bound(costs), sum(costs)
+        if name == 'response_score':
+            expression += 1441 * sum(y[j] for j in inst.target_tasks)
+            upper += 1441 * len(inst.target_tasks)
+            domain_upper += 1441 * len(inst.target_tasks)
+        objectives.append((name, expression, upper, domain_upper))
     stages, values_x, values_y = {}, None, None
     for name, expression in _objective_groups(objectives):
         remaining = deadline - time.perf_counter()

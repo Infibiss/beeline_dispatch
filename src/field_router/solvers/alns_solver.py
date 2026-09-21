@@ -11,12 +11,12 @@ from ..models import Plan, Transport
 from ..planning import build_route, make_plan
 from ..validation import require_valid, validate_plan
 from .baseline import BaselineSolver
-from .ortools_solver import objective_key, _reference_visits
+from ..objectives import objective_key, reference_visits, response_targets
 
 _MODES = {Transport.CAR:'car', Transport.WALK:'walk', Transport.BICYCLE:'bike', Transport.PUBLIC:'transit'}
 
 
-def _instance(scenario, travel, profile, reference):
+def _instance(scenario, travel, profile, reference, focus_request_id=None):
     from .._alns.instance import Task, Engineer, Instance
     locations = [e.start_location for e in scenario.engineers] + [r.id for r in scenario.requests]
     matrices = {'km':{}, 'minutes':{}}
@@ -30,11 +30,14 @@ def _instance(scenario, travel, profile, reference):
     engineers = [Engineer(idx=i,id=e.id,name=e.name,lat=0,lon=0,shift_start=e.shift.start,shift_end=e.shift.end,
         skills=frozenset(s.value for s in e.skills),mode=_MODES[e.transport],start_label=e.start_location,
         stock=e.stock.model_dump() if e.stock is not None else None) for i,e in enumerate(scenario.engineers)]
-    prior = _reference_visits(scenario,reference)
+    prior = reference_visits(scenario,reference)
+    targets = response_targets(scenario,focus_request_id)
     eng_index = {e.id:i for i,e in enumerate(scenario.engineers)}
     return Instance(scenario.id,tasks,engineers,matrices=matrices,profile=profile,
-        prev_owner={i:eng_index[prior[r.id][0]] for i,r in enumerate(scenario.requests) if r.id in prior},
-        prev_start={i:prior[r.id][1] for i,r in enumerate(scenario.requests) if r.id in prior}).build_matrices()
+        prev_owner={i:eng_index[prior[r.id][0]] for i,r in enumerate(scenario.requests)
+                    if r.id in prior and prior[r.id][0] in eng_index},
+        prev_start={i:prior[r.id][1] for i,r in enumerate(scenario.requests) if r.id in prior},
+        response_targets={i for i,r in enumerate(scenario.requests) if r.id in targets}).build_matrices()
 
 
 def _reference_seed(scenario, travel, reference):
@@ -71,18 +74,20 @@ def _with_stable_schedule(plan, inst, solution):
             end = start + visit.end - visit.start
             visits.append(visit.model_copy(update={'arrival':arrival,'start':start,'end':end,
                 'explanation':f'Дорога {visit.travel_minutes} мин, ожидание {start-arrival} мин. '
-                              'Время выбрано целью сохранения утвержденного расписания; допустимость проверена.'}))
+                              'Время выбрано с учётом цели пересчёта; допустимость проверена.'}))
             ready = end
         rebuilt.append(route.model_copy(update={'visits':visits}))
     return plan.model_copy(update={'routes':rebuilt})
 
 
 class AlnsSolver:
-    def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference: Plan | None = None, seed=0, initial_plan: Plan | None = None):
+    def solve(self, scenario, travel, *, time_limit_seconds=5, profile=None, reference: Plan | None = None,
+              seed=0, initial_plan: Plan | None = None, focus_request_id=None):
         if profile not in (None,'sla','stable','cost'):
             raise ValueError('Unknown objective profile')
         if not math.isfinite(time_limit_seconds) or time_limit_seconds <= 0:
             raise ValueError('time_limit_seconds must be finite and positive')
+        response_targets(scenario,focus_request_id)
         started = perf_counter()
         baseline = BaselineSolver().solve(scenario,travel)
         candidates = [baseline]
@@ -90,24 +95,26 @@ class AlnsSolver:
             ref = _reference_seed(scenario,travel,source)
             if ref is not None:
                 candidates.append(ref)
-        key = lambda p: objective_key(p,scenario,profile=profile,reference=reference)
+        key = lambda p: objective_key(p,scenario,profile=profile,reference=reference,focus_request_id=focus_request_id)
         incumbent = min(candidates,key=key)
-        diagnostics = {'optimality_proven':False,'certificate':'disabled', 'profile':profile or 'cost',
+        diagnostics = {'optimality_proven':False,'certificate':'disabled', 'profile':profile or 'morning',
+                       'focus_request_id':focus_request_id,
                        'seed':seed,'time_limit_seconds':time_limit_seconds,'source':'ALNS-OptimizationKernel/f2f1cc0 (adapted)'}
         if not scenario.requests:
             return incumbent.model_copy(update={'solver':'alns','status':'empty','diagnostics':diagnostics})
         from .._alns.solution import Solution, RouteEval
         from .._alns.solver import solve
-        inst = _instance(scenario,travel,profile,reference)
+        inst = _instance(scenario,travel,profile,reference,focus_request_id)
         eng_index = {e.id:i for i,e in enumerate(scenario.engineers)}
         job_index = {r.id:i for i,r in enumerate(scenario.requests)}
-        init = Solution(unassigned={job_index[u.request_id] for u in incumbent.unassigned})
-        for route in incumbent.routes:
-            e = eng_index[route.engineer_id]
-            init.routes[e] = RouteEval(inst,e,[job_index[v.request_id] for v in route.visits])
-        if profile == 'stable':
-            incumbent = _with_stable_schedule(incumbent, inst, init)
-            candidates.append(incumbent)
+        def kernel_plan(plan):
+            return Solution({eng_index[route.engineer_id]: RouteEval(inst,eng_index[route.engineer_id],
+                        [job_index[v.request_id] for v in route.visits]) for route in plan.routes},
+                        {job_index[u.request_id] for u in plan.unassigned})
+        if profile is not None:
+            candidates = [_with_stable_schedule(plan,inst,kernel_plan(plan)) for plan in candidates]
+        incumbent = min(candidates,key=key)
+        init = kernel_plan(incumbent)
         remaining = time_limit_seconds-(perf_counter()-started)
         status='budget_exhausted_before_search'
         if remaining > 0:
@@ -116,7 +123,7 @@ class AlnsSolver:
             candidate = make_plan(scenario,travel,
                 {scenario.engineers[e].id:[scenario.requests[j].id for j in route.seq] for e,route in solution.routes.items()},
                 'alns','feasible_search_completed')
-            if profile == 'stable':
+            if profile is not None:
                 candidate = _with_stable_schedule(candidate, inst, solution)
             require_valid(scenario,travel,candidate)
             candidates.append(candidate)

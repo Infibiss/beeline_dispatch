@@ -12,7 +12,8 @@ from .geography import attach_geography
 from .road_travel import bundle_travel
 from .operational_facts import validate_fact, apply_observations
 from .validation import require_valid
-from .solvers.ortools_solver import objective_key
+from .objectives import objective_key, reference_visits, response_targets
+from .recommendation import LABELS, STRATEGY_ORDER, eligible_candidates
 from .solvers.selection import get_solver
 
 
@@ -33,6 +34,25 @@ def fingerprint(value):
 
 def _assignments(plan):
     return {v.request_id:(r.engineer_id,v.start) for r in plan.routes for v in r.visits}
+
+
+def group_candidates(candidates):
+    """Keep API aliases but show only unique execution plans, Stable first."""
+    groups={}
+    for candidate in sorted(candidates,key=lambda c:STRATEGY_ORDER.index(c['id'])):
+        plan=candidate['plan']
+        signature=fingerprint({'routes':[
+            {'engineer_id':r['engineer_id'],'visits':[
+                {k:v[k] for k in ('request_id','arrival','start','end','travel_minutes','distance_m')}
+                for v in r['visits']]} for r in sorted(plan['routes'],key=lambda r:r['engineer_id'])],
+            'unassigned':sorted(u['request_id'] for u in plan['unassigned']),'metrics':plan['metrics']})
+        groups.setdefault(signature,[]).append(candidate)
+    for group in groups.values():
+        ids=[c['id'] for c in group]
+        for candidate in group:
+            candidate['duplicate_of']=None if candidate is group[0] else group[0]['id']
+            candidate['strategy_ids']=list(ids)
+    return candidates
 
 
 def differences(before,after,ids):
@@ -376,16 +396,25 @@ class ScenarioSession:
         reference=self.plan.model_copy(update={'routes':list(ref_routes.values())})
         labels=self.request_labels()
         if event.type=='emergency':labels['emergency:'+event.id]=f'Авария №{len(labels)+1}'
-        candidates=[];seen={}
+        candidates=[]
+        focus='emergency:'+event.id if event.type=='emergency' else None
+        targets=response_targets(s,focus)
+        prior=reference_visits(s,reference)
+        available={e.id for e in s.engineers}
         backend=get_solver(solver)
-        pool=[backend.solve(s,travel,time_limit_seconds=time_limit,profile=p,reference=reference) for p in ('sla','stable','cost')]
-        for profile,label in [('sla','SLA-first'),('stable','Stable'),('cost','Cost-first')]:
-            plan=min(pool,key=lambda candidate:objective_key(candidate,s,profile=profile,reference=reference))
+        pool=[backend.solve(s,travel,time_limit_seconds=time_limit,profile=p,reference=reference,focus_request_id=focus) for p in ('sla','stable','cost')]
+        for profile in ('sla','stable','cost'):
+            plan=min(pool,key=lambda candidate:objective_key(candidate,s,profile=profile,reference=reference,focus_request_id=focus))
             require_valid(s,travel,plan)
             diff_ids={r.id for r in s.requests}
             if event.type=='cancel':diff_ids.add(event.request_id)
             diff=differences(reference,plan,diff_ids)
             facts=facts_for(s,plan,[d for d in diff if not (event.type=='cancel' and d['request_id']==event.request_id)])
+            assignments=_assignments(plan)
+            facts.update(avoidable_reassigned=sum(old[0] in available and assignments[key][0]!=old[0]
+                         for key,old in prior.items() if key in assignments),
+                         priority_start_sum=sum(assignments[key][1] for key in targets if key in assignments),
+                         response_target_count=len(targets),response_unassigned=len(targets-set(assignments)))
             by_id={r.id:r for r in s.requests}
             lost={d['request_id'] for d in diff if d['before_engineer'] and d['after_engineer'] is None}
             emergency=None
@@ -396,13 +425,15 @@ class ScenarioSession:
                     'end':match[1].end if match else None,'response_minutes':match[1].start-event.time if match else None}
             unassigned_details=[{'request_id':u.request_id,'address':by_id[u.request_id].address,
                 'reason':u.reason,'lost_assignment':u.request_id in lost} for u in plan.unassigned]
-            signature=fingerprint(_assignments(plan))
-            candidates.append({'id':profile,'label':label,'plan':plan.model_dump(mode='json'),'diff':diff,'facts':facts,
-                'emergency':emergency,'unassigned_details':unassigned_details,'explanation':explanation(facts),'duplicate_of':seen.get(signature),
+            candidates.append({'id':profile,'label':LABELS[profile],'plan':plan.model_dump(mode='json'),'diff':diff,'facts':facts,
+                'objective_key':list(objective_key(plan,s,profile=profile,reference=reference,focus_request_id=focus)),
+                'emergency':emergency,'unassigned_details':unassigned_details,'explanation':explanation(facts),'duplicate_of':None,
                 'llm':{'status':'not_connected','facts_only':True,'instruction':'Объясни компромиссы только по facts и diff. Не придумывай SLA, деньги, причины невозможности или оптимальность. Решение принимает диспетчер.'}})
-            seen.setdefault(signature,profile)
+        group_candidates(candidates)
         batch={'request_labels':labels,'observation_warnings':[f"{self.initial_engineers[eid].name}: последний ручной факт в {f['time']//60:02}:{f['time']%60:02}; последующее выполнение не подтверждено." for eid,f in self.statuses.items() if f['time']<event.time],'id':uuid4().hex,'version':self.version,'event':event.model_dump(),'candidates':candidates,'frozen':frozen,'inventory':inventory,
             'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам.'}
+        batch['recommended_candidate_id']=eligible_candidates(batch)[0]['id']
+        batch['response_focus_request_id']=focus
         # Internal payload never trusts a plan sent back from the browser.
         self.batches[batch['id']]={'batch':deepcopy(batch),'scenario':s,'hash':fingerprint(batch),'policy':{'allow_redirect':payload.get('allow_redirect',False),'preserve_in_progress':payload.get('preserve_in_progress',False)}}
         return batch

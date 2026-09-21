@@ -1,0 +1,4076 @@
+{
+  "solver_limit_seconds": 3.0,
+  "solver": "hybrid",
+  "regions": [
+    {
+      "region": "Восток",
+      "source": "data/demo-road/Восток.json",
+      "sha256": "b24f0e7c212a186dac616fb4709594a3bc85d867e83e3a5888a611e9692839a2",
+      "requests": 66,
+      "initial_assigned": 66,
+      "stress_results": [
+        {
+          "stress": "baseline",
+          "fixed_execution": {
+            "window_breaches": 0,
+            "shift_breaches": 0,
+            "breached_requests": 0,
+            "pending": 0,
+            "max_start_delay_minutes": 0,
+            "max_shift_overrun_minutes": 0
+          }
+        },
+        {
+          "stress": "travel+20%",
+          "fixed_execution": {
+            "window_breaches": 7,
+            "shift_breaches": 1,
+            "breached_requests": 8,
+            "pending": 0,
+            "max_start_delay_minutes": 32,
+            "max_shift_overrun_minutes": 3
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 66,
+            "pending": 0
+          }
+        },
+        {
+          "stress": "travel+40%",
+          "fixed_execution": {
+            "window_breaches": 12,
+            "shift_breaches": 4,
+            "breached_requests": 16,
+            "pending": 0,
+            "max_start_delay_minutes": 63,
+            "max_shift_overrun_minutes": 39
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 63,
+            "pending": 3
+          }
+        },
+        {
+          "stress": "service+20%",
+          "fixed_execution": {
+            "window_breaches": 8,
+            "shift_breaches": 7,
+            "breached_requests": 15,
+            "pending": 0,
+            "max_start_delay_minutes": 60,
+            "max_shift_overrun_minutes": 52
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 62,
+            "pending": 4
+          }
+        },
+        {
+          "stress": "travel+40% service+20%",
+          "fixed_execution": {
+            "window_breaches": 21,
+            "shift_breaches": 9,
+            "breached_requests": 27,
+            "pending": 0,
+            "max_start_delay_minutes": 111,
+            "max_shift_overrun_minutes": 101
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 59,
+            "pending": 7
+          }
+        }
+      ],
+      "dynamic_day": {
+        "stages": [
+          {
+            "event": {
+              "id": "emergency-1",
+              "type": "emergency",
+              "time": 545,
+              "anchor_id": "74198",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 8,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 168196,
+                  "travel_minutes": 1187,
+                  "service_minutes": 3280,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 28,
+                  "connection_total": 28,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 783,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Восток-10",
+                  "arrival": 783,
+                  "start": 783,
+                  "end": 863,
+                  "response_minutes": 238
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  783,
+                  0,
+                  0,
+                  1187,
+                  168196,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "bc14aa86ca38ff6a25895c6db08b98b0d6094ca2a86254e90cb776ff532ec0e3"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 167545,
+                  "travel_minutes": 1186,
+                  "service_minutes": 3280,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 28,
+                  "connection_total": 28,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 1115,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Восток-10",
+                  "arrival": 1115,
+                  "start": 1115,
+                  "end": 1195,
+                  "response_minutes": 570
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1186,
+                  167545,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "ed2faa7e1c6c1113e639f2f04c9dcd09fd3aab39d757edb2f99da142054a4e04"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 167545,
+                  "travel_minutes": 1186,
+                  "service_minutes": 3280,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 28,
+                  "connection_total": 28,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 1115,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Восток-10",
+                  "arrival": 1115,
+                  "start": 1115,
+                  "end": 1195,
+                  "response_minutes": 570
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  1186,
+                  167545,
+                  0,
+                  0,
+                  13
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "ed2faa7e1c6c1113e639f2f04c9dcd09fd3aab39d757edb2f99da142054a4e04"
+              }
+            ],
+            "preview_seconds": 9.018,
+            "unique_plans": 2,
+            "recommended_candidate_id": "sla",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "emergency-2",
+              "type": "emergency",
+              "time": 565,
+              "anchor_id": "86160",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 61,
+            "pending": 0,
+            "frozen": 7,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 61,
+                  "unassigned": 0,
+                  "engineers_used": 14,
+                  "distance_m": 194070,
+                  "travel_minutes": 1347,
+                  "service_minutes": 3360,
+                  "high_assigned": 37,
+                  "high_total": 37,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 28,
+                  "connection_total": 28,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 3,
+                  "shifted": 2,
+                  "time_shift_minutes": 109,
+                  "avoidable_reassigned": 3,
+                  "priority_start_sum": 701,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Восток-06",
+                  "arrival": 701,
+                  "start": 701,
+                  "end": 781,
+                  "response_minutes": 136
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  701,
+                  3,
+                  109,
+                  1347,
+                  194070,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "46950bf017ccdf1b5ea8bfd39c26da848ef4ca0c40137ce25293a7d302c0f97d"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 61,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 183988,
+                  "travel_minutes": 1207,
+                  "service_minutes": 3360,
+                  "high_assigned": 37,
+                  "high_total": 37,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 28,
+                  "connection_total": 28,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 944,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Восток-11",
+                  "arrival": 944,
+                  "start": 944,
+                  "end": 1024,
+                  "response_minutes": 379
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1207,
+                  183988,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "9db2491669197288eaf13934b3fe1273df4b1fb294ef8977305a2673df0bd4c9"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 61,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 183988,
+                  "travel_minutes": 1207,
+                  "service_minutes": 3360,
+                  "high_assigned": 37,
+                  "high_total": 37,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 28,
+                  "connection_total": 28,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 944,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Восток-11",
+                  "arrival": 944,
+                  "start": 944,
+                  "end": 1024,
+                  "response_minutes": 379
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  1207,
+                  183988,
+                  0,
+                  0,
+                  13
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "9db2491669197288eaf13934b3fe1273df4b1fb294ef8977305a2673df0bd4c9"
+              }
+            ],
+            "preview_seconds": 9.017,
+            "unique_plans": 2,
+            "recommended_candidate_id": "sla",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "cancel",
+              "type": "cancel",
+              "time": 566,
+              "request_id": "74198"
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 14,
+                  "distance_m": 213221,
+                  "travel_minutes": 1372,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 9,
+                  "shifted": 17,
+                  "time_shift_minutes": 1205,
+                  "avoidable_reassigned": 9,
+                  "priority_start_sum": 8332,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  8332,
+                  9,
+                  1205,
+                  1372,
+                  213221,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "a370ce5e91b00f629aa296eca741e94ef25743700711f55b6fe5ea1378f1c059"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 183223,
+                  "travel_minutes": 1202,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 9075,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1202,
+                  183223,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "2ac5312739cef7f6a3e28250e158b78e0274747ce4715fecee8a0f9d05148628"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 199622,
+                  "travel_minutes": 975,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 23,
+                  "shifted": 32,
+                  "time_shift_minutes": 1421,
+                  "avoidable_reassigned": 23,
+                  "priority_start_sum": 9139,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  975,
+                  199622,
+                  23,
+                  1421,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "00d1b289ec56f98433399be2c17613c33d709458d775a626aa32f0fb1e975281"
+              }
+            ],
+            "preview_seconds": 9.015,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "unavailable",
+              "type": "unavailable",
+              "time": 567,
+              "engineer_id": "Восток-04"
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 14,
+                  "distance_m": 232050,
+                  "travel_minutes": 1357,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 10,
+                  "shifted": 20,
+                  "time_shift_minutes": 1223,
+                  "avoidable_reassigned": 10,
+                  "priority_start_sum": 8332,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  8332,
+                  10,
+                  1223,
+                  1357,
+                  232050,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "63305157329487791a2229b78d891f1d924bfa19fec9a1cb55137aad8748126b"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 183223,
+                  "travel_minutes": 1202,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 9075,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1202,
+                  183223,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "2ac5312739cef7f6a3e28250e158b78e0274747ce4715fecee8a0f9d05148628"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 199786,
+                  "travel_minutes": 982,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 20,
+                  "shifted": 32,
+                  "time_shift_minutes": 1589,
+                  "avoidable_reassigned": 20,
+                  "priority_start_sum": 9139,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  982,
+                  199786,
+                  20,
+                  1589,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "95a12e60288d9878c9d68214ae925c5b594f848c339c7aa9488fd54af4e2b5a5"
+              }
+            ],
+            "preview_seconds": 9.014,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "delay-fact-replan",
+              "type": "replan",
+              "time": 600
+            },
+            "urgent_assigned_remaining": 9,
+            "urgent_pending": 0,
+            "assigned_remaining": 60,
+            "pending": 0,
+            "frozen": 7,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 14,
+                  "distance_m": 202976,
+                  "travel_minutes": 1344,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 10,
+                  "shifted": 18,
+                  "time_shift_minutes": 1121,
+                  "avoidable_reassigned": 10,
+                  "priority_start_sum": 8364,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  8364,
+                  10,
+                  1121,
+                  1344,
+                  202976,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "db6d07414451f653de59fa8f499d5229d814aa57922343d95566560c09339b5c"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 200286,
+                  "travel_minutes": 1271,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 1,
+                  "shifted": 1,
+                  "time_shift_minutes": 92,
+                  "avoidable_reassigned": 1,
+                  "priority_start_sum": 9075,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  1,
+                  92,
+                  1271,
+                  200286,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "9bd27362e5f23b534b6ec8cc8312429857c057f8cd75e3c774e7fe05ea744cf9"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 60,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 208948,
+                  "travel_minutes": 1006,
+                  "service_minutes": 3290,
+                  "high_assigned": 36,
+                  "high_total": 36,
+                  "emergency_assigned": 9,
+                  "emergency_total": 9,
+                  "connection_assigned": 27,
+                  "connection_total": 27,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 21,
+                  "shifted": 28,
+                  "time_shift_minutes": 1474,
+                  "avoidable_reassigned": 21,
+                  "priority_start_sum": 9139,
+                  "response_target_count": 9,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  1006,
+                  208948,
+                  21,
+                  1474,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "2d4a2031373c46e9f35bb885360e4ea2ff72df926888558332522f9926cba867"
+              }
+            ],
+            "preview_seconds": 9.014,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "completion-replan",
+              "type": "replan",
+              "time": 690
+            },
+            "urgent_assigned_remaining": 8,
+            "urgent_pending": 0,
+            "assigned_remaining": 52,
+            "pending": 0,
+            "frozen": 15,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 0,
+                  "engineers_used": 14,
+                  "distance_m": 195655,
+                  "travel_minutes": 1110,
+                  "service_minutes": 2840,
+                  "high_assigned": 31,
+                  "high_total": 31,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 23,
+                  "connection_total": 23,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 6,
+                  "shifted": 13,
+                  "time_shift_minutes": 935,
+                  "avoidable_reassigned": 6,
+                  "priority_start_sum": 7698,
+                  "response_target_count": 8,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  7698,
+                  6,
+                  935,
+                  1110,
+                  195655,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "a3621138499e17b7008d093597e25e93f561a8a06d3ed86acc3a5fba1ca1ab06"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 179198,
+                  "travel_minutes": 1069,
+                  "service_minutes": 2840,
+                  "high_assigned": 31,
+                  "high_total": 31,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 23,
+                  "connection_total": 23,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 8391,
+                  "response_target_count": 8,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1069,
+                  179198,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "95b0ee805cb0246a695a5f388340055a726e6886943e2bd70e69e83dc3761dfb"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 0,
+                  "engineers_used": 12,
+                  "distance_m": 191633,
+                  "travel_minutes": 826,
+                  "service_minutes": 2840,
+                  "high_assigned": 31,
+                  "high_total": 31,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 23,
+                  "connection_total": 23,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 20,
+                  "shifted": 26,
+                  "time_shift_minutes": 1185,
+                  "avoidable_reassigned": 20,
+                  "priority_start_sum": 8455,
+                  "response_target_count": 8,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  826,
+                  191633,
+                  20,
+                  1185,
+                  12
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "5f24bfc4c627d7da67bfea71d2be5a4aff5d8e994330f4dfab2715514b2c7bff"
+              }
+            ],
+            "preview_seconds": 9.014,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "post-restore",
+              "type": "replan",
+              "time": 691
+            },
+            "urgent_assigned_remaining": 8,
+            "urgent_pending": 0,
+            "assigned_remaining": 52,
+            "pending": 0,
+            "frozen": 15,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 0,
+                  "engineers_used": 14,
+                  "distance_m": 195655,
+                  "travel_minutes": 1110,
+                  "service_minutes": 2840,
+                  "high_assigned": 31,
+                  "high_total": 31,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 23,
+                  "connection_total": 23,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 6,
+                  "shifted": 13,
+                  "time_shift_minutes": 935,
+                  "avoidable_reassigned": 6,
+                  "priority_start_sum": 7698,
+                  "response_target_count": 8,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  7698,
+                  6,
+                  935,
+                  1110,
+                  195655,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "1afa95c4a883142c749c807cdc1d80e0f5fb6c29c22951b4b00e5f23e9e5c3b0"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 0,
+                  "engineers_used": 13,
+                  "distance_m": 179198,
+                  "travel_minutes": 1069,
+                  "service_minutes": 2840,
+                  "high_assigned": 31,
+                  "high_total": 31,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 23,
+                  "connection_total": 23,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 8391,
+                  "response_target_count": 8,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1069,
+                  179198,
+                  13
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "4183fa00616449a085b23d9a29922b3b3952dfebd6066bc5fb7d11df4d7293a9"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 0,
+                  "engineers_used": 12,
+                  "distance_m": 191633,
+                  "travel_minutes": 826,
+                  "service_minutes": 2840,
+                  "high_assigned": 31,
+                  "high_total": 31,
+                  "emergency_assigned": 8,
+                  "emergency_total": 8,
+                  "connection_assigned": 23,
+                  "connection_total": 23,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 20,
+                  "shifted": 26,
+                  "time_shift_minutes": 1185,
+                  "avoidable_reassigned": 20,
+                  "priority_start_sum": 8455,
+                  "response_target_count": 8,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  0,
+                  826,
+                  191633,
+                  20,
+                  1185,
+                  12
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "32e66db12811909ca1d7f9a193e9d7ee7a2ef2399d250837c0a0b8804455fa97"
+              }
+            ],
+            "preview_seconds": 9.013,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "end-of-shift",
+              "type": "replan",
+              "time": 1320
+            },
+            "urgent_assigned_remaining": 0,
+            "urgent_pending": 0,
+            "assigned_remaining": 0,
+            "pending": 1,
+            "frozen": 66,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 1,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 1,
+                  "emergency_assigned": 0,
+                  "emergency_total": 0,
+                  "connection_assigned": 0,
+                  "connection_total": 1,
+                  "lost_assignments": 1,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 0,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "78ab91c5a7044154f74d88f25d581243e6652fc9c823c3e2ada0ac52cdea59cf"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 1,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 1,
+                  "emergency_assigned": 0,
+                  "emergency_total": 0,
+                  "connection_assigned": 0,
+                  "connection_total": 1,
+                  "lost_assignments": 1,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 0,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "78ab91c5a7044154f74d88f25d581243e6652fc9c823c3e2ada0ac52cdea59cf"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 1,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 1,
+                  "emergency_assigned": 0,
+                  "emergency_total": 0,
+                  "connection_assigned": 0,
+                  "connection_total": 1,
+                  "lost_assignments": 1,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 0,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  1,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "78ab91c5a7044154f74d88f25d581243e6652fc9c823c3e2ada0ac52cdea59cf"
+              }
+            ],
+            "preview_seconds": 7.724,
+            "unique_plans": 1,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          }
+        ],
+        "delay_fact": {
+          "engineer_id": "Восток-03",
+          "request_id": "77563",
+          "time": 600,
+          "extra_service_minutes": 20,
+          "remaining_minutes": 90
+        },
+        "restore_equal": true,
+        "final_pending": 1,
+        "cancelled": "74198",
+        "unavailable_engineer": "Восток-04",
+        "note": "Frozen includes simulated execution and explicit facts; these are not observed field outcomes."
+      }
+    },
+    {
+      "region": "Юго-восток",
+      "source": "data/demo-road/Юго-восток.json",
+      "sha256": "9a3603afedbaf5c1071912b894ff4919de325979b435dda412890e8eaaf2b9b2",
+      "requests": 83,
+      "initial_assigned": 71,
+      "stress_results": [
+        {
+          "stress": "baseline",
+          "fixed_execution": {
+            "window_breaches": 0,
+            "shift_breaches": 0,
+            "breached_requests": 0,
+            "pending": 12,
+            "max_start_delay_minutes": 0,
+            "max_shift_overrun_minutes": 0
+          }
+        },
+        {
+          "stress": "travel+20%",
+          "fixed_execution": {
+            "window_breaches": 7,
+            "shift_breaches": 2,
+            "breached_requests": 9,
+            "pending": 12,
+            "max_start_delay_minutes": 62,
+            "max_shift_overrun_minutes": 24
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 67,
+            "pending": 16
+          }
+        },
+        {
+          "stress": "travel+40%",
+          "fixed_execution": {
+            "window_breaches": 11,
+            "shift_breaches": 4,
+            "breached_requests": 14,
+            "pending": 12,
+            "max_start_delay_minutes": 130,
+            "max_shift_overrun_minutes": 50
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 66,
+            "pending": 17
+          }
+        },
+        {
+          "stress": "service+20%",
+          "fixed_execution": {
+            "window_breaches": 9,
+            "shift_breaches": 6,
+            "breached_requests": 14,
+            "pending": 12,
+            "max_start_delay_minutes": 78,
+            "max_shift_overrun_minutes": 76
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 67,
+            "pending": 16
+          }
+        },
+        {
+          "stress": "travel+40% service+20%",
+          "fixed_execution": {
+            "window_breaches": 19,
+            "shift_breaches": 12,
+            "breached_requests": 27,
+            "pending": 12,
+            "max_start_delay_minutes": 142,
+            "max_shift_overrun_minutes": 119
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 60,
+            "pending": 23
+          }
+        }
+      ],
+      "dynamic_day": {
+        "stages": [
+          {
+            "event": {
+              "id": "emergency-1",
+              "type": "emergency",
+              "time": 545,
+              "anchor_id": "67472",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 13,
+            "urgent_pending": 0,
+            "assigned_remaining": 64,
+            "pending": 12,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 462315,
+                  "travel_minutes": 1880,
+                  "service_minutes": 3490,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 13,
+                  "emergency_total": 13,
+                  "connection_assigned": 24,
+                  "connection_total": 31,
+                  "lost_assignments": 1,
+                  "new_assignments": 2,
+                  "reassigned": 18,
+                  "shifted": 28,
+                  "time_shift_minutes": 1386,
+                  "avoidable_reassigned": 18,
+                  "priority_start_sum": 973,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Юго-восток-15",
+                  "arrival": 973,
+                  "start": 973,
+                  "end": 1053,
+                  "response_minutes": 428
+                },
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  973,
+                  18,
+                  1386,
+                  1880,
+                  462315,
+                  15
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "a6312449e968faf8a39421bcd3d5987e34adc8c2b3b09711c065f8cf2a96e0bf"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 427610,
+                  "travel_minutes": 1458,
+                  "service_minutes": 3490,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 13,
+                  "emergency_total": 13,
+                  "connection_assigned": 24,
+                  "connection_total": 31,
+                  "lost_assignments": 1,
+                  "new_assignments": 2,
+                  "reassigned": 5,
+                  "shifted": 3,
+                  "time_shift_minutes": 89,
+                  "avoidable_reassigned": 5,
+                  "priority_start_sum": 1013,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Юго-восток-15",
+                  "arrival": 1013,
+                  "start": 1013,
+                  "end": 1093,
+                  "response_minutes": 468
+                },
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  5,
+                  89,
+                  1458,
+                  427610,
+                  15
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "26faec0b819f2991dca88e2817493a6c1d7b43d6ee12370c1e08d43d6e2cabbd"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 427610,
+                  "travel_minutes": 1458,
+                  "service_minutes": 3490,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 13,
+                  "emergency_total": 13,
+                  "connection_assigned": 24,
+                  "connection_total": 31,
+                  "lost_assignments": 1,
+                  "new_assignments": 2,
+                  "reassigned": 5,
+                  "shifted": 3,
+                  "time_shift_minutes": 89,
+                  "avoidable_reassigned": 5,
+                  "priority_start_sum": 1013,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Юго-восток-15",
+                  "arrival": 1013,
+                  "start": 1013,
+                  "end": 1093,
+                  "response_minutes": 468
+                },
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1458,
+                  427610,
+                  5,
+                  89,
+                  15
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "26faec0b819f2991dca88e2817493a6c1d7b43d6ee12370c1e08d43d6e2cabbd"
+              }
+            ],
+            "preview_seconds": 9.284,
+            "unique_plans": 2,
+            "recommended_candidate_id": "sla",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "emergency-2",
+              "type": "emergency",
+              "time": 565,
+              "anchor_id": "84466",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 65,
+            "pending": 12,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 65,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 430684,
+                  "travel_minutes": 1495,
+                  "service_minutes": 3570,
+                  "high_assigned": 38,
+                  "high_total": 45,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 24,
+                  "connection_total": 31,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 907,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Юго-восток-05",
+                  "arrival": 907,
+                  "start": 907,
+                  "end": 987,
+                  "response_minutes": 342
+                },
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  907,
+                  0,
+                  0,
+                  1495,
+                  430684,
+                  15
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "1e5894bb80e724504229ebd07411174c8e2d9f44b91b7d6832d13650287f1889"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 65,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 430684,
+                  "travel_minutes": 1495,
+                  "service_minutes": 3570,
+                  "high_assigned": 38,
+                  "high_total": 45,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 24,
+                  "connection_total": 31,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 907,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Юго-восток-05",
+                  "arrival": 907,
+                  "start": 907,
+                  "end": 987,
+                  "response_minutes": 342
+                },
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  0,
+                  0,
+                  1495,
+                  430684,
+                  15
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "1e5894bb80e724504229ebd07411174c8e2d9f44b91b7d6832d13650287f1889"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 65,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 430684,
+                  "travel_minutes": 1495,
+                  "service_minutes": 3570,
+                  "high_assigned": 38,
+                  "high_total": 45,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 24,
+                  "connection_total": 31,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 907,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Юго-восток-05",
+                  "arrival": 907,
+                  "start": 907,
+                  "end": 987,
+                  "response_minutes": 342
+                },
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1495,
+                  430684,
+                  0,
+                  0,
+                  15
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "1e5894bb80e724504229ebd07411174c8e2d9f44b91b7d6832d13650287f1889"
+              }
+            ],
+            "preview_seconds": 9.282,
+            "unique_plans": 1,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "cancel",
+              "type": "cancel",
+              "time": 566,
+              "request_id": "67472"
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 64,
+            "pending": 12,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 456495,
+                  "travel_minutes": 1824,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 6,
+                  "shifted": 18,
+                  "time_shift_minutes": 700,
+                  "avoidable_reassigned": 6,
+                  "priority_start_sum": 14036,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  14036,
+                  6,
+                  700,
+                  1824,
+                  456495,
+                  15
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "0c0b8b47b904196b89004fa2698b2202f2eed403add62178cc3c8886d5f514a7"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 430206,
+                  "travel_minutes": 1491,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 14335,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  0,
+                  0,
+                  1491,
+                  430206,
+                  15
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "dc2387fd372f45f1880536987fe0292151f192adafa4b8b9c7e5049e73ce8eaa"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 15,
+                  "distance_m": 432473,
+                  "travel_minutes": 1388,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 1,
+                  "new_assignments": 1,
+                  "reassigned": 5,
+                  "shifted": 8,
+                  "time_shift_minutes": 413,
+                  "avoidable_reassigned": 5,
+                  "priority_start_sum": 14284,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1388,
+                  432473,
+                  5,
+                  413,
+                  15
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "626aa65e4d096328841cc064cd229fe8e28440208f3f9a02548f64f6898ad051"
+              }
+            ],
+            "preview_seconds": 9.272,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "unavailable",
+              "type": "unavailable",
+              "time": 630,
+              "engineer_id": "Юго-восток-04"
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 64,
+            "pending": 12,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 462399,
+                  "travel_minutes": 1732,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 1,
+                  "new_assignments": 1,
+                  "reassigned": 9,
+                  "shifted": 18,
+                  "time_shift_minutes": 1276,
+                  "avoidable_reassigned": 8,
+                  "priority_start_sum": 13968,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  13968,
+                  8,
+                  1276,
+                  1732,
+                  462399,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "90155d394fee1586a653321e6916553eb48fa91afc7ef46e69e63a1c14b1c63f"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 435806,
+                  "travel_minutes": 1477,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 1,
+                  "shifted": 1,
+                  "time_shift_minutes": 98,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 14335,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  0,
+                  98,
+                  1477,
+                  435806,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "1e3a5312ffd7026f11541deb7e129cbee279c5a69a430690c9f06d151c6f3bc0"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 438148,
+                  "travel_minutes": 1425,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 6,
+                  "shifted": 10,
+                  "time_shift_minutes": 662,
+                  "avoidable_reassigned": 5,
+                  "priority_start_sum": 14338,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1425,
+                  438148,
+                  5,
+                  662,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "a5844d55969007e02b9e6547561f04e3bc0aad13f852d1f5e77b97c4172e11b5"
+              }
+            ],
+            "preview_seconds": 9.261,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "delay-fact-replan",
+              "type": "replan",
+              "time": 631
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 64,
+            "pending": 12,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 451755,
+                  "travel_minutes": 1654,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 8,
+                  "shifted": 20,
+                  "time_shift_minutes": 835,
+                  "avoidable_reassigned": 8,
+                  "priority_start_sum": 14009,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  14009,
+                  8,
+                  835,
+                  1654,
+                  451755,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "3c2609277d3ef5dfd7bd1956eb3274a335843d42d41d69a3306dfeab8091b96b"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 435806,
+                  "travel_minutes": 1477,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 5,
+                  "time_shift_minutes": 100,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 14375,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  0,
+                  100,
+                  1477,
+                  435806,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "50accbf6b094c39570a632c0efc4095ec03ab0f51d81a78c1f3e1c9c7d00911c"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 64,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 434767,
+                  "travel_minutes": 1374,
+                  "service_minutes": 3500,
+                  "high_assigned": 37,
+                  "high_total": 44,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 23,
+                  "connection_total": 30,
+                  "lost_assignments": 1,
+                  "new_assignments": 1,
+                  "reassigned": 4,
+                  "shifted": 12,
+                  "time_shift_minutes": 482,
+                  "avoidable_reassigned": 4,
+                  "priority_start_sum": 14324,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1374,
+                  434767,
+                  4,
+                  482,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "96242286dd283d69544505c7fa26a67a5791ef8b035a80089390190f2a67c6e0"
+              }
+            ],
+            "preview_seconds": 9.263,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "completion-replan",
+              "type": "replan",
+              "time": 690
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 62,
+            "pending": 12,
+            "frozen": 10,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 62,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 430903,
+                  "travel_minutes": 1479,
+                  "service_minutes": 3400,
+                  "high_assigned": 36,
+                  "high_total": 43,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 22,
+                  "connection_total": 29,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 1,
+                  "shifted": 8,
+                  "time_shift_minutes": 242,
+                  "avoidable_reassigned": 1,
+                  "priority_start_sum": 14245,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  14245,
+                  1,
+                  242,
+                  1479,
+                  430903,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "ac259426e5125bd2a26952f48de14f063d3e8e2e822b415da4475fab326f44c2"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 62,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 431765,
+                  "travel_minutes": 1421,
+                  "service_minutes": 3400,
+                  "high_assigned": 36,
+                  "high_total": 43,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 22,
+                  "connection_total": 29,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 14375,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  0,
+                  0,
+                  1421,
+                  431765,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "46ebcc26ad317f60fa1e9825929b636ebbcf43338129a11b1cb0bb096a82d901"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 62,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 431691,
+                  "travel_minutes": 1318,
+                  "service_minutes": 3400,
+                  "high_assigned": 36,
+                  "high_total": 43,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 22,
+                  "connection_total": 29,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 2,
+                  "shifted": 7,
+                  "time_shift_minutes": 382,
+                  "avoidable_reassigned": 2,
+                  "priority_start_sum": 14324,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1318,
+                  431691,
+                  2,
+                  382,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "b1f5bfaecf7b41f96f47857495141cbcf0567933cca46656a414232911e941ee"
+              }
+            ],
+            "preview_seconds": 9.259,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "post-restore",
+              "type": "replan",
+              "time": 691
+            },
+            "urgent_assigned_remaining": 14,
+            "urgent_pending": 0,
+            "assigned_remaining": 62,
+            "pending": 12,
+            "frozen": 10,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 62,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 430903,
+                  "travel_minutes": 1479,
+                  "service_minutes": 3400,
+                  "high_assigned": 36,
+                  "high_total": 43,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 22,
+                  "connection_total": 29,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 1,
+                  "shifted": 13,
+                  "time_shift_minutes": 247,
+                  "avoidable_reassigned": 1,
+                  "priority_start_sum": 14247,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  14247,
+                  1,
+                  247,
+                  1479,
+                  430903,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "8f0d774926cf6e4e4fdb5850f93080498a425a2a55e7c07c440300e14577d4a4"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 62,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 431765,
+                  "travel_minutes": 1421,
+                  "service_minutes": 3400,
+                  "high_assigned": 36,
+                  "high_total": 43,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 22,
+                  "connection_total": 29,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 5,
+                  "time_shift_minutes": 5,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 14377,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  0,
+                  5,
+                  1421,
+                  431765,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "7018bfa47a0ee5aa806ac8fdaf21541ade167cf2f4ac7bc6038bd74f8a768b79"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 62,
+                  "unassigned": 12,
+                  "engineers_used": 14,
+                  "distance_m": 431691,
+                  "travel_minutes": 1318,
+                  "service_minutes": 3400,
+                  "high_assigned": 36,
+                  "high_total": 43,
+                  "emergency_assigned": 14,
+                  "emergency_total": 14,
+                  "connection_assigned": 22,
+                  "connection_total": 29,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 2,
+                  "shifted": 12,
+                  "time_shift_minutes": 387,
+                  "avoidable_reassigned": 2,
+                  "priority_start_sum": 14326,
+                  "response_target_count": 14,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  7,
+                  12,
+                  1318,
+                  431691,
+                  2,
+                  387,
+                  14
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "64403b21813f0417c0a5d3846a83541d998e273dc6fbc32275c12cdc919906c1"
+              }
+            ],
+            "preview_seconds": 9.262,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "end-of-shift",
+              "type": "replan",
+              "time": 1320
+            },
+            "urgent_assigned_remaining": 0,
+            "urgent_pending": 2,
+            "assigned_remaining": 0,
+            "pending": 17,
+            "frozen": 67,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 17,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 11,
+                  "emergency_assigned": 0,
+                  "emergency_total": 2,
+                  "connection_assigned": 0,
+                  "connection_total": 9,
+                  "lost_assignments": 5,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 2,
+                  "response_unassigned": 2
+                },
+                "emergency": null,
+                "objective_key": [
+                  2,
+                  11,
+                  17,
+                  2882,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "b0de2d665c01e77ba3816d5a5ebcfc3141984c07b51657dee3a9874087b5f904"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 17,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 11,
+                  "emergency_assigned": 0,
+                  "emergency_total": 2,
+                  "connection_assigned": 0,
+                  "connection_total": 9,
+                  "lost_assignments": 5,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 2,
+                  "response_unassigned": 2
+                },
+                "emergency": null,
+                "objective_key": [
+                  2,
+                  11,
+                  17,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "b0de2d665c01e77ba3816d5a5ebcfc3141984c07b51657dee3a9874087b5f904"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 17,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 11,
+                  "emergency_assigned": 0,
+                  "emergency_total": 2,
+                  "connection_assigned": 0,
+                  "connection_total": 9,
+                  "lost_assignments": 5,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 2,
+                  "response_unassigned": 2
+                },
+                "emergency": null,
+                "objective_key": [
+                  2,
+                  11,
+                  17,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "b0de2d665c01e77ba3816d5a5ebcfc3141984c07b51657dee3a9874087b5f904"
+              }
+            ],
+            "preview_seconds": 9.024,
+            "unique_plans": 1,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          }
+        ],
+        "delay_fact": {
+          "engineer_id": "Юго-восток-01",
+          "request_id": "876",
+          "time": 631,
+          "extra_service_minutes": 20,
+          "remaining_minutes": 59
+        },
+        "restore_equal": true,
+        "final_pending": 17,
+        "cancelled": "67472",
+        "unavailable_engineer": "Юго-восток-04",
+        "note": "Frozen includes simulated execution and explicit facts; these are not observed field outcomes."
+      }
+    },
+    {
+      "region": "Югоцентр",
+      "source": "data/demo-road/Югоцентр.json",
+      "sha256": "dbd04aca8e43f37b2b9d06817879765fff863829f83add0e1054226edd0ba9f1",
+      "requests": 56,
+      "initial_assigned": 55,
+      "stress_results": [
+        {
+          "stress": "baseline",
+          "fixed_execution": {
+            "window_breaches": 0,
+            "shift_breaches": 0,
+            "breached_requests": 0,
+            "pending": 1,
+            "max_start_delay_minutes": 0,
+            "max_shift_overrun_minutes": 0
+          }
+        },
+        {
+          "stress": "travel+20%",
+          "fixed_execution": {
+            "window_breaches": 4,
+            "shift_breaches": 2,
+            "breached_requests": 6,
+            "pending": 1,
+            "max_start_delay_minutes": 35,
+            "max_shift_overrun_minutes": 19
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 54,
+            "pending": 2
+          }
+        },
+        {
+          "stress": "travel+40%",
+          "fixed_execution": {
+            "window_breaches": 6,
+            "shift_breaches": 3,
+            "breached_requests": 8,
+            "pending": 1,
+            "max_start_delay_minutes": 78,
+            "max_shift_overrun_minutes": 63
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 53,
+            "pending": 3
+          }
+        },
+        {
+          "stress": "service+20%",
+          "fixed_execution": {
+            "window_breaches": 5,
+            "shift_breaches": 5,
+            "breached_requests": 9,
+            "pending": 1,
+            "max_start_delay_minutes": 46,
+            "max_shift_overrun_minutes": 47
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 53,
+            "pending": 3
+          }
+        },
+        {
+          "stress": "travel+40% service+20%",
+          "fixed_execution": {
+            "window_breaches": 11,
+            "shift_breaches": 8,
+            "breached_requests": 16,
+            "pending": 1,
+            "max_start_delay_minutes": 124,
+            "max_shift_overrun_minutes": 123
+          },
+          "morning_reoptimization": {
+            "valid": true,
+            "assigned": 51,
+            "pending": 5
+          }
+        }
+      ],
+      "dynamic_day": {
+        "stages": [
+          {
+            "event": {
+              "id": "emergency-1",
+              "type": "emergency",
+              "time": 545,
+              "anchor_id": "32840",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 51,
+            "pending": 1,
+            "frozen": 5,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 160322,
+                  "travel_minutes": 1023,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 26,
+                  "connection_total": 26,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 608,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Югоцентр-05",
+                  "arrival": 608,
+                  "start": 608,
+                  "end": 688,
+                  "response_minutes": 63
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  608,
+                  0,
+                  0,
+                  1023,
+                  160322,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "ce80358ebe754e533028501add3009cb18b4c097ca58576a6fb22c6a65787bba"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 159962,
+                  "travel_minutes": 973,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 26,
+                  "connection_total": 26,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 793,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Югоцентр-10",
+                  "arrival": 793,
+                  "start": 793,
+                  "end": 873,
+                  "response_minutes": 248
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  973,
+                  159962,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "b6ffb2bd668d8e9995a8f172c02f400ffb246db6338b0c22e89b066299114638"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 159962,
+                  "travel_minutes": 973,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 26,
+                  "connection_total": 26,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 793,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Югоцентр-10",
+                  "arrival": 793,
+                  "start": 793,
+                  "end": 873,
+                  "response_minutes": 248
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  973,
+                  159962,
+                  0,
+                  0,
+                  11
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "b6ffb2bd668d8e9995a8f172c02f400ffb246db6338b0c22e89b066299114638"
+              }
+            ],
+            "preview_seconds": 9.017,
+            "unique_plans": 2,
+            "recommended_candidate_id": "sla",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "emergency-2",
+              "type": "emergency",
+              "time": 565,
+              "anchor_id": "78540",
+              "duration_minutes": 80,
+              "router": 0
+            },
+            "urgent_assigned_remaining": 3,
+            "urgent_pending": 0,
+            "assigned_remaining": 52,
+            "pending": 1,
+            "frozen": 5,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 1,
+                  "engineers_used": 12,
+                  "distance_m": 168862,
+                  "travel_minutes": 1045,
+                  "service_minutes": 2740,
+                  "high_assigned": 29,
+                  "high_total": 29,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 26,
+                  "connection_total": 26,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 637,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Югоцентр-05",
+                  "arrival": 637,
+                  "start": 637,
+                  "end": 717,
+                  "response_minutes": 72
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  637,
+                  0,
+                  0,
+                  1045,
+                  168862,
+                  12
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "e68d5af36c8928f79077b26e2f39f9fd2fc2381ef99a0cb684c35ba10e737669"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 164656,
+                  "travel_minutes": 982,
+                  "service_minutes": 2740,
+                  "high_assigned": 29,
+                  "high_total": 29,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 26,
+                  "connection_total": 26,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 882,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Югоцентр-10",
+                  "arrival": 882,
+                  "start": 882,
+                  "end": 962,
+                  "response_minutes": 317
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  982,
+                  164656,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "d2566db2fa52fd2337b218fc77e9790e901ce7c784dfdb35ec91aa78471690cf"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 52,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 164656,
+                  "travel_minutes": 982,
+                  "service_minutes": 2740,
+                  "high_assigned": 29,
+                  "high_total": 29,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 26,
+                  "connection_total": 26,
+                  "lost_assignments": 0,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 882,
+                  "response_target_count": 1,
+                  "response_unassigned": 0
+                },
+                "emergency": {
+                  "assigned": true,
+                  "engineer_id": "Югоцентр-10",
+                  "arrival": 882,
+                  "start": 882,
+                  "end": 962,
+                  "response_minutes": 317
+                },
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  982,
+                  164656,
+                  0,
+                  0,
+                  11
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "cost"
+                ],
+                "plan_sha256": "d2566db2fa52fd2337b218fc77e9790e901ce7c784dfdb35ec91aa78471690cf"
+              }
+            ],
+            "preview_seconds": 9.017,
+            "unique_plans": 2,
+            "recommended_candidate_id": "sla",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "cancel",
+              "type": "cancel",
+              "time": 566,
+              "request_id": "32840"
+            },
+            "urgent_assigned_remaining": 3,
+            "urgent_pending": 0,
+            "assigned_remaining": 51,
+            "pending": 1,
+            "frozen": 5,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 161040,
+                  "travel_minutes": 1072,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 1,
+                  "new_assignments": 1,
+                  "reassigned": 2,
+                  "shifted": 2,
+                  "time_shift_minutes": 275,
+                  "avoidable_reassigned": 2,
+                  "priority_start_sum": 2240,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  2240,
+                  2,
+                  275,
+                  1072,
+                  161040,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "51a4b77fd89ee9bf6b8f1cdc484a0c325ce3b09d63cc07dcd2457f9bb0d1af95"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 160792,
+                  "travel_minutes": 969,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 1,
+                  "new_assignments": 1,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 2515,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  969,
+                  160792,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "a69cbe323ae16b28b4fda399fd1022b569843b371953a8a6888635ee9ddf614e"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 183606,
+                  "travel_minutes": 939,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 1,
+                  "new_assignments": 1,
+                  "reassigned": 10,
+                  "shifted": 11,
+                  "time_shift_minutes": 637,
+                  "avoidable_reassigned": 10,
+                  "priority_start_sum": 2687,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  939,
+                  183606,
+                  10,
+                  637,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "a72e736bc5212b19db433bd85c2f2dd6f12fb6422fa0a7d949f2781624a9a7f6"
+              }
+            ],
+            "preview_seconds": 9.011,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "unavailable",
+              "type": "unavailable",
+              "time": 567,
+              "engineer_id": "Югоцентр-04"
+            },
+            "urgent_assigned_remaining": 3,
+            "urgent_pending": 0,
+            "assigned_remaining": 51,
+            "pending": 1,
+            "frozen": 5,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 161040,
+                  "travel_minutes": 1072,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 2,
+                  "shifted": 2,
+                  "time_shift_minutes": 273,
+                  "avoidable_reassigned": 2,
+                  "priority_start_sum": 2242,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  2242,
+                  2,
+                  273,
+                  1072,
+                  161040,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "sla"
+                ],
+                "plan_sha256": "85c4380af23d371d1cfc00010dd8c951229539f661a3b37b83e8e44866d50d45"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 160792,
+                  "travel_minutes": 969,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 2515,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  969,
+                  160792,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable"
+                ],
+                "plan_sha256": "7496429983fead355af9c2bf4b4019bdeffd710e257161fbe69edb8cc0fe9696"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 183606,
+                  "travel_minutes": 939,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 10,
+                  "shifted": 12,
+                  "time_shift_minutes": 737,
+                  "avoidable_reassigned": 10,
+                  "priority_start_sum": 2687,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  939,
+                  183606,
+                  10,
+                  737,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "e00ef9bc9460b46e5f26b235463e1d2451960eddeedfefaf253207f333b67467"
+              }
+            ],
+            "preview_seconds": 9.012,
+            "unique_plans": 3,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "delay-fact-replan",
+              "type": "replan",
+              "time": 600
+            },
+            "urgent_assigned_remaining": 3,
+            "urgent_pending": 0,
+            "assigned_remaining": 51,
+            "pending": 1,
+            "frozen": 5,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 12,
+                  "distance_m": 190668,
+                  "travel_minutes": 1085,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 3,
+                  "shifted": 8,
+                  "time_shift_minutes": 468,
+                  "avoidable_reassigned": 3,
+                  "priority_start_sum": 2297,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  2297,
+                  3,
+                  468,
+                  1085,
+                  190668,
+                  12
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "a5506728f03941c2d7e791ae7c0f3ab4b0fd097703f917f10d72d4f6ecc64883"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 12,
+                  "distance_m": 190668,
+                  "travel_minutes": 1085,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 3,
+                  "shifted": 8,
+                  "time_shift_minutes": 468,
+                  "avoidable_reassigned": 3,
+                  "priority_start_sum": 2297,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  3,
+                  468,
+                  1085,
+                  190668,
+                  12
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "a5506728f03941c2d7e791ae7c0f3ab4b0fd097703f917f10d72d4f6ecc64883"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 51,
+                  "unassigned": 1,
+                  "engineers_used": 12,
+                  "distance_m": 190668,
+                  "travel_minutes": 1085,
+                  "service_minutes": 2660,
+                  "high_assigned": 28,
+                  "high_total": 28,
+                  "emergency_assigned": 3,
+                  "emergency_total": 3,
+                  "connection_assigned": 25,
+                  "connection_total": 25,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 3,
+                  "shifted": 8,
+                  "time_shift_minutes": 468,
+                  "avoidable_reassigned": 3,
+                  "priority_start_sum": 2297,
+                  "response_target_count": 3,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  1085,
+                  190668,
+                  3,
+                  468,
+                  12
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "a5506728f03941c2d7e791ae7c0f3ab4b0fd097703f917f10d72d4f6ecc64883"
+              }
+            ],
+            "preview_seconds": 9.012,
+            "unique_plans": 1,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "completion-replan",
+              "type": "replan",
+              "time": 650
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 48,
+            "pending": 1,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 48,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 177672,
+                  "travel_minutes": 961,
+                  "service_minutes": 2480,
+                  "high_assigned": 26,
+                  "high_total": 26,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 24,
+                  "connection_total": 24,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 1634,
+                  "response_target_count": 2,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  1634,
+                  0,
+                  0,
+                  961,
+                  177672,
+                  11
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla"
+                ],
+                "plan_sha256": "61eea72f620561345e8b6ded4580c023b575c8c198a2348d554a261c02eac177"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 48,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 177672,
+                  "travel_minutes": 961,
+                  "service_minutes": 2480,
+                  "high_assigned": 26,
+                  "high_total": 26,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 24,
+                  "connection_total": 24,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 1634,
+                  "response_target_count": 2,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  961,
+                  177672,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla"
+                ],
+                "plan_sha256": "61eea72f620561345e8b6ded4580c023b575c8c198a2348d554a261c02eac177"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 48,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 176130,
+                  "travel_minutes": 916,
+                  "service_minutes": 2480,
+                  "high_assigned": 26,
+                  "high_total": 26,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 24,
+                  "connection_total": 24,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 9,
+                  "shifted": 11,
+                  "time_shift_minutes": 522,
+                  "avoidable_reassigned": 9,
+                  "priority_start_sum": 1759,
+                  "response_target_count": 2,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  916,
+                  176130,
+                  9,
+                  522,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "cee05a11113dd775eeb0df911242143326bdae3a1bc923c1ef1bc8cd29abb218"
+              }
+            ],
+            "preview_seconds": 9.012,
+            "unique_plans": 2,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "post-restore",
+              "type": "replan",
+              "time": 651
+            },
+            "urgent_assigned_remaining": 2,
+            "urgent_pending": 0,
+            "assigned_remaining": 48,
+            "pending": 1,
+            "frozen": 8,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 48,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 177672,
+                  "travel_minutes": 961,
+                  "service_minutes": 2480,
+                  "high_assigned": 26,
+                  "high_total": 26,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 24,
+                  "connection_total": 24,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 4,
+                  "time_shift_minutes": 4,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 1634,
+                  "response_target_count": 2,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  1634,
+                  0,
+                  4,
+                  961,
+                  177672,
+                  11
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla"
+                ],
+                "plan_sha256": "15509e2b508e7ee7f5c6da4b8b8a56d432b4b39e893fca3eb3c6962e93a4feb3"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 48,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 177672,
+                  "travel_minutes": 961,
+                  "service_minutes": 2480,
+                  "high_assigned": 26,
+                  "high_total": 26,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 24,
+                  "connection_total": 24,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 4,
+                  "time_shift_minutes": 4,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 1634,
+                  "response_target_count": 2,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  0,
+                  4,
+                  961,
+                  177672,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla"
+                ],
+                "plan_sha256": "15509e2b508e7ee7f5c6da4b8b8a56d432b4b39e893fca3eb3c6962e93a4feb3"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 48,
+                  "unassigned": 1,
+                  "engineers_used": 11,
+                  "distance_m": 176130,
+                  "travel_minutes": 916,
+                  "service_minutes": 2480,
+                  "high_assigned": 26,
+                  "high_total": 26,
+                  "emergency_assigned": 2,
+                  "emergency_total": 2,
+                  "connection_assigned": 24,
+                  "connection_total": 24,
+                  "lost_assignments": 0,
+                  "new_assignments": 0,
+                  "reassigned": 9,
+                  "shifted": 13,
+                  "time_shift_minutes": 526,
+                  "avoidable_reassigned": 9,
+                  "priority_start_sum": 1760,
+                  "response_target_count": 2,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  0,
+                  1,
+                  916,
+                  176130,
+                  9,
+                  526,
+                  11
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "cost"
+                ],
+                "plan_sha256": "6fbe3e7ebb44e8631b25c2b251d60fb3843db73b711c17b6517d140cb4a2c073"
+              }
+            ],
+            "preview_seconds": 9.012,
+            "unique_plans": 2,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          },
+          {
+            "event": {
+              "id": "end-of-shift",
+              "type": "replan",
+              "time": 1320
+            },
+            "urgent_assigned_remaining": 0,
+            "urgent_pending": 0,
+            "assigned_remaining": 0,
+            "pending": 5,
+            "frozen": 52,
+            "alternatives": [
+              {
+                "id": "sla",
+                "label": "Быстрее к аварии",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 5,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 2,
+                  "emergency_assigned": 0,
+                  "emergency_total": 0,
+                  "connection_assigned": 0,
+                  "connection_total": 2,
+                  "lost_assignments": 4,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 0,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  2,
+                  5,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "b4f7b2b98fd14a338a34ec2ebf429bc6033ba166a6e5aede1048d8239db1c813"
+              },
+              {
+                "id": "stable",
+                "label": "Меньше изменений",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 5,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 2,
+                  "emergency_assigned": 0,
+                  "emergency_total": 0,
+                  "connection_assigned": 0,
+                  "connection_total": 2,
+                  "lost_assignments": 4,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 0,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  2,
+                  5,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": null,
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "b4f7b2b98fd14a338a34ec2ebf429bc6033ba166a6e5aede1048d8239db1c813"
+              },
+              {
+                "id": "cost",
+                "label": "Меньше дороги",
+                "facts": {
+                  "assigned": 0,
+                  "unassigned": 5,
+                  "engineers_used": 0,
+                  "distance_m": 0,
+                  "travel_minutes": 0,
+                  "service_minutes": 0,
+                  "high_assigned": 0,
+                  "high_total": 2,
+                  "emergency_assigned": 0,
+                  "emergency_total": 0,
+                  "connection_assigned": 0,
+                  "connection_total": 2,
+                  "lost_assignments": 4,
+                  "new_assignments": 0,
+                  "reassigned": 0,
+                  "shifted": 0,
+                  "time_shift_minutes": 0,
+                  "avoidable_reassigned": 0,
+                  "priority_start_sum": 0,
+                  "response_target_count": 0,
+                  "response_unassigned": 0
+                },
+                "emergency": null,
+                "objective_key": [
+                  0,
+                  2,
+                  5,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "duplicate_of": "stable",
+                "strategy_ids": [
+                  "stable",
+                  "sla",
+                  "cost"
+                ],
+                "plan_sha256": "b4f7b2b98fd14a338a34ec2ebf429bc6033ba166a6e5aede1048d8239db1c813"
+              }
+            ],
+            "preview_seconds": 8.983,
+            "unique_plans": 1,
+            "recommended_candidate_id": "stable",
+            "all_three_candidates_valid": true,
+            "invariants_valid": true
+          }
+        ],
+        "delay_fact": {
+          "engineer_id": "Югоцентр-01",
+          "request_id": "80308",
+          "time": 600,
+          "extra_service_minutes": 20,
+          "remaining_minutes": 50
+        },
+        "restore_equal": true,
+        "final_pending": 5,
+        "cancelled": "32840",
+        "unavailable_engineer": "Югоцентр-04",
+        "note": "Frozen includes simulated execution and explicit facts; these are not observed field outcomes."
+      }
+    }
+  ]
+}

@@ -20,15 +20,16 @@ def test_stable_preserves_engineer_and_non_earliest_start(make_scenario):
     assert validate_plan(s,t,stable) == []
 
 
-def test_sla_prefers_earlier_high_tier_even_with_extra_engineer(make_scenario):
+def test_sla_starts_emergency_first_without_rewarding_connections(make_scenario):
     s = make_scenario([job('a',priority='high'),job('b',priority='urgent')],
                       [engineer('first'),engineer('second')])
     t = travel(s)
     cost = OrToolsSolver().solve(s,t,profile='cost',time_limit_seconds=.1)
     sla = OrToolsSolver().solve(s,t,profile='sla',time_limit_seconds=.1)
     assert cost.metrics.engineers_used == 1
-    assert sla.metrics.engineers_used == 2
-    assert [v.start for r in sla.routes for v in r.visits] == [600,600]
+    assert sla.metrics.engineers_used == 1
+    assert sla.routes[0].visits[0].request_id == 'b'
+    assert sla.routes[0].visits[0].start == 600
 
 
 @pytest.mark.parametrize('profile',['stable','sla','cost'])
@@ -39,12 +40,12 @@ def test_profiles_preserve_coverage_priority(make_scenario,profile):
     assert [v.request_id for r in p.routes for v in r.visits] == ['high']
 
 
-def test_reference_to_unavailable_engineer_is_ignored(make_scenario):
+def test_unavailable_reference_owner_has_no_reassignment_penalty(make_scenario):
     old = make_scenario([job('a')],[engineer('gone')])
     reference = make_plan(old,travel(old),{'gone':['a']},'test','test')
     s = make_scenario(old.requests)
     p = OrToolsSolver().solve(s,travel(s),profile='stable',reference=reference,time_limit_seconds=.1)
-    assert objective_key(p,s,profile='stable',reference=reference)[2:4] == (0,0)
+    assert objective_key(p,s,profile='stable',reference=reference)[3:5] == (0,0)
 
 
 def test_bad_profile_rejected(make_scenario):
@@ -53,10 +54,11 @@ def test_bad_profile_rejected(make_scenario):
         OrToolsSolver().solve(s,travel(s),profile='invented')
 
 
-def test_profile_weights_scale_secondary_distance_without_overflow(make_scenario):
+def test_profile_weights_omit_trailing_search_tiers_without_overflow(make_scenario):
     s = make_scenario([job('a')])
     p=OrToolsSolver().solve(s,travel(s,metres=10**15),profile='stable',time_limit_seconds=.1)
-    assert p.diagnostics['search_distance_unit_metres'] > 1
+    assert p.diagnostics['search_objective_bound'] < 2**60
+    assert 'distance_m' in p.diagnostics['search_omitted_tiers']
     assert not validate_plan(s,travel(s,metres=10**15),p)
 
 
@@ -73,12 +75,13 @@ def test_stable_reconstructs_waiting_and_arrivals_for_multiple_visits(make_scena
     assert not validate_plan(s,t,p)
 
 
-def test_default_and_cost_keep_same_objective_order(make_scenario):
+def test_default_keeps_morning_order_and_cost_uses_operational_order(make_scenario):
     s = make_scenario([job('a'),job('b')],[engineer('first'),engineer('second')])
     t = travel(s)
     default = OrToolsSolver().solve(s,t,time_limit_seconds=.1)
     cost = OrToolsSolver().solve(s,t,profile='cost',time_limit_seconds=.1)
-    assert objective_key(default,s) == objective_key(cost,s,profile='cost')
+    assert objective_key(default,s) == (0,0,0,1,2000)
+    assert objective_key(cost,s,profile='cost') == (0,0,0,20,2000,0,0,1)
     assert default.metrics.engineers_used == 1
 
 @pytest.mark.parametrize('profile', ['sla','stable','cost'])

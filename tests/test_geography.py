@@ -130,3 +130,18 @@ def test_home_start_uses_its_own_address(make_scenario):
     e=engineer().model_copy(update={'start_location':'home:e1','start_address':'Кашира, Садовая улица, 1'})
     s=make_scenario([job('a')],[e])
     assert addresses(s)['home:e1']=='Кашира, Садовая улица, 1'
+
+
+def test_home_only_roster_may_keep_office_but_not_unknown_or_missing_points(make_scenario):
+    from conftest import engineer, job
+    e=engineer().model_copy(update={'start_location':'home:e1','start_address':'Home'})
+    s=make_scenario([job('a')],[e])
+    point=GeoLocation(lat=55.7,lon=37.7,quality='manual',source='fixture')
+    locations={key:point for key in ('a','home:e1','office')}
+    geo=GeographyBundle(scenario_signature=scenario_signature(s),locations=locations)
+    assert attach_geography(s,geo).engineers[0].start_location=='home:e1'
+    for invalid in ({**locations,'unknown':point},
+                    {key:value for key,value in locations.items() if key!='a'},
+                    {key:value for key,value in locations.items() if key!='home:e1'}):
+        with pytest.raises(ValueError,match='координаты'):
+            attach_geography(s,geo.model_copy(update={'locations':invalid}))

@@ -24,6 +24,7 @@ def _operation_context(payload: dict) -> tuple[str, str]:
         return '—'
 
     labels = {'available': 'Свободен', 'traveling': 'В пути', 'working': 'Работает',
+              'completion_pending': 'Ожидает подтверждения диспетчера',
               'completed': 'Завершена по факту', 'interrupted': 'Прервана по факту',
               'unavailable': 'Недоступен'}
     statuses = operations.get('statuses') or []
@@ -49,7 +50,7 @@ def _operation_context(payload: dict) -> tuple[str, str]:
         for visit in route.get('visits', [route]):
             fact = by_engineer.get(engineer_id)
             status = visit.get('status')
-            if status in ('completed', 'interrupted'):
+            if status in ('completed', 'completion_pending', 'interrupted'):
                 status_text = labels[status]
             elif fact and fact.get('request_id') == visit.get('request_id'):
                 status_text = labels.get(fact.get('status'), fact.get('status', 'Записанный факт'))
@@ -66,7 +67,7 @@ def _operation_context(payload: dict) -> tuple[str, str]:
             consumed = visit.get('consumed_equipment', visit.get('consumed'))
             usage = ', '.join(str(key) + ': ' + str(value) for key, value in consumed.items()) if isinstance(consumed, dict) else '—'
             if isinstance(consumed, dict):
-                spent = status in ('completed', 'interrupted') or (not fact and visit.get('end', float('inf')) <= operations.get('time', 0))
+                spent = status in ('completed', 'interrupted') or (status != 'completion_pending' and not fact and visit.get('end', float('inf')) <= operations.get('time', 0))
                 usage = ('Списано: ' if spent else 'Резерв: ') + usage
             values = [engineers.get(engineer_id, engineer_id), payload.get('request_labels', {}).get(visit.get('request_id'), visit.get('request_id')),
                       clock(visit.get('start', visit.get('time'))), clock(visit.get('end', visit.get('time'))),

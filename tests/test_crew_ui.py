@@ -70,6 +70,7 @@ function build(item) {
 }
 build(markup);
 global.document={getElementById:id=>ids[id]||null,createElement:tag=>new Element(tag),createTextNode:text=>Object.assign(new Element('#text'),{textContent:text})};
+global.window={events:{},addEventListener(type,handler){(this.events[type] ||= []).push(handler);},scrollTo(){},dispatch(type){const e={prevented:false,preventDefault(){this.prevented=true;}};for(const handler of this.events[type]||[])handler(e);return e;}};
 global.location={href:'http://localhost/regions/south/crew'};
 global.crypto=require('node:crypto').webcrypto;
 const base={id:'E-1',name:'Анна',transport:'public',shift:{start:540,end:1080},skills:['local'],start_location:'office',stock_mode:'fixed',router:0,tv_box:0};
@@ -83,7 +84,7 @@ const presets=[
  {id:'control',label:'Контрольный состав',description:'Ориентир',engineers:[{...base,id:'model-01'}],changes:[],assumptions:[]}
 ];
 const settings={version:7,region:'Юго-восток',editable:true,network:false,control_count:12,engineers:[base],recommended_engineers:[{...base,id:'old-model'}],presets,locations:[{id:'office',label:'Офис'},{id:'job',label:'Ступино'}],metrics:{}};
-const preview={id:'draft-1',before:{assigned:4,unassigned:3,engineers_used:2,travel_minutes:120,distance_m:22500},after:{assigned:6,unassigned:1,engineers_used:3,travel_minutes:95,distance_m:18000},before_coverage:{urgent:{assigned:0,total:1},high:{assigned:1,total:2},normal:{assigned:3,total:4}},after_coverage:{urgent:{assigned:1,total:1},high:{assigned:2,total:2},normal:{assigned:3,total:4}},changes,assumptions:['Склад достаточен'],issue:[{name:'Анна',router:3,tv_box:0}],unassigned:[{request_id:'R-7',reason:'Нет времени'}]};
+const preview={id:'draft-1',before:{assigned:4,unassigned:3,engineers_used:2,travel_minutes:120,distance_m:22500},after:{assigned:6,unassigned:1,engineers_used:3,travel_minutes:95,distance_m:18000},before_coverage:{urgent:{assigned:0,total:1},high:{assigned:1,total:2},normal:{assigned:3,total:4}},after_coverage:{urgent:{assigned:1,total:1},high:{assigned:2,total:2},normal:{assigned:3,total:4}},engineers:[{id:'E-1',name:'Анна',region:'Юго-восток',assigned:6}],changes,assumptions:['Склад достаточен'],issue:[{name:'Анна',router:3,tv_box:0}],unassigned:[{request_id:'R-7',reason:'Нет времени'}]};
 const requests=[]; let holdPreview=false, releasePreview;
 global.fetch=async(url,options={})=>{
   requests.push({url,payload:options.body?JSON.parse(options.body):null});
@@ -181,3 +182,42 @@ releasePreview(); await pending;
 assert.equal($('fields').disabled,false);
 assert.equal($('apply').disabled,false);
 ''')
+
+
+def test_authenticated_regional_preview_keeps_comparison_membership_and_mobile_links():
+    client('''
+assert.equal($('rows').querySelector('.crew-mobile-link').href,'/r/south/engineer?engineer_id=E-1');
+choose('reserve'); $('recommend').onclick(); await submit();
+assert.ok(requests.every(request=>request.url.startsWith('/r/south/')));
+assert.equal(secureCalls,requests.length,'Every request must use authenticated transport');
+assert.match($('participation').textContent,/Анна.*Юго-восток.*6/);
+assert.match($('comparison').textContent,/Аварии/);
+assert.match($('changes').textContent,/Роутеры/);
+assert.equal(requests.filter(x=>x.url.endsWith('/apply')).length,0);
+await $('apply').onclick();
+assert.equal(requests.filter(x=>x.url.endsWith('/apply')).length,1);
+assert.equal(location.href,'/r/south/');
+''', before='''let secureCalls=0; window.FieldRouter={url:path=>'/r/south'+path,fetch:(...args)=>{secureCalls++;return fetch(...args);}};''')
+
+
+def test_dirty_roster_blocks_navigation_until_explicit_apply():
+    client('''
+assert.equal(window.dispatch('region-change').prevented,false);
+assert.equal(window.dispatch('beforeunload').prevented,false);
+input('name').value='Несохранённое имя'; input('name').dispatch('input');
+assert.equal(window.dispatch('region-change').prevented,true);
+assert.equal(window.dispatch('beforeunload').prevented,true);
+await submit();
+assert.equal(window.dispatch('beforeunload').prevented,true,'Preview does not save roster');
+await $('apply').onclick();
+assert.equal(window.dispatch('beforeunload').prevented,false,'Confirmed apply clears unsaved state');
+''')
+
+
+def test_crew_ids_work_on_lan_http_without_secure_context_crypto():
+    client('''
+$('add').onclick();
+assert.equal($('rows').children.length,2);
+assert.ok($('rows').children[1].dataset.id.startsWith('crew-'));
+assert.equal(new Set($('rows').children.map(row=>row.dataset.id)).size,2);
+''', before="Object.defineProperty(globalThis,'crypto',{value:undefined,configurable:true});")

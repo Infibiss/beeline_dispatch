@@ -26,7 +26,7 @@
         <details id="preset-details" class="change-details"><summary>Что изменит вариант</summary><div id="preset-changes"></div><ul id="preset-assumptions" class="assumptions"></ul></details>
       </div>
       <div id="rows"></div>
-      <div class="form-actions"><button id="add" type="button" class="secondary">Добавить бригаду</button><button type="submit" class="primary">Рассчитать новый план</button></div>
+      <div class="form-actions"><button id="add" type="button" class="secondary">Добавить бригаду</button><button id="preview-button" type="submit" class="primary">Рассчитать новый план</button></div>
     </fieldset>
   </form>
   <section id="preview" aria-labelledby="preview-title" hidden>
@@ -34,6 +34,7 @@
     <div id="comparison" class="table-scroll"></div>
     <details class="change-details"><summary>Изменения состава и допущения</summary><div id="changes"></div><ul id="assumptions" class="assumptions"></ul></details>
     <details id="unassigned-details" class="change-details"><summary id="unassigned-summary">Без назначения</summary><div id="unassigned"></div></details>
+    <details class="change-details"><summary>Участие бригад в расчёте</summary><div id="participation"></div></details>
     <details class="change-details"><summary>Утренняя выдача</summary><div id="issue"></div></details>
     <div class="preview-actions"><a id="plan-link" target="_blank" rel="noopener">Посмотреть маршруты</a><button id="apply" class="primary" type="button" disabled>Применить состав и план</button></div>
   </section>

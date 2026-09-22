@@ -5,54 +5,119 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Рабочее место диспетчера · Маршруты</title>
 <link rel="stylesheet" href="scenarios.css">
+<link rel="stylesheet" href="/assets/leaflet.css">
+<link rel="stylesheet" href="/gps.css">
+<link rel="stylesheet" href="/risk-dashboard.css">
+<script src="/assets/leaflet.js" defer></script>
 <script src="scenarios.js" defer></script>
+<script src="/gps-dispatcher.js" defer></script>
+<script src="/risk-dashboard.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">К рабочему месту</a>
-<header><div class="brand"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span class="brand-divider"></span><span>Диспетчер</span></div><div class="header-actions"><label for="region-select">Регион</label><select id="region-select" aria-label="Регион" disabled><option>Загрузка…</option></select><a href="/crew">Бригады и запас</a><span id="mode-badge" class="simulation">Демо</span><button id="reload" type="button" class="secondary">Обновить</button></div></header>
+<header><div class="brand"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span class="brand-divider"></span><span>Диспетчер</span></div><div class="header-actions"><a class="engineer-link" href="/crew">Бригады и запас</a><a class="engineer-link" href="/engineer">Инженер ↗</a><span id="mode-badge" class="simulation">Демо</span><button id="reload" type="button" class="secondary">Обновить</button></div></header>
 <main id="main">
+<div id="region-context" class="region-context"><label>Район данных<select id="region-select" disabled aria-label="Район данных"></select></label></div>
 <h1 class="sr-only">Рабочее место диспетчера</h1>
-
 <div id="error" role="alert" class="error" hidden></div>
 <div id="status" role="status" aria-live="polite">Загрузка состояния…</div>
-<section class="state-strip" aria-label="Текущее состояние"><div class="region-context"><strong id="region">—</strong></div><div><span>План</span><strong id="version">—</strong></div><div><span id="clock-label">Время симуляции</span><strong id="clock">—</strong></div><div><span>Назначено / осталось заявок</span><strong id="coverage">—</strong></div></section>
+<div id="remote-update" class="notice remote-update" role="status" hidden><span id="remote-update-text">Получены изменения с другого устройства.</span><button id="load-remote" class="secondary" type="button">Загрузить изменения</button></div>
+<section class="state-strip" aria-label="Текущее состояние"><div><span>Регион</span><strong id="region">—</strong></div><div><span>Версия плана</span><strong id="version">—</strong></div><div><span id="clock-label">Время симуляции</span><strong id="clock">—</strong></div><div><span>Остаток дня: назначено / всего</span><strong id="coverage">—</strong></div></section>
 <nav class="workbench-tabs" role="tablist" aria-label="Рабочее место">
 <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="panel-plan">План дня</button>
+<button id="tab-risk" type="button" role="tab" aria-selected="false" aria-controls="panel-risk" tabindex="-1">Риски дня</button>
 <button id="tab-events" type="button" role="tab" aria-selected="false" aria-controls="panel-events" tabindex="-1">Перепланирование</button>
 <button id="tab-facts" type="button" role="tab" aria-selected="false" aria-controls="panel-facts" tabindex="-1">Статусы инженеров</button>
+<button id="tab-gps" type="button" role="tab" aria-selected="false" aria-controls="panel-gps" tabindex="-1">GPS и связь</button>
 </nav>
+<section id="panel-risk" role="tabpanel" aria-labelledby="tab-risk" hidden>
+  <div class="risk-heading"><div><p class="risk-eyebrow">КОНТРОЛЬ ДНЯ</p><h2>Где плану нужен запас</h2><p>Загрузка, ограничения и объяснения в одном месте.</p></div><button id="risk-refresh" type="button" class="secondary">Обновить показатели</button></div>
+  <p id="risk-context" class="hint" role="status">Показатели появятся при открытии вкладки.</p>
+  <p id="risk-error" class="error" role="alert" hidden></p>
+  <p id="risk-stale" class="notice" role="status" hidden></p>
+  <div class="risk-section-label"><h3>По утверждённому плану</h3><span>Проценты загрузки, не вероятности срыва</span></div>
+  <div id="risk-indicators" class="risk-grid" aria-label="Показатели плана"></div>
+  <section class="risk-forecast" aria-labelledby="risk-forecast-title">
+    <div class="risk-heading"><div><p class="risk-eyebrow">ПРОГНОЗ</p><h3 id="risk-forecast-title">На что обратить внимание заранее</h3></div><button id="risk-demo" class="secondary" type="button" aria-pressed="false">Показать пример ML-прогноза</button></div>
+    <p id="risk-model-status" role="status">ML-модель ещё не подключена. Вероятности пока не рассчитываются.</p>
+    <p id="risk-demo-notice" class="risk-demo-notice" hidden>ДЕМОНСТРАЦИЯ · Все оценки и причины ниже вымышлены и не относятся к вашему плану. Показатели выше остаются расчётными.</p>
+    <div id="risk-forecasts" class="risk-grid" aria-label="Прогноз и объяснения"></div>
+    <p class="hint">Прогноз помогает выбрать, что проверить. Изменения плана применяет диспетчер после сравнения вариантов.</p>
+  </section>
+  <div class="risk-next"><div><strong>Проверить решение на плане</strong><p>Запишите новую информацию или откройте расчёт вариантов. Переход сам по себе ничего не изменяет.</p></div><div class="risk-actions"><button id="risk-facts" type="button" class="secondary">Уточнить статусы</button><button id="risk-replan" type="button" class="primary">Открыть перепланирование</button></div></div>
+</section>
+<section id="panel-gps" role="tabpanel" aria-labelledby="tab-gps" hidden>
+  <div class="panel gps-heading"><div><h2>Где нужна помощь диспетчера</h2><p>GPS подсказывает, что уточнить. Изменение статусов и плана остаётся за вами.</p></div>
+    <div><label for="gps-channel">Источник координат</label><select id="gps-channel"><option value="device">Устройства инженеров</option><option value="demo">Демонстрационные ситуации</option></select></div></div>
+  <p id="gps-dashboard-error" class="notice" role="alert" hidden></p>
+  <p id="gps-model-notice" class="notice" role="status" hidden></p>
+  <p id="gps-context" class="notice"></p>
+  <div id="gps-demo-tools" class="panel" hidden><h3>Показать ситуацию</h3><p>Синтетические точки в отдельном канале. Реальные статусы, факты и план не изменяются.</p>
+    <div class="gps-demo-controls"><div><label for="gps-demo-engineer">Инженер</label><select id="gps-demo-engineer"></select></div><div><label for="gps-demo-case">Ситуация</label><select id="gps-demo-case"><option value="stopped">Остановка по пути</option><option value="moving_away">Удаление от адреса</option><option value="near_site">Прибыл к адресу</option><option value="late">Риск не попасть в окно</option><option value="low_accuracy">Неточная координата</option><option value="stale">Устаревшая координата</option><option value="shift_unconfirmed">Смена не подтверждена</option><option value="clear">Очистить пример</option></select></div><button id="gps-demo-run" class="primary" type="button">Показать</button></div><p id="gps-demo-status" role="status"></p>
+    <details id="gps-own-data"><summary>Проверить свои координаты / трек</summary>
+      <p>Точки будут отмечены за выбранным выше инженером только в тестовом канале. Для проверки считаем, что он едет к выбранной заявке. Последняя точка переносится на сейчас, интервалы сохраняются.</p>
+      <div class="gps-demo-controls"><div><label for="gps-replay-task">Назначенная заявка</label><select id="gps-replay-task"></select></div><div><label for="gps-replay-time">Время на дате плана</label><input id="gps-replay-time" type="time" value="09:00"></div><button id="gps-replay-reload" type="button" class="secondary">Обновить заявки</button></div>
+      <p id="gps-replay-target" class="hint"></p>
+      <div class="gps-demo-controls"><div><label for="gps-lat">Широта</label><input id="gps-lat" type="number" step="any" min="-90" max="90" placeholder="55.75"></div><div><label for="gps-lon">Долгота</label><input id="gps-lon" type="number" step="any" min="-180" max="180" placeholder="37.62"></div><div><label for="gps-accuracy">Точность, м</label><input id="gps-accuracy" type="number" min="0.1" step="any" value="10"></div></div>
+      <div class="gps-actions"><button type="button" id="gps-own-position" class="secondary">Взять координату моего устройства</button><button type="button" id="gps-single-point" class="secondary">Подставить одну точку</button><button type="button" id="gps-track-sample" class="secondary">Пример: стоим у заявки</button></div>
+      <p class="hint">Одна точка проверяет близость и качество. Для остановки или движения нужен трек. Пример создаёт 3 точки за 2 минуты.</p>
+      <label for="gps-track-file">Или загрузите CSV / JSON · до 48 КБ</label><input id="gps-track-file" type="file" accept=".csv,.json,text/csv,application/json">
+      <label for="gps-track-text">Точки для проверки · до 120 строк</label><textarea id="gps-track-text" rows="5" spellcheck="false" placeholder="seconds,lat,lon,accuracy_m"></textarea>
+      <p class="hint">CSV: seconds,lat,lon,accuracy_m. seconds — секунды от начала трека, по возрастанию, от 0 до 595. JSON — массив объектов с теми же полями. Десятичный разделитель — точка.</p>
+      <button id="gps-replay-run" type="button" class="primary">Проверить трек</button><p id="gps-replay-status" role="status"></p>
+    </details></div>
+  <div id="gps-metrics" class="gps-metrics" aria-label="Наблюдаемость сотрудников"></div>
+  <section class="panel gps-exclusion-panel" aria-labelledby="gps-exclusion-title">
+    <h3 id="gps-exclusion-title">Пересчитать без инженеров</h3>
+    <p>Отметьте одного или нескольких сотрудников в карточках ниже. Получите варианты распределения их оставшихся заявок. Состав сохраняется; план изменится после вашего выбора и применения варианта.</p>
+    <p id="gps-excluded-now" class="hint" hidden></p>
+    <div class="gps-exclusion-controls"><div><label for="gps-exclusion-time">С какого времени на дате плана</label><input id="gps-exclusion-time" type="time" step="60" required></div>
+    <button id="gps-exclusion-run" class="primary" type="button" disabled>Пересчитать без выбранных (0)</button>
+    <button id="gps-exclusion-clear" class="secondary" type="button">Снять выбор</button></div>
+    <p id="gps-exclusion-selection" role="status">Выберите сотрудников в карточках ниже.</p>
+    <p id="gps-exclusion-error" class="notice" role="alert" hidden></p>
+    <p class="hint">Начатые работы остальных сотрудников сохраняются. Для исключаемого инженера с начатой работой сначала отметьте завершение или прерывание во вкладке «Статусы инженеров». GPS-сигнал сам по себе не подтверждает недоступность.</p>
+  </section>
+  <p class="hint">Проценты показывают долю инженеров в этом плане. Это не вероятность отказа или опоздания. Описание и подсказки доступны при наведении и в раскрывающемся блоке.</p>
+  <div class="gps-workspace"><section class="panel"><h3>Последние надёжные координаты</h3><div id="gps-map" aria-label="Карта GPS-позиций инженеров"></div><p class="hint">Серый маркер — устаревшая точка или передача остановлена. На карте сохраняется последняя надёжная точка; время указано в карточке.</p><button id="gps-fit" class="secondary" type="button">Показать все точки</button></section><section><div id="gps-people" class="gps-people"></div></section></div>
+  <details class="panel gps-diagnostics"><summary>Состояние GPS-модуля и диагностика</summary><p id="gps-health"></p><p>Анализ выполняется отдельно от планирования. При сбое модели доступны последние точки и проверки связи; прогнозы временно отключаются.</p><pre id="gps-diagnostics"></pre><details><summary>Последние измерения выбранного инженера</summary><label for="gps-trace-engineer">Инженер</label><select id="gps-trace-engineer"></select><button id="gps-trace-load" class="secondary" type="button">Показать журнал точек</button><pre id="gps-trace"></pre></details></details>
+</section>
 <section id="panel-plan" role="tabpanel" aria-labelledby="tab-plan">
 <div class="plan-toolbar"><div><label for="plan-version">История плана</label><select id="plan-version" disabled></select></div><p id="plan-context" class="hint">Загрузка плана…</p></div>
 <iframe id="plan-frame" title="План дня: карта, маршруты и заявки"></iframe>
 
 </section>
 <section id="panel-facts" role="tabpanel" aria-labelledby="tab-facts" hidden>
+<section id="completion-panel" class="panel" hidden><h2>Подтвердить выполнение · <span id="completion-count">0</span></h2><div id="completion-list"></div></section>
 <details class="mode-settings"><summary>Настройки учёта выполнения</summary><div class="mode-controls"><label for="execution-mode">Учёт выполнения</label><select id="execution-mode"><option value="simulation">Демо: по плану, если нет фактов</option><option value="manual">Ручной: только факты</option></select><button id="mode-apply" type="button" class="secondary">Применить режим</button><p class="hint">В ручном режиме инженер без статуса недоступен для новых назначений.</p></div></details><div class="workspace"><section class="panel event-panel"><h2>Обновить статус</h2>
 
 <form id="facts-form"><fieldset id="facts-fields" disabled>
 <label for="fact-engineer">Инженер</label><select id="fact-engineer" required></select>
 <p id="engineer-fact-context" class="hint"></p><label for="fact-time">Время факта</label><input id="fact-time" type="time" step="60" required>
-<label for="fact-status">Статус</label><select id="fact-status"><option value="available">Свободен</option><option value="traveling">В пути</option><option value="working">Работает</option><option value="completed">Завершил заявку</option><option value="interrupted">Работа прервана</option><option value="unavailable">Недоступен</option></select>
+<label for="fact-status">Статус</label><select id="fact-status"><option value="available">Свободен</option><option value="traveling">В пути</option><option value="working">Работает</option><option value="completion_pending" disabled>Ожидает подтверждения</option><option value="completed">Завершил заявку</option><option value="interrupted">Работа прервана</option><option value="unavailable">Недоступен</option></select>
 <label for="fact-request">Заявка</label><select id="fact-request"></select>
 <label for="fact-location">Текущее местоположение</label><select id="fact-location"></select><p id="fact-location-note" class="hint">Выберите известное место вручную.</p>
 <div id="fact-remaining-group" hidden><label for="fact-remaining">Осталось работы, мин</label><input id="fact-remaining" type="number" min="1" max="1440" step="1"></div>
 <div id="fact-consumed-group" hidden><p id="fact-consumed-note" class="hint"></p><div class="input-pair"><div><label for="fact-router">Списать роутеров</label><input id="fact-router" type="number" min="0" step="1" placeholder="По заявке"></div><div><label for="fact-tv">Списать ТВ-приставок</label><input id="fact-tv" type="number" min="0" step="1" placeholder="По заявке"></div></div></div>
 <details class="fact-history-controls"><summary>Исправление или прошлый статус</summary><label for="fact-edit">Запись</label><select id="fact-edit"><option value="">Новый факт</option></select><label class="check"><input id="fact-late" type="checkbox"><span>Сообщение пришло с задержкой</span></label><div id="correction-fields" hidden><label for="correction-reason">Причина исправления</label><input id="correction-reason" type="text" minlength="3" maxlength="300"></div></details>
 <button class="primary" type="submit">Сохранить статус</button><button id="go-replan" class="secondary" type="button" hidden>Перейти к пересчёту →</button>
-</fieldset></form></section><section class="panel diff-panel"><h2>Журнал статусов</h2><div class="table-scroll"><table><thead><tr><th>Инженер</th><th>Статус</th><th>Заявка</th><th>Время факта</th><th>Место</th><th>Осталось, мин</th><th>Записано</th></tr></thead><tbody id="facts-body"></tbody></table></div><details><summary>История исправлений</summary><div id="fact-audit" class="hint"></div></details></section></div>
+</fieldset></form></section><section class="panel diff-panel"><h2>Журнал статусов</h2><div class="table-scroll"><table><thead><tr><th>Инженер</th><th>Статус</th><th>Заявка</th><th>Время факта</th><th>Место</th><th>Осталось, мин</th><th>Записано</th><th>Источник и комментарий</th></tr></thead><tbody id="facts-body"></tbody></table></div><details><summary>История исправлений</summary><div id="fact-audit" class="hint"></div></details></section></div>
 </section>
 <section id="panel-events" role="tabpanel" aria-labelledby="tab-events" hidden><div id="replan-needed" class="notice" hidden>Статусы изменились. Рассчитайте варианты, чтобы обновить план.</div>
 <div class="workspace">
 <section class="panel event-panel"><div class="section-heading"><h2>Пересчёт плана</h2></div>
 <form id="event-form"><fieldset id="event-fields" disabled>
-<label for="event-type">Тип события</label><select id="event-type"><option value="replan">Пересчитать по фактам</option><option value="emergency">Аварийная заявка</option><option value="cancel">Отмена заявки</option><option value="unavailable">Инженер недоступен</option></select>
+<label for="event-type">Тип события</label><select id="event-type"><option value="replan">Пересчитать по фактам</option><option value="emergency">Аварийная заявка</option><option value="new_request">Новая обычная заявка</option><option value="cancel">Отмена заявки</option><option value="unavailable">Инженер недоступен</option></select>
 <label for="event-time">Время события</label><input id="event-time" type="time" required step="60">
 <label id="target-label" for="event-target">Адрес по существующей заявке</label><select id="event-target" required></select>
+<div id="event-engineers-group" hidden><p class="field-label">Не учитывать инженеров</p><div id="event-engineers" class="engineer-checklist"></div></div>
 <div id="emergency-fields"><details id="new-address-panel"><summary>Адреса нет в списке</summary><label for="new-address">Город, улица, дом</label><input id="new-address" type="text" maxlength="300" placeholder="Москва, улица …, дом …"><button id="address-search" type="button" class="secondary">Найти точку</button><label for="address-candidates">Результаты поиска</label><select id="address-candidates"><option value="">Сначала найдите адрес</option></select><p id="address-context" class="hint"></p><iframe id="address-map" title="Проверка нового адреса на карте" hidden></iframe><button id="address-confirm" type="button" class="secondary" disabled>Использовать точку и рассчитать дороги</button></details><div class="input-pair"><div><label for="duration">Работа на объекте, мин</label><input id="duration" type="number" min="1" max="1440" value="80" required></div><div><label for="router">Роутеры, шт.</label><input id="router" type="number" min="0" value="0" required></div></div><label class="check"><input id="redirect" type="checkbox"><span>Разрешить перенаправление в пути</span></label></div>
-<label class="check"><input id="preserve" type="checkbox"><span>Сохранить начатую работу до завершения</span></label>
+<div id="ordinary-fields" hidden><label for="work-kind">Вид работ</label><select id="work-kind"><option value="connection">Подключение</option><option value="local">Локальная заявка</option><option value="addon">Дозаказ</option></select><div class="input-pair"><div><label for="window-start">Окно с</label><input id="window-start" type="time" value="10:00" required></div><div><label for="window-end">Окно до</label><input id="window-end" type="time" value="12:00" required></div></div><label for="new-tv">ТВ-приставки, шт.</label><input id="new-tv" type="number" min="0" max="100" value="0"></div>
+<input id="preserve" type="checkbox" checked disabled hidden><p id="event-policy" class="hint">Начатые работы сохраняются до завершения.</p>
 <button id="preview" class="primary" type="submit">Рассчитать варианты</button>
 </fieldset></form></section>
 <section class="comparison"><div class="section-heading"><h2>Варианты плана</h2></div>
+<p id="excluded-summary" class="notice" hidden></p>
 
 <div id="comparison-tools" class="comparison-controls" hidden><label for="candidate-sort">Порядок вариантов</label><select id="candidate-sort"><option value="default">Сначала меньше изменений</option><option value="coverage">Меньше неназначенных</option><option value="response">Раньше начало аварии</option><option value="stable">По числу изменений</option><option value="distance">Дорога</option></select></div>
 <p id="observation-warnings" class="hint"></p><p id="variants-note" class="hint" role="status"></p>

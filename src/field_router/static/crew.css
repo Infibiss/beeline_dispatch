@@ -30,3 +30,6 @@
 .form-actions,.preview-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
 .preview-actions{margin-top:20px}
 @media(max-width:700px){.preset-controls>div{width:100%}.preview-actions{align-items:flex-start;flex-direction:column}#preview{padding:16px}}
+
+.crew-membership{font-weight:600;color:var(--muted);margin:0 0 14px}
+.crew-mobile-link{display:inline-block;margin:8px;overflow-wrap:anywhere}

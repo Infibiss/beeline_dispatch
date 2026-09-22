@@ -14,3 +14,15 @@ test-results.xml
 
 # Teammate source clone; adapted runtime is tracked under src/field_router/_alns.
 ALNS-OptimizationKernel/
+
+# Local environments, account databases and development TLS material.
+.venv-*/
+*.sqlite*
+*.db
+*.db-*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr

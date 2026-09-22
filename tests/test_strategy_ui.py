@@ -82,6 +82,13 @@ function build(item) {
 const root=build(markup);
 global.document={getElementById:id=>ids[id]||null,createElement:tag=>new Element(tag),querySelector:s=>root.querySelector(s),querySelectorAll:s=>root.querySelectorAll(s)};
 global.location={href:'http://localhost/regions/south/'};
+const windowEvents=new EventTarget();
+// Browser API boundary, including CI Node versions without global CustomEvent.
+global.CustomEvent=class extends Event {constructor(type,options={}){super(type,options);this.detail=options.detail;}};
+global.window={addEventListener:windowEvents.addEventListener.bind(windowEvents),dispatchEvent:windowEvents.dispatchEvent.bind(windowEvents)};
+global.requestAnimationFrame=fn=>fn();
+const nativeInterval=global.setInterval;
+global.setInterval=(...args)=>nativeInterval(...args).unref();
 global.crypto=require('node:crypto').webcrypto;
 const state={version:7,time:600,region:'Юг',requests:[],engineers:[],locations:[],plan:{routes:[]},execution_mode:'simulation'};
 function candidate(id, facts={}) {

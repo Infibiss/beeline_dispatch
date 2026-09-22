@@ -1,5 +1,14 @@
 (function () {
   'use strict';
+  function uniqueEventId() {
+    // randomUUID is unavailable on http://LAN-IP in mobile browsers.
+    const source = globalThis.crypto;
+    if (source && typeof source.randomUUID === 'function') return source.randomUUID();
+    if (source && typeof source.getRandomValues === 'function') {
+      return 'event-' + Array.from(source.getRandomValues(new Uint32Array(4)), n => n.toString(16).padStart(8, '0')).join('');
+    }
+    return 'event-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+  }
   function minute(value) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('Укажите корректное время события.');
     const [h, m] = value.split(':').map(Number);
@@ -10,28 +19,43 @@
     return String(Math.floor(value / 60)).padStart(2, '0') + ':' + String(value % 60).padStart(2, '0');
   }
   function eventPayload(version, input) {
-    if (input.type !== 'replan' && !input.target) throw new Error('Выберите заявку или инженера.');
+    if (!['replan','unavailable'].includes(input.type) && !input.target) throw new Error('Выберите заявку или инженера.');
     const event = {id: input.id, type: input.type, time: minute(input.time)};
-    if (input.type === 'emergency') {
+    if (['emergency','new_request'].includes(input.type)) {
       const duration = Number(input.duration), router = Number(input.router);
       if (!Number.isInteger(duration) || duration < 1 || duration > 1440 || !Number.isInteger(router) || router < 0) throw new Error('Проверьте длительность и количество роутеров.');
       Object.assign(event, {anchor_id: input.target, duration_minutes: duration, router});
+      if (input.type === 'new_request') {
+        const tv = Number(input.tvBox || 0), start = minute(input.windowStart), end = minute(input.windowEnd);
+        if (!['connection','local','addon'].includes(input.workKind) || !Number.isInteger(tv) || tv < 0 || tv > 100 || start > end || end < event.time) throw new Error('Проверьте тип, окно клиента и оборудование новой заявки.');
+        Object.assign(event, {work_kind: input.workKind, tv_box: tv, window_start: start, window_end: end});
+      }
     } else if (input.type === 'cancel') event.request_id = input.target;
-    else if (input.type === 'unavailable') event.engineer_id = input.target;
+    else if (input.type === 'unavailable') {
+      if (input.engineerIds !== undefined) {
+        if (!Array.isArray(input.engineerIds) || !input.engineerIds.length ||
+            input.engineerIds.some(id=>typeof id!=='string' || !id) || new Set(input.engineerIds).size!==input.engineerIds.length)
+          throw new Error('Выберите одного или нескольких инженеров.');
+        event.engineer_ids = [...input.engineerIds];
+      } else {
+        if (!input.target) throw new Error('Выберите инженера.');
+        event.engineer_id = input.target;
+      }
+    }
     else if (input.type !== 'replan') throw new Error('Неизвестный тип события.');
-    return {version, event, allow_redirect: input.type === 'emergency' && !!input.redirect, preserve_in_progress: !!input.preserve};
+    return {version, event, allow_redirect: input.type === 'emergency' && !!input.redirect, preserve_in_progress: true};
   }
-  const factLabels = {available: 'Свободен', traveling: 'В пути', working: 'Работает', completed: 'Завершил заявку', interrupted: 'Работа прервана', unavailable: 'Недоступен'};
+  const factLabels = {available: 'Свободен', traveling: 'В пути', working: 'Работает', completion_pending:'Ожидает подтверждения', completed: 'Завершил заявку', interrupted: 'Работа прервана', unavailable: 'Недоступен'};
   function factPayload(version, input) {
     if (!input.engineer_id || !factLabels[input.status]) throw new Error('Выберите инженера и статус.');
     const result = {version, mode: 'manual', time: minute(input.time), engineer_id: input.engineer_id, status: input.status};
-    const requiresRequest = ['working', 'completed', 'interrupted', 'traveling'].includes(input.status);
+    const requiresRequest = ['working', 'completed', 'completion_pending', 'interrupted', 'traveling'].includes(input.status);
     if (requiresRequest && !input.request_id) throw new Error('Для этого статуса выберите заявку.');
     if (['available', 'traveling', 'unavailable'].includes(input.status) && !input.location_id) throw new Error('Укажите текущее местоположение инженера.');
     if (requiresRequest && input.request_id) result.request_id = input.request_id;
-    if (input.location_id && !['working', 'completed', 'interrupted'].includes(input.status)) result.location_id = input.location_id;
+    if (input.location_id && !['working', 'completed', 'completion_pending', 'interrupted'].includes(input.status)) result.location_id = input.location_id;
     for (const name of ['remaining_minutes', 'consumed_router', 'consumed_tv_box']) {
-      const applies = name === 'remaining_minutes' ? ['working', 'interrupted', 'traveling'].includes(input.status) : ['completed', 'interrupted'].includes(input.status);
+      const applies = name === 'remaining_minutes' ? ['working', 'interrupted', 'traveling'].includes(input.status) : ['completed', 'completion_pending', 'interrupted'].includes(input.status);
       if (!applies) continue;
       const raw = input[name];
       if (raw == null || raw === '') {
@@ -51,10 +75,11 @@
     if (visit.start <= now) return 'В работе';
     return visit.arrival > now ? 'В пути · работа закреплена' : 'Ожидание · работа закреплена';
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {requestsForEngineer, eventPayload, factPayload, minute, time, frozenStatus};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {requestsForEngineer, eventPayload, factPayload, minute, time, frozenStatus, uniqueEventId};
   if (typeof document === 'undefined') return;
-  const regionURL = path => new URL(path.replace(/^\//, ''), new URL('.', location.href)).href;
   const $ = id => document.getElementById(id);
+  const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
+  const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
   let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false;
   const strategyNames = {sla:'Быстрее к аварии', stable:'Меньше изменений', cost:'Меньше дороги'};
   function strategyName(c) { return strategyNames[c.id] || c.label; }
@@ -67,7 +92,7 @@
     return node;
   }
   function controls() {
-    $('region-select').disabled=busy || $('region-select').options.length<2;
+    window.dispatchEvent(new CustomEvent('planning-busy',{detail:{busy}}));
     $('event-fields').disabled = busy || !state;
     $('facts-fields').disabled = busy || !state;
     $('plan-version').disabled = busy || !state;
@@ -77,8 +102,10 @@
     $('approve').disabled = busy || !state || !batch || !selected || batch.version !== state.version;
     $('ai-recommend').disabled = busy || !batch || recommendationPending;
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
+    document.querySelectorAll('#completion-list button').forEach(button => { button.disabled = busy || !state; });
   }
   function resetCandidates(message) {
+    $('excluded-summary').hidden=true;
     batch = null; selected = null; recommendation = null; recommendationPending = false; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('observation-warnings').textContent = ''; $('variants-note').textContent = ''; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
     $('candidates').dataset.count = '0';
     $('candidates').replaceChildren(element('div', message || 'Задайте событие и рассчитайте варианты.', 'empty'));
@@ -101,7 +128,7 @@
     controls();
   }
   async function request(path, payload) {
-    const response = await fetch(regionURL(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
+    const response = await appFetch(appUrl(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
     let data;
     try { data = await response.json(); } catch { throw new Error('Сервер вернул некорректный ответ. Откройте страницу через локальный сервер.'); }
     if (!response.ok) { const error = new Error((response.status === 409 ? 'Версия изменилась. ' : '') + (data.error || 'Ошибка сервера.')); error.httpStatus = response.status; throw error; }
@@ -109,28 +136,43 @@
   }
   function targets() {
     if (!state) return;
-    const engineer = $('event-type').value === 'unavailable', emergency = $('event-type').value === 'emergency', replan = $('event-type').value === 'replan';
-    $('event-target').hidden = replan; $('target-label').hidden = replan;
-    $('event-target').disabled = replan; $('event-target').required = !replan;
-    $('emergency-fields').hidden = !emergency;
-    $('duration').disabled = !emergency; $('router').disabled = !emergency;
-    $('target-label').textContent = engineer ? 'Недоступный инженер' : emergency ? 'Место аварии' : 'Отменяемая заявка';
-    $('event-target').replaceChildren(...(engineer ? state.engineers : emergency ? (state.locations || []).map(item => ({id:item.id,address:item.label})) : state.requests).map(item => {
-      const option = element('option', engineer ? item.name + ' · ' + item.id : emergency ? item.address : requestName(item.id) + ' · ' + item.address);
+    const engineer = $('event-type').value === 'unavailable', emergency = $('event-type').value === 'emergency', ordinary = $('event-type').value === 'new_request', newJob = emergency || ordinary, replan = $('event-type').value === 'replan';
+    $('event-target').hidden = replan || engineer; $('target-label').hidden = replan || engineer;
+    $('event-target').disabled = replan || engineer; $('event-target').required = !replan && !engineer;
+    $('event-engineers-group').hidden = !engineer;
+    const chosen = new Set([...$('event-engineers').querySelectorAll('input:checked')].map(input=>input.value));
+    $('event-engineers').replaceChildren(...state.engineers.map(item=>{
+      const label=element('label');label.className='check';
+      const checkbox=element('input');checkbox.type='checkbox';checkbox.value=item.id;
+      checkbox.disabled=(state.excluded_engineer_ids || []).includes(item.id);
+      checkbox.checked=!checkbox.disabled && chosen.has(item.id);
+      label.append(checkbox,element('span',item.name+(checkbox.disabled?' · уже исключён':'')));return label;
+    }));
+    $('emergency-fields').hidden = !newJob;
+    $('duration').disabled = !newJob; $('router').disabled = !newJob;
+    $('ordinary-fields').hidden = !ordinary;
+    for (const id of ['work-kind','window-start','window-end','new-tv']) $(id).disabled = !ordinary;
+    $('redirect').closest('label').hidden = !emergency; $('redirect').disabled = !emergency;
+    $('event-policy').textContent = ordinary ? 'Добавим в свободный интервал без переноса прежних назначений. Если места нет, заявка останется без назначения.' : emergency ? 'Начатая работа завершается. Ориентир реакции на аварию — до 2 часов с поступления; превышение покажем в результате.' : 'Начатые работы сохраняются до завершения.';
+    $('target-label').textContent = engineer ? 'Недоступный инженер' : newJob ? 'Адрес новой заявки' : 'Отменяемая заявка';
+    $('event-target').replaceChildren(...(engineer ? state.engineers : newJob ? (state.locations || []).map(item => ({id:item.id,address:item.label})) : state.requests).map(item => {
+      const option = element('option', engineer ? item.name + ' · ' + item.id : newJob ? item.address : requestName(item.id) + ' · ' + item.address);
       option.value = item.id; return option;
     }));
   }
   function renderState(data) {
     if (!data || data.version == null || !Array.isArray(data.requests) || !Array.isArray(data.engineers)) throw new Error('Сервер вернул неполное состояние.');
     state = data;
-    $('region').textContent = data.region || '—'; $('version').textContent = '№ ' + data.version;
+    $('remote-update').hidden = true;
+    $('region').textContent = data.region || '—'; $('status').classList.toggle('attention', !!data.needs_replanning); $('version').textContent = data.version;
     $('clock').textContent = time(data.time); $('event-time').value = time(data.time); $('event-time').min = time(data.time);
     const count = (data.plan && data.plan.routes || []).reduce((sum, route) => sum + (route.visits || []).length, 0);
     $('coverage').textContent = count + ' / ' + data.requests.length;
     const mode = data.mode || 'simulation';
     $('mode-badge').textContent = mode === 'mixed' ? 'Смешанный учёт' : mode === 'manual' ? 'Ручной учёт' : 'Симуляция';
     $('clock-label').textContent = mode === 'simulation' ? 'Время симуляции' : 'Время состояния';
-    $('mode-notice').textContent = mode === 'simulation' ? (data.geography_mode === 'road' ? 'Дорожные матрицы; исполнение по времени плана моделируется, без GPS.' : 'Условная география и время по утверждённому плану. Это симуляция, без GPS и реальных дорожных маршрутов.') : mode === 'mixed' ? 'Ручные статусы + симуляция остальных. Для инженеров с записанными фактами время само по себе не подтверждает завершение. Местоположение вводится вручную, без GPS.' : 'Ручной учёт: завершение подтверждается записанным фактом. Местоположение вводится вручную, без GPS.';
+    $('mode-notice').textContent = mode === 'simulation' ? (data.geography_mode === 'road' ? 'Дорожные матрицы; исполнение по времени плана моделируется.' : 'Условная география и исполнение по времени плана.') : mode === 'mixed' ? 'Факты инженеров и диспетчера + симуляция остальных. Время само по себе не закрывает заявку инженера с записанными фактами.' : 'Ручной учёт: выполнение подтверждает диспетчер.';
+    $('mode-notice').textContent += ' GPS используется для наблюдения; координаты не меняют план и не подтверждают выполнение автоматически.';
     if (data.approximate_locations) $('mode-notice').textContent += ' Приблизительных точек: ' + data.approximate_locations + '. Исходный и выбранный адрес сохранены в карточке.';
     $('execution-mode').value=data.execution_mode || 'simulation';
     populateSelect('fact-edit',data.fact_journal || [],f=>engineerName(f.engineer_id)+' · '+time(f.time)+' · '+factLabels[f.status],'Новый факт');
@@ -146,7 +188,9 @@
     const versions = data.versions && data.versions.length ? data.versions : [{version: data.version, time: data.time, label: 'Текущий план'}];
     $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', '№ ' + item.version + ' · ' + time(item.time) + ' · ' + (item.label || 'План') + (item.version === data.version ? ' · текущий' : '')); option.value = item.version; return option; }));
     $('plan-version').value = String(data.version); showPlan();
-    renderFacts(); factFields(); targets(); resetCandidates();
+    renderFacts(); renderCompletions(); factFields(); targets(); resetCandidates();
+    window.dispatchEvent(new CustomEvent('planning-state',{detail:{version:data.version,time:data.time,
+      engineers:data.engineers,excludedEngineerIds:data.excluded_engineer_ids || []}}));
   }
   function populateSelect(id, values, label, empty) {
     const options = values.map(item => { const option = element('option', label(item)); option.value = item.id; return option; });
@@ -156,8 +200,8 @@
   function showPlan() {
     if (!state) return;
     const version = $('plan-version').value, historical = String(state.version) !== version;
-    $('plan-frame').src = regionURL('/dispatcher?version=' + encodeURIComponent(version));
-    $('plan-context').textContent = historical ? 'Просмотр истории · текущий план № ' + state.version : state.needs_replanning ? 'План требует пересчёта по новым статусам.' : '';
+    $('plan-frame').src = appUrl('/dispatcher?version=' + encodeURIComponent(version));
+    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : 'Текущий утверждённый план · версия ' + version + '.';
     $('plan-context').classList.toggle('attention', !historical && !!state.needs_replanning);
   }
   function factRequests() {
@@ -173,7 +217,7 @@
     const previous = (state?.statuses || []).find(f => f.engineer_id === $('fact-engineer').value);
     const historical=$('fact-late').checked || !!$('fact-edit').value;
     const workingNow = !historical && previous?.status === 'working';
-    for (const option of $('fact-status').options) option.disabled = (workingNow && ['available','traveling','unavailable'].includes(option.value)) || (option.value === 'interrupted' && !workingNow && !historical);
+    for (const option of $('fact-status').options) option.disabled = (workingNow && ['available','traveling','unavailable'].includes(option.value)) || (option.value === 'interrupted' && !workingNow && !historical) || (option.value === 'completion_pending' && !$('fact-edit').value);
     if ($('fact-status').selectedOptions[0]?.disabled) $('fact-status').value = workingNow ? 'working' : 'available';
     $('engineer-fact-context').textContent = previous ? 'Последний статус: ' + factLabels[previous.status] + ' · ' + time(previous.time) + (workingNow ? '. Сначала завершите или прервите работу.' : '') : state?.execution_mode === 'manual' ? 'Нет статуса — инженер недоступен для назначений.' : 'Статус определяется по плану.';
     const earliest = historical ? 0 : Math.max(state?.time || 0, previous ? previous.time + 1 : 0);
@@ -183,13 +227,13 @@
     $('fact-time').min = time(earliest);
     if (earliest < 1440 && $('fact-time').value && minute($('fact-time').value) < earliest) $('fact-time').value = time(earliest);
     const status = $('fact-status').value, interrupted = status === 'interrupted', working = status === 'working', traveling = status === 'traveling';
-    $('fact-request').required = ['working', 'completed', 'interrupted', 'traveling'].includes(status);
+    $('fact-request').required = ['working', 'completed', 'completion_pending', 'interrupted', 'traveling'].includes(status);
     $('fact-request').disabled = !$('fact-request').required;
     $('fact-request').hidden = !$('fact-request').required;
     document.querySelector('label[for="fact-request"]').hidden = !$('fact-request').required;
     if (workingNow) { for (const option of $('fact-request').options) option.disabled = option.value !== previous.request_id; }
     $('fact-location').required = ['available','traveling','unavailable'].includes(status);
-    const atRequest = ['working', 'completed', 'interrupted'].includes(status);
+    const atRequest = ['working', 'completed', 'completion_pending', 'interrupted'].includes(status);
     $('fact-location').disabled = atRequest;
     $('fact-location').hidden = atRequest;
     document.querySelector('label[for="fact-location"]').hidden = atRequest;
@@ -198,7 +242,7 @@
     $('fact-remaining').disabled = $('fact-remaining-group').hidden;
     document.querySelector('label[for="fact-remaining"]').textContent = traveling ? 'Осталось пути, мин' : 'Осталось работы, мин';
     $('fact-remaining').required = interrupted || working || traveling;
-    $('fact-consumed-group').hidden = !interrupted && status !== 'completed';
+    $('fact-consumed-group').hidden = !interrupted && !['completed','completion_pending'].includes(status);
     $('fact-router').disabled = $('fact-consumed-group').hidden; $('fact-tv').disabled = $('fact-consumed-group').hidden;
     $('fact-router').required = interrupted; $('fact-tv').required = interrupted;
     $('fact-consumed-note').textContent = interrupted ? 'Укажите фактически потраченное оборудование, включая нули. Остаток работы обязателен.' : 'Пустые поля означают списание потребности заявки. Можно указать фактическое количество, включая нули.';
@@ -207,12 +251,36 @@
     const rows = (state.fact_journal || state.statuses || []).map(fact => {
       const row = element('tr'), location = (state.locations || []).find(item => item.id === fact.location_id);
       [engineerName(fact.engineer_id), factLabels[fact.status] || fact.status, requestName(fact.request_id), time(fact.time), location ? location.label : fact.location_id || '—', fact.remaining_minutes ?? '—', fact.recorded_at && !fact.recorded_at.startsWith('unknown') ? new Date(fact.recorded_at).toLocaleString('ru-RU') : '—'].forEach(value => row.append(element('td', value)));
+      const report = element('td', (fact.source === 'engineer' ? 'Инженер' : 'Диспетчер') + (fact.comment ? ': ' + fact.comment : ''));
+      report.className = 'fact-comment'; row.append(report);
       return row;
     });
-    fillTable('facts-body', rows, 7, 'Фактические статусы ещё не записаны.');
+    fillTable('facts-body', rows, 8, 'Фактические статусы ещё не записаны.');
     const revisions=(state.fact_audit || []).filter(r=>r.replaces);
     $('fact-audit').replaceChildren(...revisions.map(r=>element('p',engineerName(r.fact.engineer_id)+' · '+time(r.previous.time)+' '+factLabels[r.previous.status]+' → '+time(r.fact.time)+' '+factLabels[r.fact.status]+'. '+r.reason)));
     if(!revisions.length)$('fact-audit').textContent='Исправлений нет.';
+  }
+  function renderCompletions() {
+    const reports = state.pending_completions || [];
+    $('completion-panel').hidden = !reports.length;
+    $('completion-count').textContent = reports.length;
+    $('completion-list').replaceChildren(...reports.map(report => {
+      const card = element('article', null, 'completion-card');
+      card.append(element('strong', report.engineer_name + ' · ' + requestName(report.request_id)),
+        element('p', report.address), element('p', 'Выполнение заявлено в ' + time(report.time) + '. Роутеры: ' + report.consumed.router + ', ТВ-приставки: ' + report.consumed.tv_box + '.'));
+      if (report.comment) card.append(element('p', report.comment, 'hint'));
+      const confirm = element('button', 'Подтвердить выполнение', 'primary'); confirm.type = 'button';
+      confirm.addEventListener('click', async () => {
+        if (busy || !state) return;
+        busy = true; controls(); $('error').hidden = true;
+        try { renderState(await request('/api/completions/confirm', {version:state.version, fact_id:report.id})); $('status').textContent = 'Выполнение подтверждено. Расход оборудования списан один раз.'; }
+        catch (error) { failure(error); }
+        finally { busy = false; controls(); }
+      });
+      const edit = element('button', 'Уточнить время или расход', 'secondary'); edit.type = 'button';
+      edit.addEventListener('click', () => { $('fact-edit').value = report.id; $('fact-edit').dispatchEvent(new Event('change')); $('facts-form').scrollIntoView({block:'center'}); $('fact-time').focus(); });
+      card.append(confirm, edit); return card;
+    }));
   }
   async function reload() {
     busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Загрузка состояния…';
@@ -229,6 +297,9 @@
     $(id).replaceChildren(...rows);
   }
   function commitmentStatus(engineerId, visit, now) {
+    const pending = (state?.pending_completions || []).some(f => f.request_id === visit.request_id);
+    if (pending || visit.status === 'completion_pending') return 'Ожидает подтверждения диспетчера';
+    if (['completed','interrupted'].includes(visit.status)) return factLabels[visit.status] + ' · записанный факт';
     const fact = (state && state.statuses || []).find(item => item.engineer_id === engineerId);
     if (fact && fact.request_id === visit.request_id) return (factLabels[fact.status] || fact.status) + ' · записанный факт';
     if (fact || state && state.mode === 'manual') return 'Закреплена · завершение не подтверждено';
@@ -346,6 +417,11 @@
       recommendationPending = false;
     }
     batch = data; selected = null;
+    const excluded=data.excluded_engineers || [];
+    $('excluded-summary').hidden=!excluded.length;
+    $('excluded-summary').textContent=excluded.length
+      ? 'Расчёт с '+time(data.event.time)+' без: '+excluded.map(item=>item.name).join(', ')+'. Проверьте переназначения и заявки без исполнителя. Изменения вступят в силу после «Применить план».'
+      : '';
     $('replan-needed').hidden = true;
     $('observation-warnings').textContent = (data.observation_warnings || []).join(' ');
     const order = $('candidate-sort').value;
@@ -357,6 +433,7 @@
     $('comparison-metrics').hidden = !ordered.length;
     const merged = ordered.length < data.candidates.length;
     const notes = [];
+    if (data.insertion_policy) notes.push('Новая заявка добавляется без изменения прежних назначений и времени начала.');
     if (merged) notes.push(ordered.length === 1 ? 'Один уникальный план: все стратегии нашли одинаковые маршруты и время.' : 'Совпавшие планы объединены в одну карточку.');
     if (!newEmergency && !responseTargets && merged) notes.push('Аварий в остатке дня нет: «Быстрее к аварии» совпадает с «Меньше изменений».');
     $('variants-note').textContent = notes.join(' ');
@@ -402,7 +479,15 @@
       card.append(element('p', 'Назначено: аварии ' + f.emergency_assigned + '/' + f.emergency_total + ' · подключения ' + f.connection_assigned + '/' + f.connection_total, 'priority-coverage'));
       const metrics = [['Без назначения', f.unassigned], ['Смена исполнителя', f.reassigned], ['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Дорога, мин', f.travel_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
       if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
-      if (candidate.emergency) { const e = candidate.emergency; card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + '. Прибытие ' + time(e.arrival) + ', начало ' + time(e.start) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary')); }
+      if (candidate.emergency) {
+        const e = candidate.emergency;
+        card.append(element('p', e.assigned ? 'Авария: ' + engineerName(e.engineer_id) + '. Прибытие ' + time(e.arrival) + ', начало ' + time(e.start) + '. До начала: ' + e.response_minutes + ' мин.' : 'Авария не назначена', 'emergency-summary'));
+        if (e.exceeds_response_target) card.append(element('p', 'Начало позже ориентира реакции 2 часа. Проверьте другие варианты или дополнительные ресурсы.', 'notice'));
+      }
+      if (candidate.ordinary_request) {
+        const added = candidate.ordinary_request;
+        card.append(element('p', added.assigned ? 'Новая заявка: ' + engineerName(added.engineer_id) + ', начало ' + time(added.start) + '. Прежние назначения сохранены.' : 'Для новой заявки нет свободного интервала с нужными навыками и оборудованием. Прежние назначения сохранены.', 'emergency-summary'));
+      }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
       card.append(dl); const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
 
@@ -422,7 +507,7 @@
     const point=addressCandidates.find(p=>p.id===$('address-candidates').value);
     $('address-map').hidden = !point;
     $('address-context').textContent = point ? (point.quality==='approximate' ? 'Приблизительное совпадение — проверьте точку. ' : 'Совпадение здания. ') + point.lat + ', ' + point.lon : '';
-    if(point) $('address-map').src=regionURL('/address-preview?version='+state.version+'&candidate_id='+encodeURIComponent(point.id));
+    if(point) $('address-map').src=appUrl('/address-preview?version='+state.version+'&candidate_id='+encodeURIComponent(point.id));
     controls();
   }
   $('address-candidates').addEventListener('change',addressSelection);
@@ -436,20 +521,24 @@
   $('address-confirm').addEventListener('click',async()=>{
     if(busy||!state||!$('address-candidates').value)return;
     busy=true;controls();$('error').hidden=true;$('address-context').textContent='Расчёт дорожных матриц…';
-    try{const result=await request('/api/address/confirm',{version:state.version,candidate_id:$('address-candidates').value});renderState(result);$('event-type').value='emergency';targets();$('event-target').value=result.added_location_id;$('new-address-panel').open=false;$('address-candidates').value='';$('status').textContent='Адрес добавлен. Задайте время и параметры аварии, затем рассчитайте варианты.';}
+    try{const kind=$('event-type').value;const result=await request('/api/address/confirm',{version:state.version,candidate_id:$('address-candidates').value});renderState(result);$('event-type').value=kind;targets();$('event-target').value=result.added_location_id;$('new-address-panel').open=false;$('address-candidates').value='';$('status').textContent='Адрес добавлен. Задайте время и параметры заявки, затем рассчитайте варианты.';}
     catch(error){failure(error);}finally{busy=false;controls();}
   });
   $('candidate-sort').addEventListener('change', () => { if (batch) { const choice=selected; renderBatch(batch); if (choice) select(choice); } });
   $('event-form').addEventListener('input', () => { const hadBatch = !!batch; resetCandidates('Параметры изменены. Рассчитайте варианты.'); if (hadBatch) $('status').textContent = 'Параметры изменены — предыдущий расчёт сброшен.'; });
-  $('event-type').addEventListener('change', targets);
+  function defaultDuration() { $('duration').value = $('event-type').value === 'new_request' ? ({connection:70,local:30,addon:20}[$('work-kind').value]) : 80; }
+  $('event-type').addEventListener('change', () => { targets(); defaultDuration(); });
+  $('work-kind').addEventListener('change', defaultDuration);
   $('event-form').addEventListener('submit', async event => {
     event.preventDefault(); if (busy || !state) return;
     let payload;
-    try { payload = eventPayload(state.version, {id: crypto.randomUUID(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value, duration: $('duration').value, router: $('router').value, redirect: $('redirect').checked, preserve: $('preserve').checked}); }
+    try { payload = eventPayload(state.version, {id: uniqueEventId(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value,
+      engineerIds:[...$('event-engineers').querySelectorAll('input:checked:not(:disabled)')].map(input=>input.value),
+      duration: $('duration').value, router: $('router').value, tvBox:$('new-tv').value, workKind:$('work-kind').value, windowStart:$('window-start').value, windowEnd:$('window-end').value, redirect: $('redirect').checked, preserve: true}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Расчёт может занять несколько секунд…';
     try { renderBatch(await request('/api/preview', payload)); $('status').textContent = 'Расчёт завершён. Выберите вариант и проверьте изменения.'; }
-    catch (error) { failure(error); }
+    catch (error) { failure(error); $('error').scrollIntoView({block:'center'}); }
     finally { busy = false; controls(); }
   });
   $('approve').addEventListener('click', async () => {
@@ -460,10 +549,40 @@
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   });
-  const tabs = ['plan', 'events', 'facts'];
+  const tabs = ['plan', 'risk', 'events', 'facts', 'gps'];
   function activateTab(name) {
     tabs.forEach(tab => { const active = tab === name; $('tab-' + tab).setAttribute('aria-selected', String(active)); $('tab-' + tab).tabIndex = active ? 0 : -1; $('panel-' + tab).hidden = !active; });
+    if (name === 'plan') requestAnimationFrame(() => $('plan-frame').resizePlan?.());
+    window.dispatchEvent(new CustomEvent('workbench-tab', {detail: {name}}));
   }
+  window.addEventListener('gps-intent', event => {
+    if (!state || busy) return;
+    if (event.detail.action === 'facts') {
+      activateTab('facts');
+      if ([...$('fact-engineer').options].some(o => o.value === event.detail.engineerId)) $('fact-engineer').value = event.detail.engineerId;
+      factRequests(); factFields(); $('fact-engineer').focus();
+    } else if (event.detail.action === 'replan') {
+      $('event-type').value = 'replan'; targets(); resetCandidates(); activateTab('events'); $('preview').focus();
+    } else if (event.detail.action === 'exclude') {
+      const ids=event.detail.engineerIds || [];
+      if (event.detail.version!==state.version) {
+        $('error').textContent='Версия плана изменилась. Обновите страницу и выберите инженеров заново.';
+        $('error').hidden=false;$('error').scrollIntoView({block:'center'});return;
+      }
+      if(!ids.length || ids.some(id=>!state.engineers.some(e=>e.id===id) || (state.excluded_engineer_ids || []).includes(id)))return;
+      $('event-type').value='unavailable';targets();
+      $('event-engineers').querySelectorAll('input').forEach(input=>{input.checked=ids.includes(input.value);});
+      $('event-time').value=event.detail.time;
+      $('preserve').checked=true;resetCandidates();activateTab('events');
+      $('panel-events').scrollIntoView({block:'start'});
+      $('event-form').requestSubmit();
+    }
+  });
+  window.addEventListener('risk-intent', event => {
+    if (!state || busy) return;
+    if (event.detail?.action === 'facts') {activateTab('facts');$('fact-engineer').focus();}
+    if (event.detail?.action === 'replan') {activateTab('events');$('event-type').focus();}
+  });
   tabs.forEach((name, index) => {
     $('tab-' + name).addEventListener('click', () => activateTab(name));
     $('tab-' + name).addEventListener('keydown', event => {
@@ -504,11 +623,22 @@
     finally { busy = false; controls(); }
   });
   $('reload').addEventListener('click', reload);
-  request('/api/regions').then(data=>{
-    $('region-select').replaceChildren(...data.regions.map(r=>{const o=element('option',r.name);o.value=r.url;o.selected=r.id===data.current;return o;}));
-    controls();
-  }).catch(()=>{ $('region-select').replaceChildren(element('option','Регион недоступен')); });
-  $('region-select').addEventListener('change',()=>{if(!busy) location.href=$('region-select').value;});
+  $('load-remote').addEventListener('click', reload);
+  let polling = false;
+  setInterval(async () => {
+    if (!state || busy || polling || document.hidden) return;
+    polling = true;
+    try {
+      const revision = await request('/api/revision');
+      if (state && revision.version !== state.version) {
+        $('remote-update-text').textContent = 'Есть новые факты или назначения с другого устройства (версия ' + revision.version + '). Загрузите изменения перед продолжением.';
+        $('remote-update').hidden = false;
+      }
+    } catch {
+      $('remote-update-text').textContent = 'Связь с сервером потеряна. Показанные данные могут быть устаревшими.';
+      $('remote-update').hidden = false;
+    } finally { polling = false; }
+  }, 5000);
   reload();
 })();
 
@@ -517,6 +647,12 @@ if (typeof document !== 'undefined') document.getElementById('plan-frame')?.addE
   const frame = this, body = frame.contentDocument?.body;
   if (!body) return;
   if (frame.planObserver) frame.planObserver.disconnect();
-  const resize = () => { frame.style.height = Math.ceil(body.getBoundingClientRect().height + 24) + 'px'; };
+  const resize = () => {
+    // Hidden tabs report zero height; do not collapse a working plan to 24px.
+    if (!frame.getClientRects().length) return;
+    const height = Math.ceil(body.getBoundingClientRect().height + 24);
+    if (height > 24 && frame.style.height !== height + 'px') frame.style.height = height + 'px';
+  };
+  frame.resizePlan = resize;
   frame.planObserver = new ResizeObserver(resize); frame.planObserver.observe(body); resize();
 });

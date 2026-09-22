@@ -27,12 +27,11 @@ def test_preview_does_not_publish_and_approval_invalidates_old_batch(make_scenar
     with pytest.raises(ValueError,match='повтор'):session.preview({**payload,'version':2},time_limit=.03)
 
 
-def test_started_work_requires_explicit_preservation_and_reserves_equipment(make_scenario):
+def test_started_work_is_always_preserved_and_reserves_equipment(make_scenario):
     from field_router.replanning import ScenarioSession
     s,p=demo(make_scenario);session=ScenarioSession(s,p)
     payload={'version':1,'event':{'id':'cancel','type':'cancel','time':560,'request_id':'b'},'allow_redirect':False,'preserve_in_progress':False}
-    with pytest.raises(ValueError,match='начат'):session.preview(payload,time_limit=.03)
-    batch=session.preview({**payload,'preserve_in_progress':True},time_limit=.03)
+    batch=session.preview(payload,time_limit=.03)
     assert batch['inventory'][0]['reserved']['router']==1
     assert batch['inventory'][0]['consumed']['router']==0
     assert batch['frozen'][0]['visits'][0]['request_id']=='a'

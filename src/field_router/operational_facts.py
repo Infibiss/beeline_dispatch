@@ -4,6 +4,10 @@ from .models import Equipment, TimeWindow, Visit, Route
 
 
 def validate_fact(session,payload):
+    source=payload.get('source','dispatcher')
+    comment=payload.get('comment','')
+    if source not in ('dispatcher','engineer'):raise ValueError('Неизвестный источник факта')
+    if not isinstance(comment,str) or len(comment)>1000:raise ValueError('Комментарий должен быть текстом до 1000 символов')
     if payload.get('version')!=session.version:raise ValueError('Устаревшая версия плана')
     now=payload.get('time')
     if type(now) is not int or not session.time<=now<=1440:raise ValueError('Недопустимое время факта')
@@ -11,35 +15,36 @@ def validate_fact(session,payload):
     engineers=session.initial_engineers
     if eid not in engineers:raise ValueError('Неизвестный инженер')
     kind=payload.get('status')
-    if kind not in ('available','traveling','working','completed','interrupted','unavailable'):raise ValueError('Неизвестный статус')
-    key=payload.get('request_id') if kind in ('working','completed','interrupted','traveling') else None
+    if kind not in ('available','traveling','working','completed','completion_pending','interrupted','unavailable'):raise ValueError('Неизвестный статус')
+    key=payload.get('request_id') if kind in ('working','completed','completion_pending','interrupted','traveling') else None
     old=session.statuses.get(eid,{})
     if old and now<=old['time']:raise ValueError('Новый статус инженера должен быть позже предыдущего')
     if old.get('status')=='working' and kind in ('available','traveling','unavailable'):
         raise ValueError('Сначала явно завершите или прервите начатую работу')
-    if kind in ('working','completed','interrupted','traveling'):
+    if kind in ('working','completed','completion_pending','interrupted','traveling'):
         if key not in session.catalog:raise ValueError('Нужна известная заявка')
         if any(h.get('event',{}).get('type')=='cancel' and h['event'].get('request_id')==key and h['event']['time']<=now for h in session.history):
             raise ValueError('Заявка отменена до этого факта; проверьте время сообщения')
-        if any(f['status']=='completed' and f.get('request_id')==key for f in session.fact_log):raise ValueError('Заявка уже завершена фактически')
+        if any(f['status'] in ('completed','completion_pending') and f.get('request_id')==key for f in session.fact_log):raise ValueError('Заявка уже завершена или ожидает подтверждения')
         owner=next((r.engineer_id for r in session.plan.routes for v in r.visits if v.request_id==key),None)
         if owner is None:owner=next((r['engineer_id'] for r in session.frozen for v in r['visits'] if v['request_id']==key),None)
         if hasattr(session,'fact_owner_override'):owner=session.fact_owner_override.get(key,owner)
         if owner!=eid:raise ValueError('Заявка не назначена этому инженеру; сначала измените план')
         if any(f.get('status')=='working' and f.get('request_id')==key and other!=eid for other,f in session.statuses.items()):raise ValueError('Эта работа не завершена другим инженером')
         if kind=='interrupted' and not (old.get('status')=='working' and old.get('request_id')==key):raise ValueError('Прерывание возможно после ручного статуса работы')
+        if kind=='completion_pending' and not (old.get('status')=='working' and old.get('request_id')==key):raise ValueError('Сообщение о завершении возможно после начала работы')
         if old.get('status')=='working' and old.get('request_id')!=key:raise ValueError('Сначала завершите текущую работу')
-    location=key if kind in ('working','completed','interrupted') else payload.get('location_id')
+    location=key if kind in ('working','completed','completion_pending','interrupted') else payload.get('location_id')
     if location not in session.scenario.points and location not in getattr(session,'geo_locations',{}):raise ValueError('Укажите известную фактическую точку')
     remaining=payload.get('remaining_minutes') if kind in ('working','interrupted','traveling') else None
     if kind in ('working','interrupted','traveling') and (type(remaining) is not int or not 0<remaining<=1440):raise ValueError('Укажите положительное оставшееся время')
     consumed=Equipment()
-    if kind in ('completed','interrupted'):
+    if kind in ('completed','completion_pending','interrupted'):
         request=session.catalog[key]
         values={}
         for device in ('router','tv_box'):
             value=payload.get('consumed_'+device)
-            if value is None and kind=='completed':
+            if value is None and kind in ('completed','completion_pending'):
                 used=sum(f['consumed'][device] for f in session.fact_log if f.get('request_id')==key)
                 value=max(0,getattr(request.equipment,device)-used)
             if type(value) is not int or value<0:raise ValueError('Явно укажите расход устройств при прерывании')
@@ -52,7 +57,7 @@ def validate_fact(session,payload):
         for k in spent:
             if spent[k]+getattr(consumed,k)>getattr(session.initial_stock[eid],k):raise ValueError('Расход превышает утренний запас')
     return {'time':now,'engineer_id':eid,'status':kind,'request_id':key,'location_id':location,
-            'remaining_minutes':remaining,'consumed':consumed.model_dump(),'source':'dispatcher'}
+            'remaining_minutes':remaining,'consumed':consumed.model_dump(),'source':source,'comment':comment.strip()}
 
 
 def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
@@ -90,7 +95,7 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
                     jobs.setdefault(visit['request_id'],session.catalog[visit['request_id']])
                     route['visits'].remove(visit)
         routes.pop(eid,None)
-        explicit=[f for f in session.fact_log if f['engineer_id']==eid and f['status'] in ('completed','interrupted')]
+        explicit=[f for f in session.fact_log if f['engineer_id']==eid and f['status'] in ('completed','completion_pending','interrupted')]
         for f in explicit:
             key=f['request_id']
             # Each recorded consumption has its own ledger row. Completed visits
@@ -100,10 +105,10 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
                 for r in frozen:
                     r['visits'][:]=[v for v in r['visits'] if not (v['request_id']==key and not v.get('fact_id'))]
                 visit={'request_id':key,'arrival':f['time'],'start':f['time'],'end':f['time'],
-                    'travel_minutes':0,'distance_m':0,'explanation':'Фактическое завершение' if f['status']=='completed' else 'Фактическое прерывание',
-                    'fact_id':marker,'consumed_equipment':f['consumed'],'status':f['status']}
+                    'travel_minutes':0,'distance_m':0,'explanation':{'completed':'Фактическое завершение','completion_pending':'Выполнение заявлено; ожидает подтверждения диспетчера','interrupted':'Фактическое прерывание'}[f['status']],
+                    'fact_id':marker,'fact_record_id':f['id'],'consumed_equipment':f['consumed'],'status':f['status']}
                 frozen.append({'engineer_id':eid,'visits':[visit],'origins':{}})
-            if f['status']=='completed' or key in cancelled:jobs.pop(key,None)
+            if f['status'] in ('completed','completion_pending') or key in cancelled:jobs.pop(key,None)
             else:
                 request=jobs.get(key,session.catalog[key])
                 jobs[key]=request.model_copy(update={'duration_minutes':f['remaining_minutes'],
@@ -142,7 +147,7 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
             routes[eid]=Route(engineer_id=eid,visits=[visit],distance_m=0,travel_minutes=0,service_minutes=0,loadout=request.equipment)
         elif kind=='unavailable':
             engineers[eid]=engineers[eid].model_copy(update={'shift':TimeWindow(start=start,end=start)})
-    completed={f['request_id'] for f in session.fact_log if f['status']=='completed'}
+    completed={f['request_id'] for f in session.fact_log if f['status'] in ('completed','completion_pending')}
     for key in completed:jobs.pop(key,None)
     frozen=[r for r in frozen if r['visits']]
     return s.model_copy(update={'requests':list(jobs.values()),'engineers':list(engineers.values()),'points':points}),routes,frozen

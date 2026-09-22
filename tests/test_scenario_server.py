@@ -40,6 +40,8 @@ def unified_server(make_scenario, tmp_path):
 
     class Session:
         version = 2
+        scenario = s
+        initial_engineers = {engineer.id: engineer for engineer in s.engineers}
 
         def state(self):
             return {'version': self.version, 'versions': [1, 2]}
@@ -81,6 +83,7 @@ def test_workbench_report_assets_and_csp(unified_server):
         assert 'История' in html
         assert 'href="/report?version=1"' in html
         policy = response.headers['Content-Security-Policy']
+        assert response.headers['Referrer-Policy'] == 'strict-origin-when-cross-origin'
         assert "frame-ancestors 'self'" in policy
         assert "script-src 'self' 'unsafe-inline'" in policy
         assert 'https://tile.openstreetmap.org' in policy
@@ -92,6 +95,7 @@ def test_workbench_report_assets_and_csp(unified_server):
             assert response.read()
     with urlopen(url + '/') as response:
         assert "'unsafe-inline'" not in response.headers['Content-Security-Policy']
+        assert response.headers['Referrer-Policy'] == 'strict-origin-when-cross-origin'
     for route in ('/assets/../scenarios.js', '/assets/%2e%2e/scenarios.js', '/assets/LEAFLET-LICENSE'):
         with pytest.raises(HTTPError) as error:
             urlopen(url + route)

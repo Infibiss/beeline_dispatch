@@ -19,9 +19,9 @@ def client(expression):
     return json.loads(result.stdout)
 
 
-def test_event_input_preserves_explicit_dispatcher_choices():
+def test_event_input_preserves_redirect_choice_but_never_interrupts_work():
     result = client("console.log(JSON.stringify(core.eventPayload(4,{id:'evt-1',type:'emergency',time:'10:35',target:'R-1',duration:'80',router:'0',redirect:true,preserve:false})))")
-    assert result == {'version': 4, 'event': {'id': 'evt-1', 'type': 'emergency', 'time': 635, 'anchor_id': 'R-1', 'duration_minutes': 80, 'router': 0}, 'allow_redirect': True, 'preserve_in_progress': False}
+    assert result == {'version': 4, 'event': {'id': 'evt-1', 'type': 'emergency', 'time': 635, 'anchor_id': 'R-1', 'duration_minutes': 80, 'router': 0}, 'allow_redirect': True, 'preserve_in_progress': True}
 
 
 def test_event_time_rejects_invalid_values_before_request():
@@ -42,7 +42,7 @@ def test_screen_has_local_assets_and_explicit_disabled_approval():
 
 def test_replan_has_no_request_target():
     result = client("console.log(JSON.stringify(core.eventPayload(4,{id:'replan-1',type:'replan',time:'11:00',target:''})))")
-    assert result == {'version': 4, 'event': {'id': 'replan-1', 'type': 'replan', 'time': 660}, 'allow_redirect': False, 'preserve_in_progress': False}
+    assert result == {'version': 4, 'event': {'id': 'replan-1', 'type': 'replan', 'time': 660}, 'allow_redirect': False, 'preserve_in_progress': True}
 
 
 def test_completion_omits_blank_consumption_for_server_defaults():

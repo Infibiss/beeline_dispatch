@@ -224,6 +224,7 @@ class CrewService:
     def settings(self,session):
         saved=current_rows(session)
         return {'version':session.version,'region':session.scenario.region,'editable':editable(session),
+            'assignments':{r.engineer_id:len(r.visits) for r in session.plan.routes},
             'control_count':CONTROL_COUNTS.get(session.scenario.region),'recommended_engineers':recommended(session),'engineers':deepcopy(saved),
             'presets':presets(session,saved) if editable(session) else [],
             'locations':session.state()['locations'],'network':self.address_service is not None,
@@ -285,6 +286,8 @@ class CrewService:
             'before_coverage':coverage(session,session.plan),'after_coverage':coverage(session,plan),
             'changes':roster_changes(current_rows(session),[r.model_dump(mode='json') for r in request.engineers]),
             'assumptions':CREW_ASSUMPTIONS,
+            'engineers':[{'id':e.id,'name':e.name,'region':e.region,
+                'assigned':next((len(r.visits) for r in plan.routes if r.engineer_id==e.id),0)} for e in issued],
             'unassigned':[u.model_dump() for u in plan.unassigned],
             'issue':[{'name':e.name,'router':e.stock.router,'tv_box':e.stock.tv_box} for e in issued]}
 

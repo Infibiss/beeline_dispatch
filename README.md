@@ -10,8 +10,10 @@ Python 3.11+. Из корня репозитория:
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
 .venv/bin/python -m pip install --no-deps -e .
-.venv/bin/python -m field_router.scenario_server data/demo-road/Восток.json --state output/local/east-state.json --port 8766 --time-limit 3 --solver hybrid --regions-dir data/demo-road
+.venv/bin/python -m field_router.scenario_server data/demo-road/Восток.json --state output/local/east-state.json --port 8766 --time-limit 3 --morning-time-limit 10 --solver hybrid --regions-dir data/demo-road
 ```
+
+`--time-limit` — бюджет пересчёта после события дня (3 с). `--morning-time-limit` — бюджет утреннего плана: бригады, старты и выдача оборудования (по умолчанию 10 с). Утром секунды не критичны, и при таком бюджете в `hybrid` после OR-Tools работает ALNS v2 с сокращением невыполненных заявок и бригад: он включается от 2,5 с на вызов ([обзор](docs/reviews/alns-v2-port.md)).
 
 Открыть [окно диспетчера](http://127.0.0.1:8766/). При первом запуске сервер покажет логин `admin` и новый пароль — сохраните его. Учётные записи сохраняются в `accounts.sqlite3` рядом с состоянием; после перезапуска нужно войти заново. Сохраненные планы и матрицы работают офлайн; подложка карты требует сети. Для поиска нового адреса добавить `--network`: адрес отправляется Photon, выбранные координаты — OSRM.
 

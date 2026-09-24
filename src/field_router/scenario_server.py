@@ -44,7 +44,8 @@ def local_ipv4_addresses():
 
 
 def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,host='127.0.0.1',
-                  gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid'):
+                  gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid',
+                  morning_time_limit=None):
     # Windows spawn imports this module in the model child. Keep OR-Tools and
     # rendering imports inside the server entrypoints, outside that cold path.
     from .dispatcher import render_dispatcher
@@ -57,6 +58,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
     from .regions import RegionRegistry
     from .solvers.selection import get_solver
     get_solver(solver)  # Validate before opening the optional services.
+    # Morning crew/stock planning may search longer than day events; None keeps the day budget.
+    morning_time_limit=time_limit if morning_time_limit is None else morning_time_limit
     # Keep an explicit Host allowlist rather than trusting any supplied private IP
     # or hostname. This also preserves the previous foreign-Origin protection.
     address = ipaddress.IPv4Address(host)
@@ -280,7 +283,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         temporary.replace(path);regions.publish_session(self.region_key,candidate)
                         gps.update(candidate)
                     elif self.path=='/api/crew/preview':
-                        result=crews.preview(holder['session'],payload,time_limit=time_limit,solver=solver)
+                        result=crews.preview(holder['session'],payload,time_limit=morning_time_limit,solver=solver)
                     elif self.path=='/api/crew/apply':
                         candidate=crews.selected(holder['session'],payload)
                         path.parent.mkdir(parents=True,exist_ok=True)
@@ -353,7 +356,9 @@ def main(argv=None):
     parser.add_argument('--host',default='127.0.0.1',help='IPv4 для прослушивания; 0.0.0.0 открывает доступ с телефона в локальной сети')
     parser.add_argument('--network',action='store_true',help='Разрешить поиск адресов через Photon и координатные запросы OSRM')
     parser.add_argument('--cache',type=Path,default=Path('output/geo-cache'))
-    parser.add_argument('--time-limit',type=float,default=3)
+    parser.add_argument('--time-limit',type=float,default=3,help='Бюджет пересчёта после события дня, секунды')
+    parser.add_argument('--morning-time-limit',type=float,default=10,
+                        help='Бюджет утреннего плана (бригады, старты, выдача), секунды; ALNS v2 включается от 2,5 с на вызов')
     parser.add_argument('--solver',choices=['ortools','alns','hybrid'],default='hybrid',help='Оптимизатор; hybrid делит бюджет между OR-Tools и ALNS')
     parser.add_argument('--gps-config',type=Path)
     parser.add_argument('--gps-model',help='Replaceable Python module:class with analyze(job)')
@@ -382,7 +387,7 @@ def main(argv=None):
     if initial_password:
         print('Первый вход: admin / '+initial_password+'\nСохраните пароль: он показывается только при создании базы.',flush=True)
     explainer=configured()
-    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,solver=args.solver,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None,host=args.host,
+    server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,morning_time_limit=args.morning_time_limit,solver=args.solver,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None,host=args.host,
                          gps_config=args.gps_config,gps_model=args.gps_model,disable_gps=args.disable_gps,tls_context=tls,
                          region_sources=discover_regions(args.comparison,args.state,args.regions_dir),accounts=accounts)
     print('Учётные записи: '+str(accounts.path.resolve()),flush=True)

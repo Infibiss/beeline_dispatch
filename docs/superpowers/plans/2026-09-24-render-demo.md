@@ -20,5 +20,7 @@ The cloud machine's wall-clock search results must be checked on that machine. A
 
 - 556 tests passed; package and JavaScript syntax verified (`/tmp/render-demo-check.log`).
 - Isolated HTTP run: all three regions' state/crew/risk/GPS/dispatcher endpoints returned 200 after login; three-profile preview returned 200 in 9.02 s. Parent RSS after preview was 410256 KiB on macOS (not a Linux container measurement and not total GPS child memory).
-- Docker Desktop is running, but two builds failed fetching `python:3.11-slim-bookworm` metadata with a TLS handshake timeout. Host-side request to the same Docker registry succeeds; container build remains unverified.
-- User chose Docker + registry instead of a GitHub mirror. Registry/account choice is pending. No image uploaded, Render service created, or deployment hook enabled yet.
+- Docker network recovered after login. Linux/amd64 image built and checked in a 512 MiB container across all three regions. Three previews took 9.03–9.58 s at 1 CPU. At Free-equivalent 0.1 CPU an East preview took 27.7 s. Final observed memory at 1 CPU: 364.4 MiB (not peak).
+- User chose Docker Hub and explicitly authorized both uploading the image and creating/storing a Read-only token in Render. Private image `infibiss/field-router-demo:d716b32` uploaded successfully. Token expires 24.10.2026; saved in Render, not local files.
+- `d716b32` pushed to SourceCraft main. Render form: Free, Frankfurt, `beeline-field-router-demo`, `/healthz`; image connection succeeded. Creation awaits user entry of new admin password and LLM values. Service is not yet live.
+- Deployment helper prepared and seven failure/success guard tests passed. Not wired into CI until Render service and deployment secrets exist.

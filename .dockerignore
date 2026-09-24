@@ -1,0 +1,13 @@
+# Allowlist: local state, credentials, source documents and history never enter the build context.
+*
+!Dockerfile
+!.dockerignore
+!requirements.lock
+!pyproject.toml
+!src/
+!src/**
+!data/
+!data/demo-road/
+!data/demo-road/*.json
+**/__pycache__/
+**/*.pyc

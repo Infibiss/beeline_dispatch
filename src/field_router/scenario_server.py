@@ -5,6 +5,7 @@ from copy import deepcopy, copy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import ipaddress
+import re
 from pathlib import Path
 import socket
 import ssl
@@ -43,9 +44,29 @@ def local_ipv4_addresses():
     return sorted(addresses)
 
 
+def validate_public_origin(value):
+    """Explicit external HTTPS origin; forwarding headers never establish trust."""
+    if value is None:
+        return None
+    try:
+        parsed = urlsplit(value)
+        valid = (parsed.scheme == 'https' and parsed.hostname and
+                 not parsed.username and not parsed.password and
+                 not parsed.path and not parsed.query and not parsed.fragment and
+                 re.fullmatch(r'[a-z0-9.-]+(?::[0-9]+)?', parsed.netloc) and
+                 (parsed.port is None or 1 <= parsed.port <= 65535) and
+                 value == 'https://' + parsed.netloc)
+    except (ValueError, TypeError):
+        valid = False
+    if not valid:
+        raise ValueError('public origin: укажите HTTPS-адрес без пути, например https://demo.onrender.com')
+    return value
+
+
 def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,host='127.0.0.1',
                   gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid',
-                  morning_time_limit=None):
+                  morning_time_limit=None,public_origin=None):
+    public_origin = validate_public_origin(public_origin)
     # Windows spawn imports this module in the model child. Keep OR-Tools and
     # rendering imports inside the server entrypoints, outside that cold path.
     from .dispatcher import render_dispatcher
@@ -89,7 +110,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                            for key,(other,other_path) in regions.items()}}
     regions=RegionRegistry(session,state_path,context_factory,region_sources)
     from .auth_http import AuthHttp
-    auth=AuthHttp(accounts, regions, _STATIC, bool(tls_context))
+    auth=AuthHttp(accounts, regions, _STATIC, bool(tls_context) or bool(public_origin))
     scheme='https' if tls_context else 'http'
 
     class Handler(BaseHTTPRequestHandler):
@@ -141,12 +162,16 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             hosts={f'{name}:{self.server.server_port}' for name in allowed_names}
             if self.server.server_port==(443 if tls_context else 80):hosts.update(allowed_names)
             authority=self.headers.get('Host','').lower()
+            if public_origin and authority == urlsplit(public_origin).netloc:
+                origin=self.headers.get('Origin')
+                return origin is None or origin == public_origin
             if authority not in hosts:return False
             origin=self.headers.get('Origin')
             return origin is None or origin == scheme+'://'+authority
 
         def do_GET(self):
             if not self.trusted():return self.reply(403,{'error':'Адрес сервера или источник запроса не разрешён'})
+            if self.path == '/healthz':return self.reply(200,{'status':'ok'})
             if auth.before(self):return
             try:holder,path,lock,crews,gps,address_service=self.context()
             except UnknownRegion:return self.reply(404,{'error':'Неизвестный район'})
@@ -354,6 +379,7 @@ def main(argv=None):
     parser.add_argument('--regions-dir',type=Path,help='Каталог сравнений регионов; по умолчанию соседние демо-участки')
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--host',default='127.0.0.1',help='IPv4 для прослушивания; 0.0.0.0 открывает доступ с телефона в локальной сети')
+    parser.add_argument('--public-origin',help='Внешний HTTPS origin за доверенным reverse proxy')
     parser.add_argument('--network',action='store_true',help='Разрешить поиск адресов через Photon и координатные запросы OSRM')
     parser.add_argument('--cache',type=Path,default=Path('output/geo-cache'))
     parser.add_argument('--time-limit',type=float,default=3,help='Бюджет пересчёта после события дня, секунды')
@@ -367,6 +393,8 @@ def main(argv=None):
     parser.add_argument('--certfile',type=Path,help='TLS certificate with IP/hostname SAN')
     parser.add_argument('--keyfile',type=Path,help='TLS private key (never served over HTTP)')
     args=parser.parse_args(argv)
+    try:validate_public_origin(args.public_origin)
+    except ValueError as exc:parser.error(str(exc))
     try:ipaddress.IPv4Address(args.host)
     except ValueError:parser.error('--host должен быть IPv4-адресом, например 127.0.0.1 или 0.0.0.0')
     if args.state.resolve()==args.comparison.resolve():parser.error('Файл состояния не должен перезаписывать исходное сравнение')
@@ -384,18 +412,20 @@ def main(argv=None):
     import os
     accounts=AccountStore(args.accounts or args.state.with_name('accounts.sqlite3'))
     initial_password=accounts.bootstrap(os.environ.get('FIELD_ROUTER_ADMIN_PASSWORD'))
-    if initial_password:
+    if initial_password and not args.public_origin:
         print('Первый вход: admin / '+initial_password+'\nСохраните пароль: он показывается только при создании базы.',flush=True)
     explainer=configured()
     server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,morning_time_limit=args.morning_time_limit,solver=args.solver,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None,host=args.host,
                          gps_config=args.gps_config,gps_model=args.gps_model,disable_gps=args.disable_gps,tls_context=tls,
-                         region_sources=discover_regions(args.comparison,args.state,args.regions_dir),accounts=accounts)
+                         region_sources=discover_regions(args.comparison,args.state,args.regions_dir),accounts=accounts,
+                         public_origin=args.public_origin)
     print('Учётные записи: '+str(accounts.path.resolve()),flush=True)
     addresses=local_ipv4_addresses() if args.host=='0.0.0.0' else [args.host]
     for address in addresses:
         print(f'Диспетчер: {scheme}://{address}:{server.server_port}/',flush=True)
         print(f'Инженер:   {scheme}://{address}:{server.server_port}/engineer',flush=True)
-    if args.host!='127.0.0.1' and not tls:print('Для входа и GPS с телефона используйте HTTPS (--certfile/--keyfile или -Https).',flush=True)
+    if args.public_origin:print('Публичное демо: '+args.public_origin,flush=True)
+    elif args.host!='127.0.0.1' and not tls:print('Для входа и GPS с телефона используйте HTTPS (--certfile/--keyfile или -Https).',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass
     finally:server.server_close()

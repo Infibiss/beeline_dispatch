@@ -39,23 +39,30 @@ def publish(env=None, *, run=subprocess.run, trigger=trigger_deploy):
     token = env.get('DOCKERHUB_PUSH_TOKEN', '')
     if not token:
         raise ValueError('Set SourceCraft secret DOCKERHUB_PUSH_TOKEN')
-    hook = urlsplit(env.get('RENDER_DEPLOY_HOOK', ''))
+    mode = env.get('RENDER_TRIGGER', 'direct')
+    if mode not in {'direct', 'dockerhub'}:
+        raise ValueError('RENDER_TRIGGER must be direct or dockerhub')
+    hook = urlsplit(env.get('RENDER_DEPLOY_HOOK', '') if mode == 'direct' else '')
     query = parse_qsl(hook.query, keep_blank_values=True)
-    if (hook.scheme != 'https' or hook.netloc != 'api.render.com' or hook.fragment or
+    if mode == 'direct' and (hook.scheme != 'https' or hook.netloc != 'api.render.com' or hook.fragment or
             not re.fullmatch(r'/deploy/srv-[a-zA-Z0-9]+', hook.path) or
             len(query) != 1 or query[0][0] != 'key' or not query[0][1]):
         raise ValueError('Set a valid RENDER_DEPLOY_HOOK from the Render service settings')
     revision = run(['git', 'rev-parse', 'HEAD'], check=True, capture_output=True, text=True).stdout.strip()
     if not re.fullmatch(r'[0-9a-f]{40}', revision):
         raise ValueError('Expected full Git commit SHA')
-    image = IMAGE + ':' + revision
+    image = IMAGE + ':' + ('demo' if mode == 'dockerhub' else revision)
     with TemporaryDirectory(prefix='field-router-docker-auth-') as config:
         docker_env = {**env, 'DOCKER_CONFIG': config}
-        run(['docker', 'build', '--platform', 'linux/amd64', '-t', image, '.'],
+        run(['docker', 'build', '--platform', 'linux/amd64',
+             '--label', 'org.opencontainers.image.revision=' + revision, '-t', image, '.'],
             check=True, env=docker_env)
         run(['docker', 'login', 'docker.io', '-u', 'infibiss', '--password-stdin'],
             input=token, text=True, check=True, capture_output=True, env=docker_env)
         run(['docker', 'push', image], check=True, env=docker_env)
+    if mode == 'dockerhub':
+        print('Published demo image for ' + revision + '; verify Docker Hub webhook and Render completion.')
+        return
     url = urlunsplit((hook.scheme, hook.netloc, hook.path,
                      urlencode(query + [('imgURL', image)]), ''))
     trigger(url)

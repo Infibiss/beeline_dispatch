@@ -21,7 +21,7 @@ workflows:
           - name: publish-tested-image
             env:
               DOCKERHUB_PUSH_TOKEN: ${{ secrets.DOCKERHUB_PUSH_TOKEN }}
-              RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+              RENDER_TRIGGER: dockerhub
             script:
               - python3 scripts/deploy_render.py
 

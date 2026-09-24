@@ -78,3 +78,24 @@ def test_hook_error_reports_status_but_never_secret(monkeypatch):
     with pytest.raises(RuntimeError, match='HTTP 401') as error:
         deploy.trigger_deploy(secret_url)
     assert 'private-hook-key' not in str(error.value)
+
+
+def test_dockerhub_mode_pushes_demo_once_without_render_access():
+    deploy = module()
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, 'c' * 40 + '\n')
+    deploy.publish({'DOCKERHUB_PUSH_TOKEN': 'test-token', 'RENDER_TRIGGER': 'dockerhub'},
+                   run=run, trigger=lambda url: pytest.fail('CI must not call Render'))
+    pushes = [c for c in calls if c[:2] == ['docker', 'push']]
+    assert pushes == [['docker', 'push', deploy.IMAGE + ':demo']]
+    build = next(c for c in calls if c[:2] == ['docker', 'build'])
+    assert 'org.opencontainers.image.revision=' + 'c' * 40 in build
+
+
+def test_unknown_trigger_fails_before_build():
+    deploy = module()
+    with pytest.raises(ValueError, match='RENDER_TRIGGER'):
+        deploy.publish({**environment(), 'RENDER_TRIGGER': 'typo'},
+                       run=lambda *a, **k: pytest.fail('command before validation'))

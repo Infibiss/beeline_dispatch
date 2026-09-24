@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 from tempfile import TemporaryDirectory
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -24,9 +25,13 @@ def trigger_deploy(url):
         with build_opener(NoRedirect()).open(Request(url, data=b'', method='POST'), timeout=30) as response:
             if not 200 <= response.status < 300:
                 raise RuntimeError('Render rejected the deployment request')
-    except Exception:
+    except HTTPError as exc:
+        raise RuntimeError(f'Render deploy hook failed: HTTP {exc.code}; check the service dashboard') from None
+    except URLError as exc:
+        raise RuntimeError(f'Render deploy hook connection failed: {type(exc.reason).__name__}') from None
+    except Exception as exc:
         # urllib errors can contain the secret hook URL; never print it.
-        raise RuntimeError('Render deploy hook failed; check the service dashboard') from None
+        raise RuntimeError(f'Render deploy hook failed: {type(exc).__name__}; check the service dashboard') from None
 
 
 def publish(env=None, *, run=subprocess.run, trigger=trigger_deploy):

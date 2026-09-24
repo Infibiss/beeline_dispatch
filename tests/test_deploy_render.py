@@ -65,3 +65,16 @@ def test_missing_secrets_fail_without_building():
     deploy = module()
     with pytest.raises(ValueError, match='DOCKERHUB_PUSH_TOKEN'):
         deploy.publish({}, run=lambda *a, **k: pytest.fail('command before validation'))
+
+
+def test_hook_error_reports_status_but_never_secret(monkeypatch):
+    from urllib.error import HTTPError
+    deploy = module()
+    secret_url = environment()['RENDER_DEPLOY_HOOK']
+    class Opener:
+        def open(self, *args, **kwargs):
+            raise HTTPError(secret_url, 401, 'contains private-hook-key', {}, None)
+    monkeypatch.setattr(deploy, 'build_opener', lambda *args: Opener())
+    with pytest.raises(RuntimeError, match='HTTP 401') as error:
+        deploy.trigger_deploy(secret_url)
+    assert 'private-hook-key' not in str(error.value)

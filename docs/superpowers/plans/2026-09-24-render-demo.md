@@ -11,8 +11,8 @@
 - [x] Test cloud startup: mandatory origin/password, fixed 10 s morning / 3 s event budgets, isolated fresh state directory, three regions, no credential logging.
 - [x] Add Render entrypoint and Dockerfile with Python dependencies and ephemeral demo state. Document reset/shared-state behavior and credentials.
 - [x] Run focused tests, full `scripts/check.sh`, and public-origin HTTP smoke test using a separate temporary demo instance. Leave local user state untouched.
-- [ ] Prepare code source, configure Free service through Render, set secrets privately and verify deployment, login and three-region scenario flows.
-- [ ] Configure SourceCraft-triggered deployment after passed checks, or document the exact remaining access blocker if connection cannot be authorized.
+- [x] Prepare code source, configure Free service through Render, set secrets privately and verify deployment, login and three-region scenario flows.
+- [x] Configure SourceCraft-triggered deployment after passed checks, or document the exact remaining access blocker if connection cannot be authorized.
 
 The cloud machine's wall-clock search results must be checked on that machine. A local passing test is not a claim about Render resource capacity. Share demo access separately from source repository visibility; no secrets in Git or browser-visible client code.
 
@@ -25,4 +25,12 @@ The cloud machine's wall-clock search results must be checked on that machine. A
 - Render service `srv-daqm427f3r2c73bbcq60` is live at https://beeline-field-router-demo.onrender.com; user supplied the admin password and Yandex values. Login, three candidates, actual YandexGPT explanation and approval passed publicly. A subsequent fact write hit the 512 MiB limit and reset the process.
 - Root cause fixed in `385c468`: per-version views now retain only displayed route journeys, not the whole all-pairs database. Full solver geography is still persisted. 565 tests passed locally and in SourceCraft. Repeated 0.1 CPU / 512 MiB container test passed all three regions, three approvals and nine fact writes; cgroup peak 467013632 bytes, zero OOM events. Slowest preview 125.8 seconds (emulated local CPU), not a public Render timing claim.
 - User explicitly authorized a separate Docker Hub Read & Write token (no Delete, 30 days) and storing it with the Render deploy hook in SourceCraft. Both secrets are saved; both Hub tokens expire 24.10.2026. Main now runs `release`: successful tests → build/push SHA image → deploy hook; PRs run checks only.
-- First release successfully pushed `385c4687848747a01282e6fb42f1a599f2710129`; hook failed because the copied secret had an extra trailing comma. Corrected from the DOM field value. Verify the next deployment and repeat public status/region flows before claiming the full deployment complete.
+- First release successfully pushed `385c4687848747a01282e6fb42f1a599f2710129`. A trailing comma in the hook secret was corrected; subsequent CI diagnostics confirmed a connection timeout to Render even with the exact correct secret.
+
+## Docker Hub trigger and remaining verification
+
+- User explicitly approved sharing the Render hook with Docker Hub and creating the `demo` tag from the tested `9b36aa7` image.
+- Commit `5f3cf89` changes CI to push only `demo`, with the full SHA in an OCI revision label; no direct Render connection from CI. Deployment guard tests: 10 passed.
+- Public memory-fix version `e59274f` passed a fact write, replan and approval (East version 3), South-East preview, South-Center and GPS pages.
+- After the user restored connectivity, the tested image was tagged `demo`, the approved Docker Hub webhook saved, and `5f3cf89` pushed to main. Render default image source now uses `demo`.
+- Release #27 succeeded, published digest `866d0ccbb3bed6cabbe1c4a695b7ef700a2918eece661fe4538934e2b76211d8`. Docker Hub delivery history confirms success / HTTP 200 at 22:21 MSK on 24.09.2026. Render deploy `dep-daqngdvlk1mc73ee3hb0`, triggered via deploy hook, reached Live with the matching digest. The automatic chain is verified end to end.

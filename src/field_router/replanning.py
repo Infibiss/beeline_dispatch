@@ -161,7 +161,26 @@ class ScenarioSession:
                 'needs_replanning':self.needs_replanning,'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values()))},
             'validation':{'valid':not self.needs_replanning,'violations':[]}}
         if self.geography:
-            payload['geography']={**self.geography.model_dump(mode='json'),'location_aliases':dict(self.aliases),'locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},'route_shapes':self.geography.route_shapes if self.version==1 else {}}
+            # A historical workbench needs only the journeys shown in this plan.
+            # Copying the all-pairs database into every view made each status
+            # transaction multiply memory usage (and exhausted a 512 MiB demo).
+            journeys={}
+            all_journeys=self.geography.matrices.get('public_journeys',{})
+            engineers={e.id:e for e in self.scenario.engineers}
+            for route in self.plan.routes:
+                origin=engineers[route.engineer_id].start_location
+                for visit in route.visits:
+                    a=self.aliases.get(origin,origin)
+                    b=self.aliases.get(visit.request_id,visit.request_id)
+                    trip=all_journeys.get(a,{}).get(b)
+                    if trip is not None:journeys.setdefault(a,{})[b]=deepcopy(trip)
+                    origin=visit.request_id
+            payload['geography']={
+                'location_aliases':dict(self.aliases),
+                'locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},
+                'modes':deepcopy(self.geography.modes),
+                'matrices':{'public_journeys':journeys},
+                'route_shapes':deepcopy(self.geography.route_shapes) if self.version==1 else {}}
         self.views[self.version]=payload
 
     def workbench(self,version=None):

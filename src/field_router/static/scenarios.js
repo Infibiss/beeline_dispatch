@@ -130,7 +130,7 @@
   async function request(path, payload) {
     const response = await appFetch(appUrl(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
     let data;
-    try { data = await response.json(); } catch { throw new Error('Сервер вернул некорректный ответ. Откройте страницу через локальный сервер.'); }
+    try { data = await response.json(); } catch { throw new Error('Сервер не подтвердил операцию. Нажмите «Обновить», чтобы проверить состояние.'); }
     if (!response.ok) { const error = new Error((response.status === 409 ? 'Версия изменилась. ' : '') + (data.error || 'Ошибка сервера.')); error.httpStatus = response.status; throw error; }
     return data;
   }

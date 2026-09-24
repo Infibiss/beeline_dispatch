@@ -1,6 +1,6 @@
 on:
   push:
-    - workflows: [checks]
+    - workflows: [release]
       filter:
         branches: [main]
   pull_request:
@@ -11,19 +11,34 @@ on:
 workflows:
   checks:
     tasks:
-      - name: test-and-package
+      - test-and-package
+  release:
+    tasks:
+      - test-and-package
+      - name: deploy-render
+        needs: [test-and-package]
         cubes:
-          - name: verify
-            image: python:3.11-bookworm
+          - name: publish-tested-image
+            env:
+              DOCKERHUB_PUSH_TOKEN: ${{ secrets.DOCKERHUB_PUSH_TOKEN }}
+              RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
             script:
-              - |
-                set -eu
-                apt-get update -qq
-                apt-get install -y --no-install-recommends nodejs
-                python -m pip install -r requirements.lock
-                python -m pip install --no-deps -e .
-                sh scripts/check.sh
-            artifacts:
-              paths:
-                - test-results.xml
-                - dist/
+              - python3 scripts/deploy_render.py
+
+tasks:
+  - name: test-and-package
+    cubes:
+      - name: verify
+        image: python:3.11-bookworm
+        script:
+          - |
+            set -eu
+            apt-get update -qq
+            apt-get install -y --no-install-recommends nodejs
+            python -m pip install -r requirements.lock
+            python -m pip install --no-deps -e .
+            sh scripts/check.sh
+        artifacts:
+          paths:
+            - test-results.xml
+            - dist/

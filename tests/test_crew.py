@@ -276,3 +276,27 @@ def test_roster_allows_same_region_city_routes_and_explicit_stock_without_transp
  assert candidate.scenario.engineers[0].stock==Equipment(router=5,tv_box=3)
  assert candidate.scenario.engineers[0].region==scenario.region
  assert original.version==1
+
+
+def test_morning_crew_preview_uses_its_own_budget(make_scenario,tmp_path,monkeypatch):
+ import json,threading
+ from urllib.request import Request,urlopen
+ from field_router.scenario_server import create_server
+ from field_router.replanning import ScenarioSession as Session
+ seen={}
+ def crew_preview(self,session,payload,*,time_limit,solver):
+  seen['crew']=time_limit;return {'id':'x'}
+ def day_preview(self,payload,*,time_limit,solver):
+  seen['day']=time_limit;return {}
+ monkeypatch.setattr(CrewService,'preview',crew_preview);monkeypatch.setattr(Session,'preview',day_preview)
+ s,service,p=setup(make_scenario)
+ server=create_server(s,tmp_path/'state.json',port=0,time_limit=.03,morning_time_limit=.07)
+ thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+ def post(route,data):
+  with urlopen(Request(f'http://127.0.0.1:{server.server_port}'+route,data=json.dumps(data).encode(),
+                       headers={'Content-Type':'application/json'})) as r:return json.load(r)
+ try:
+  post('/api/crew/preview',p);post('/api/preview',{'version':1})
+ finally:
+  server.shutdown();server.server_close()
+ assert seen=={'crew':.07,'day':.03}

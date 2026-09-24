@@ -30,8 +30,15 @@ class RouteEval:
 
     Backward starts are projected onto the union of start windows. No triangle
     inequality is assumed, including when removing a task from an existing route.
+
+    With optional depots (``Instance.depots``) the engineer reloads to the morning
+    stock just before the first job whose demand exceeds the equipment on hand.
+    ``legs[k]`` is the inbound leg of job k: (minutes, km, depot or None, travel
+    minutes); minutes include the reload. Without depots ``legs`` is None and
+    the original direct-arc path runs unchanged.
     """
-    __slots__ = ('e', 'seq', 'E', 'L', 'km', 'travel_minutes', 'ok', 'used', '_stable_starts', '_stable_reference')
+    __slots__ = ('e', 'seq', 'E', 'L', 'km', 'travel_minutes', 'ok', 'used', 'legs',
+                 '_stable_starts', '_stable_reference')
 
     def __init__(self, inst: Instance, e: int, seq: list):
         self.e, self.seq = e, list(seq)
@@ -46,6 +53,9 @@ class RouteEval:
         self.travel_minutes = 0
         self.ok = len(set(self.seq)) == n
         self.used = {'router': 0, 'tv_box': 0}
+        if inst.replenishes(eng):
+            return self._recompute_with_reloads(inst)
+        self.legs = None                     # direct arcs; see _recompute_with_reloads
         prev_node, ready = eng.idx, eng.shift_start
         for k, j in enumerate(self.seq):
             tj, node = tasks[j], inst.node(j)
@@ -69,6 +79,39 @@ class RouteEval:
             self.L[k] = latest(tj, limit)
         return self
 
+    def _recompute_with_reloads(self, inst: Instance):
+        """Same bounds as recompute, but the engineer reloads to the morning stock
+        just before the first job whose demand exceeds the equipment on hand."""
+        eng, tasks, n = inst.engineers[self.e], inst.tasks, len(self.seq)
+        tt, kmm = inst.ttl[eng.mode], inst.kml[eng.mode]
+        self.legs, on_hand = [], dict(eng.stock)
+        prev_node, ready = eng.idx, eng.shift_start
+        for k, j in enumerate(self.seq):
+            tj, node = tasks[j], inst.node(j)
+            if any(tj.equipment.get(device, 0) > on_hand.get(device, 0) for device in self.used):
+                leg = inst.reload_leg(eng, prev_node, node)
+                on_hand = dict(eng.stock)
+            else:
+                leg = (tt[prev_node][node], kmm[prev_node][node], None, tt[prev_node][node])
+            for device in self.used:
+                on_hand[device] = on_hand.get(device, 0) - tj.equipment.get(device, 0)
+                self.used[device] += tj.equipment.get(device, 0)
+            start = earliest(tj, ready + leg[0])
+            if not inst.compatible(eng, tj) or start + tj.service > eng.shift_end + EPS:
+                self.ok = False
+            self.E[k] = start
+            self.km += leg[1]
+            self.travel_minutes += leg[3]
+            self.legs.append(leg)
+            ready, prev_node = start + tj.service, node
+        for k in range(n - 1, -1, -1):
+            tj = tasks[self.seq[k]]
+            limit = eng.shift_end - tj.service
+            if k < n - 1:
+                limit = min(limit, self.L[k + 1] - tj.service - self.legs[k + 1][0])
+            self.L[k] = latest(tj, limit)
+        return self
+
     def copy(self):
         """Clone evaluated state without recomputing unchanged route bounds."""
         copied = object.__new__(RouteEval)
@@ -76,6 +119,7 @@ class RouteEval:
         copied.travel_minutes = self.travel_minutes
         copied.seq, copied.E, copied.L = self.seq.copy(), self.E.copy(), self.L.copy()
         copied.used = self.used.copy()
+        copied.legs = self.legs.copy() if self.legs is not None else None
         # Cached schedules and reference snapshots are immutable tuples.
         copied._stable_starts, copied._stable_reference = self._stable_starts, self._stable_reference
         return copied
@@ -89,7 +133,8 @@ class RouteEval:
         targets = tuple(j in target_tasks for j in self.seq) if inst.profile == 'sla' else ()
         signature = (inst.profile, reference, targets)
         if self._stable_starts is None or self._stable_reference != signature:
-            self._stable_starts = stable_starts(inst, self.e, self.seq, self.E, self.L, reference, targets)
+            self._stable_starts = stable_starts(inst, self.e, self.seq, self.E, self.L, reference, targets,
+                                                legs=[leg[0] for leg in self.legs] if self.legs is not None else None)
             self._stable_reference = signature
         return self._stable_starts
 
@@ -117,17 +162,21 @@ class RouteEval:
         values = self.objective_values(inst)
         return tuple(values[tier] for tier in inst.objective_tiers)
 
-    def insertion(self, inst: Instance, j: int, min_pos: int = 0):
+    def insertion(self, inst: Instance, j: int, min_pos: int = 0, blink: float = 0.0, rng=None):
         """Best feasible insertion (delta_km, position), including window gaps."""
         eng, tj = inst.engineers[self.e], inst.tasks[j]
         if not self.ok or j in self.seq or not inst.compatible(eng, tj):
             return None
+        if inst.replenishes(eng):
+            return self._insertion_with_reloads(inst, j, min_pos, blink, rng)
         if eng.stock is not None and any(self.used[k] + tj.equipment.get(k, 0) > eng.stock.get(k, 0)
                                         for k in self.used):
             return None
         tt, kmm = inst.ttl[eng.mode], inst.kml[eng.mode]
         nj, n, best, best_key = inst.node(j), len(self.seq), None, None
         for p in range(min_pos, n + 1):
+            if blink and rng.random() < blink:      # SISR blink: случайно пропускаем позицию
+                continue
             if p == 0:
                 prev_node, ready = eng.idx, eng.shift_start
             else:
@@ -147,6 +196,23 @@ class RouteEval:
             if inst.profile is not None:
                 candidate = RouteEval(inst, self.e, self.seq[:p] + [j] + self.seq[p:])
                 key = candidate.objective_key(inst)
+            if best_key is None or key < best_key:
+                best, best_key = (delta, p), key
+        return best
+
+    def _insertion_with_reloads(self, inst: Instance, j: int, min_pos: int = 0, blink: float = 0.0, rng=None):
+        """Insertion when reload stops move with the sequence: evaluate every position exactly.
+
+        O(n^2) per job instead of O(n); used only for engineers that can replenish."""
+        best, best_key = None, None
+        for p in range(min_pos, len(self.seq) + 1):
+            if blink and rng.random() < blink:
+                continue
+            candidate = RouteEval(inst, self.e, self.seq[:p] + [j] + self.seq[p:])
+            if not candidate.ok:
+                continue
+            delta = candidate.km - self.km
+            key = candidate.objective_key(inst) if inst.profile is not None else (delta,)
             if best_key is None or key < best_key:
                 best, best_key = (delta, p), key
         return best
@@ -224,10 +290,14 @@ def schedule(inst: Instance, e: int, seq: list):
     result, prev, ready = [], eng.idx, eng.shift_start
     for k, j in enumerate(seq):
         node = inst.node(j)
-        minutes, km = inst.ttl[eng.mode][prev][node], inst.kml[eng.mode][prev][node]
+        if route.legs is not None:
+            minutes, km, depot, _ = route.legs[k]
+        else:
+            minutes, km, depot = inst.ttl[eng.mode][prev][node], inst.kml[eng.mode][prev][node], None
         start = starts[k]
         arrival = ready + minutes
         result.append(dict(task=j, arrival=arrival, start=start, end=start + inst.tasks[j].service,
-                           leg_km=km, leg_min=minutes, wait=start - arrival))
+                           leg_km=km, leg_min=minutes, wait=start - arrival,
+                           **({'reload_depot': inst.depots[depot].id} if depot is not None else {})))
         ready, prev = start + inst.tasks[j].service, node
     return result

@@ -16,4 +16,17 @@ Integration changes:
 - Runs with at least six seconds of kernel search budget recombine mid-search and use the resulting plan for a second ALNS round. Short runs pay CP-SAT construction overhead only once. Restarts are sequential within the same total budget; there are no hidden parallel ALNS workers.
 - Column generation is deliberately excluded. `certificate` is empty, `optimality_proven` is false, and `bounds_status` explains the disabled nonmetric pricing bounds. CP-SAT stage statuses describe the restricted route pool only, not global optimality.
 
+- 2026-09-24, port of the kernel v2 research (upstream `research/README.md`; review in `docs/reviews/alns-v2-port.md`):
+  - SISR string removal and greedy insertion with blinks (Christiaens & Vanden Berghe 2020), mixed with the classic operators (`ruins='mixed'`).
+  - Uniform operator selection by default (`adaptive=False`), following the Turkeš et al. 2021 meta-analysis and the upstream ablation. The adaptive weights remain available.
+  - Absence-based reduction phases inside the shared deadline (`solve(..., absence_phases=True)`):
+    - first, fewer unassigned jobs, in every profile;
+    - then, one engineer fewer without losing coverage, only for `profile=None`.
+  - A phase result is accepted only when the full objective tuple strictly improves.
+  - The v2 configuration applies only from `V2_MIN_SECONDS = 2.5` s per call. Shorter calls (the 1 s day scenario, ALNS inside a 3 s hybrid) keep the previous classic adaptive search unchanged, because the phases took time from the main search there.
+  - Not ported:
+    - upstream multistart processes and PyVRP, because the app keeps one process per request;
+    - column generation, which stays disabled here.
+- Optional mid-day equipment replenishment (`Instance.depots`, not wired into the adapter): an engineer with known stock reloads to the morning loading at the fastest depot just before the first job whose demand exceeds equipment on hand. The detour is part of that job's inbound leg (`RouteEval.legs`) and counts in windows, shift, travel and the exact profile schedule. Without depots the original code path runs (`legs is None`). See `docs/reviews/equipment-replenishment.md`.
+
 The application adapter owns day facts, residual stock/availability, conversions, authoritative objective comparison, independent validation, and fallback. `tests/test_alns_core.py` exercises the internal contract and audited defects.

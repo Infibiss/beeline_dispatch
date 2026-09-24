@@ -3,9 +3,12 @@ from __future__ import annotations
 import math
 import time
 from .instance import Instance
-from .alns import ALNS
+from .alns import ALNS, coverage, reduce_by_absences
 from .sp import solve_sp, enrich_pool
 from .solution import Solution, validate
+
+
+V2_MIN_SECONDS = 2.5
 
 
 def better(inst, candidate: Solution, incumbent: Solution) -> bool:
@@ -13,7 +16,7 @@ def better(inst, candidate: Solution, incumbent: Solution) -> bool:
 
 
 def solve(inst: Instance, time_limit_seconds=5.0, seed=0, fixed=None,
-          init: Solution | None = None, log=False):
+          init: Solution | None = None, log=False, absence_phases=True):
     """Return the best feasible incumbent within one shared wall-clock budget.
 
     Cooperative checks cover repair, pool construction, and solver stages. CP-SAT
@@ -51,10 +54,19 @@ def solve(inst: Instance, time_limit_seconds=5.0, seed=0, fixed=None,
     # instead of only seeing it after exploration has ended. Short runs avoid
     # paying model-construction overhead twice.
     stages = [(.34, .37, .46), (.73, .77, .91)] if time_limit_seconds >= 6 else [(.63, .69, .90)]
+    # Конфигурация v2 (SISR + равномерный выбор + фазы по «отсутствиям») — только с бюджета V2_MIN_SECONDS.
+    # На коротком бюджете она ухудшала покрытие: сценарий дня по 1 с, hybrid на 3 с (ALNS ≈ 1,7 с);
+    # там остаётся прежний поиск без изменений (docs/reviews/alns-v2-port.md).
+    v2 = time_limit_seconds >= V2_MIN_SECONDS
+    absence_phases = absence_phases and v2
+    ops = {} if v2 else dict(ruins='classic', adaptive=True)
+    if absence_phases:
+        # Доли бюджета под фазы по «отсутствиям»: сначала невыполненные, утром — ещё и число бригад.
+        stages = ([(.30, .33, .41), (.62, .65, .76)] if time_limit_seconds >= 6 else [(.52, .57, .72)])
     pool_search = None
     rounds = []
     for round_index, (search_end, pool_end, sp_end) in enumerate(stages):
-        alns = ALNS(inst, seed=seed + 101*round_index, fixed=fixed)
+        alns = ALNS(inst, seed=seed + 101*round_index, fixed=fixed, **ops)
         if pool_search is not None:
             alns.pool = pool_search
         alns_deadline = start + search_end*time_limit_seconds
@@ -82,11 +94,16 @@ def solve(inst: Instance, time_limit_seconds=5.0, seed=0, fixed=None,
     info['alns'] = dict(iterations=sum(r['iterations'] for r in rounds),
                         restarts=sum(r['restarts'] for r in rounds), metrics=best.metrics(inst))
     info['rounds'] = rounds
+    if absence_phases:
+        info['absence'] = _absence_phases(inst, best, start, time_limit_seconds, seed, fixed)
+        improved = info['absence'].pop('solution', None)
+        if improved is not None and not validate(inst, improved) and better(inst, improved, best):
+            best = improved
     remaining = deadline-time.perf_counter()
     if remaining > .002:
         # Morning planning tries one fewer route; operational profiles polish
         # freely because fewer engineers may worsen their earlier priorities.
-        polish = ALNS(inst, seed=seed+1, fixed=fixed,
+        polish = ALNS(inst, seed=seed+1, fixed=fixed, **ops,
                       max_routes=max(0, len(best.routes)-1) if inst.profile is None else None)
         candidate = polish.run(time_limit=max(0, deadline-time.perf_counter()), deadline=deadline, init=best)
         if not validate(inst, candidate) and better(inst, candidate, best):
@@ -98,3 +115,39 @@ def solve(inst: Instance, time_limit_seconds=5.0, seed=0, fixed=None,
     info['objective_key'] = best.objective_key(inst)
     info['total_time'] = time.perf_counter()-start
     return best, info
+
+
+def _absence_phases(inst, best, start, budget, seed, fixed):
+    """Фазы по «отсутствиям» в общем бюджете: (1) меньше невыполненных заявок при любом числе бригад;
+    (2) только утром — план на одну бригаду меньше без потери покрытия. Каждая фаза ограничена своей
+    долей бюджета; результат принимается только при строгом улучшении полного кортежа цели."""
+    out, current = {}, best
+    unassigned_end = start + (.84 if budget >= 6 else .81) * budget
+    if current.unassigned and time.perf_counter() < unassigned_end:
+        target = coverage(inst, current)
+        found = reduce_by_absences(inst, current, deadline=unassigned_end, seed=seed + 300, fixed=fixed,
+                                   goal=lambda s, t=target: coverage(inst, s) < t)
+        out['unassigned_improved'] = found is not None
+        if found is not None and not validate(inst, found):
+            current = found
+    fleet_end = start + (.92 if budget >= 6 else .90) * budget
+    tries = 0
+    while inst.profile is None and len(current.routes) > 1 and time.perf_counter() < fleet_end:
+        k = len(current.routes) - 1
+        trial = current.copy(inst)
+        victims = sorted((len(r.seq), e) for e, r in trial.routes.items() if not (fixed and e in fixed))
+        if not victims:
+            break
+        for j in list(trial.routes[victims[0][1]].seq):
+            trial.remove(inst, j, victims[0][1])
+        target = coverage(inst, current)
+        found = reduce_by_absences(inst, trial, deadline=fleet_end, seed=seed + 400 + tries, fixed=fixed,
+                                   max_routes=k, goal=lambda s, t=target, k=k: coverage(inst, s) <= t
+                                   and len(s.routes) <= k)
+        tries += 1
+        if found is None or validate(inst, found):
+            break
+        current = found
+    out['fleet_tries'] = tries
+    out['solution'] = current if current is not best else None
+    return out

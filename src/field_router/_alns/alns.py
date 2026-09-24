@@ -43,7 +43,8 @@ class RoutePool:
 
 
 class ALNS:
-    def __init__(self, inst: Instance, seed=0, fixed=None, max_routes=None):
+    def __init__(self, inst: Instance, seed=0, fixed=None, max_routes=None, ruins='mixed', adaptive=False,
+                 blink=0.01, c_bar=10, l_max=10):
         """fixed: e -> список заявок, которые обязаны остаться первыми в маршруте (перепланирование)."""
         self.inst, self.rng = inst, random.Random(seed)
         self.compat = [[e for e, eng in enumerate(inst.engineers)
@@ -51,8 +52,21 @@ class ALNS:
         self.fixed = fixed or {}
         self.fixed_tasks = {j for seq in self.fixed.values() for j in seq}
         self.pool = RoutePool()
-        self.destroys = [self.d_random, self.d_shaw, self.d_worst, self.d_route, self.d_timeslice, self.d_conflict]
-        self.repairs = [self.r_greedy, self.r_regret2, self.r_regret3]
+        classic_d = [self.d_random, self.d_shaw, self.d_worst, self.d_route, self.d_timeslice, self.d_conflict]
+        classic_r = [self.r_greedy, self.r_regret2, self.r_regret3]
+        if ruins == 'classic':
+            self.destroys, self.repairs = classic_d, classic_r
+        elif ruins == 'mixed':          # исследование 09.2026: классика + SISR — лучшая медиана
+            self.destroys, self.repairs = classic_d + [self.d_sisr], classic_r + [self.r_blink]
+        elif ruins == 'sisr':
+            self.destroys, self.repairs = [self.d_sisr], [self.r_blink]
+        else:
+            raise ValueError(f'Unknown ruin set {ruins!r}')
+        # Адаптивные веса операторов по умолчанию выключены: в наших замерах и в мета-анализе
+        # Turkeš et al. (2021) они не дают выигрыша, а итераций становится меньше.
+        self.adaptive, self.blink, self.c_bar, self.l_max = adaptive, blink, c_bar, l_max
+        order = inst.km[inst.E:inst.E + inst.N, inst.E:inst.E + inst.N].argsort(axis=1) if inst.N else []
+        self.neigh = [[int(k) for k in order[j] if k != j] for j in range(inst.N)]
         # нормированная «связанность» заявок для Shaw
         self.span = max(1.0, float(inst.km.max())) if inst.km.size else 1.0
         self.engineer_weight = inst.N * self.span + 1
@@ -61,14 +75,14 @@ class ALNS:
         self.max_routes = max_routes      # режим сокращения парка: новые маршруты сверх лимита запрещены
 
     # ---------- insertion ----------
-    def _move(self, sol: Solution, j: int, e: int):
+    def _move(self, sol: Solution, j: int, e: int, blink: float = 0.0):
         route = sol.routes.get(e)
         extra = int(route is None)
         if route is None:
             if self.max_routes is not None and len(sol.routes) >= self.max_routes:
                 return None
             route = self._empty[e]
-        ins = route.insertion(self.inst, j, len(self.fixed.get(e, ())))
+        ins = route.insertion(self.inst, j, len(self.fixed.get(e, ())), blink, self.rng)
         if ins is None:
             return None
         delta, pos = ins
@@ -222,6 +236,69 @@ class ALNS:
         for _, k in sorted(candidates)[:max(2, self._q(sol))]:
             sol.remove(inst, k)
 
+    # ---------- SISR (Christiaens & Vanden Berghe, 2020) ----------
+    def d_sisr(self, sol):
+        """Удаление «строк»: от случайной заявки по её соседям из каждого затронутого маршрута
+        вырезается непрерывный кусок, содержащий соседа («пространственный запас» для вставок)."""
+        own = sol.task_owner()
+        routed = [j for j in own if j not in self.fixed_tasks]
+        if not routed:
+            return
+        rng, inst = self.rng, self.inst
+        avg = sum(len(r.seq) for r in sol.routes.values()) / max(1, len(sol.routes))
+        ls_max = min(self.l_max, avg)
+        k_s = max(1, int(rng.uniform(1, 4 * self.c_bar / (1 + ls_max))))
+        seed = rng.choice(routed)
+        ruined = set()
+        for c in [seed] + self.neigh[seed]:
+            if len(ruined) >= k_s:
+                break
+            e = own.get(c)
+            if e is None or e in ruined or c in self.fixed_tasks or e not in sol.routes:
+                continue
+            seq = sol.routes[e].seq
+            if c not in seq:
+                continue
+            length = max(1, int(rng.uniform(1, min(len(seq), ls_max) + 1)))
+            pos = seq.index(c)
+            lo, hi = max(0, pos - length + 1), min(pos, len(seq) - length)
+            first = rng.randint(lo, max(lo, hi))
+            for j in [j for j in seq[first:first + length] if j not in self.fixed_tasks]:
+                sol.remove(inst, j, e)
+            ruined.add(e)
+
+    def r_blink(self, sol):
+        """Жадная вставка с «морганием» (SISR): порядок — по случайному критерию, важные заявки первыми;
+        каждая позиция пропускается с вероятностью blink. Стоимость — тот же точный кортеж цели."""
+        for e, route in list(sol.routes.items()):
+            if not route.ok:
+                for j in list(route.seq):
+                    if j not in self.fixed_tasks:
+                        sol.remove(self.inst, j, e)
+        rng, inst = self.rng, self.inst
+        pending = sorted(sol.unassigned)
+        rule = rng.choices(['random', 'twlen', 'twstart', 'twend'], weights=[4, 2, 2, 2])[0]
+        if rule == 'random':
+            rng.shuffle(pending)
+        elif rule == 'twlen':
+            pending.sort(key=lambda j: inst.tasks[j].b - inst.tasks[j].a)
+        elif rule == 'twstart':
+            pending.sort(key=lambda j: inst.tasks[j].a)
+        else:
+            pending.sort(key=lambda j: -inst.tasks[j].b)
+        pending.sort(key=lambda j: -inst.tasks[j].priority)      # устойчивая сортировка: авария → подключение
+        for j in pending:
+            if time.perf_counter() >= self.deadline:
+                break
+            best = None
+            for e in self.compat[j]:
+                move = self._move(sol, j, e, self.blink)
+                if move is not None and (best is None or move[0] < best[0]):
+                    best = (move[0], e, move[1])
+            if best is not None:
+                sol.insert(inst, j, best[1], best[2])
+        return sol
+
     def accept(self, cost, current, best, temperature):
         """Explore a bounded neighbourhood while the best uses exact ordering.
 
@@ -301,12 +378,13 @@ class ALNS:
                 if rng.random() < .3:
                     self.pool.add_solution(cand)
             sd[di] += score; nd[di] += 1; sr[ri] += score; nr[ri] += 1
-            if it % 50 == 0:
+            if it % 50 == 0 and self.adaptive:
                 for weights, scores, counts in ((wd, sd, nd), (wr, sr, nr)):
                     for k in range(len(weights)):
                         if counts[k]:
                             weights[k] = .8*weights[k] + .2*max(.1, scores[k]/counts[k])
                         scores[k], counts[k] = 0.0, 0
+            if it % 50 == 0:
                 temperature = max(.15, temperature*.96)
                 if rng.random() < .1:
                     cur, cur_cost = best.copy(inst), best_cost
@@ -333,3 +411,40 @@ class ALNS:
         self.iterations = it
         self.pool.add_solution(best)
         return best
+
+
+def coverage(inst: Instance, sol: Solution) -> tuple:
+    """Первые три уровня цели: (аварии, аварии+подключения, все) среди невыполненных."""
+    return (sum(inst.tasks[j].priority == 3 for j in sol.unassigned),
+            sum(inst.tasks[j].priority >= 2 for j in sol.unassigned), len(sol.unassigned))
+
+
+def reduce_by_absences(inst: Instance, start: Solution, *, deadline: float, seed=0, fixed=None,
+                       max_routes=None, goal=None):
+    """Поиск по «отсутствиям» (SISR fleet minimisation, Christiaens & Vanden Berghe 2020).
+
+    Кандидат принимается, если покрытие строго лучше или меньше сумма «отсутствий» невставленных
+    заявок (сколько итераций каждая уже не вставлялась). Возвращает первое решение, для которого
+    goal(solution) истинно, либо None. Каждый возвращаемый маршрут допустим.
+    """
+    a = ALNS(inst, seed=seed, fixed=fixed, max_routes=max_routes, ruins='mixed', adaptive=False)
+    a.deadline = deadline
+    cur = a.r_blink(start.copy(inst))
+    if any(not r.ok for r in cur.routes.values()):
+        cur = start.copy(inst)
+    absences = [0] * inst.N
+    rng = a.rng
+    while time.perf_counter() < deadline:
+        if goal(cur) and all(r.ok for r in cur.routes.values()):
+            return cur
+        cand = cur.copy(inst)
+        rng.choice(a.destroys)(cand)
+        rng.choice(a.repairs)(cand)
+        if any(not r.ok for r in cand.routes.values()):
+            continue
+        for j in cand.unassigned:
+            absences[j] += 1
+        if coverage(inst, cand) < coverage(inst, cur) or \
+                sum(absences[j] for j in cand.unassigned) < sum(absences[j] for j in cur.unassigned):
+            cur = cand
+    return None

@@ -1,7 +1,8 @@
 """Internal TRSP data model adapted from the teammate kernel; see PROVENANCE.md.
 
-Nodes 0..E-1 are engineer starts; E..E+N-1 are jobs. Travel matrices are
-mandatory: this backend must use exactly the travel model of the application.
+Nodes 0..E-1 are engineer starts; E..E+N-1 are jobs; optional replenishment
+depots follow as E+N..E+N+D-1. Travel matrices are mandatory: this backend must
+use exactly the travel model of the application.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -48,6 +49,17 @@ class Engineer:
 
 
 @dataclass
+class Depot:
+    """Optional warehouse for mid-day equipment replenishment (not wired into the app yet).
+
+    A visit refills the engineer's stock to the morning loading; ``service`` is the
+    reload duration in minutes."""
+    idx: int
+    id: str
+    service: int = 15
+
+
+@dataclass
 class Instance:
     name: str
     tasks: list[Task]
@@ -60,6 +72,7 @@ class Instance:
     prev_owner: dict[int, int] = field(default_factory=dict)
     prev_start: dict[int, int] = field(default_factory=dict)
     response_targets: set[int] | None = None
+    depots: list[Depot] = field(default_factory=list)
 
     @property
     def target_tasks(self):
@@ -89,12 +102,32 @@ class Instance:
     def node(self, task_idx):
         return self.E + task_idx
 
+    def depot_node(self, depot_idx):
+        return self.E + self.N + depot_idx
+
+    def replenishes(self, engineer) -> bool:
+        """Mid-day reloads apply only with depots and a known (finite) stock."""
+        return bool(self.depots) and engineer.stock is not None
+
+    def reload_leg(self, engineer, prev_node, node):
+        """Fastest detour prev -> depot -> node: (minutes incl. reload, km, depot idx, travel minutes)."""
+        tt, kmm = self.ttl[engineer.mode], self.kml[engineer.mode]
+        best = None
+        for d in self.depots:
+            dn = self.depot_node(d.idx)
+            travel = tt[prev_node][dn] + tt[dn][node]
+            key = (travel + d.service, kmm[prev_node][dn] + kmm[dn][node])
+            if best is None or key < best[0]:
+                best = (key, d.idx, travel)
+        (minutes, km), depot, travel = best
+        return minutes, km, depot, travel
+
     def build_matrices(self):
         if self.profile not in (None, 'cost', 'sla', 'stable'):
             raise ValueError('Unknown objective profile')
         if any(t.priority not in (1, 2, 3) for t in self.tasks):
             raise ValueError('Task priorities must be 1, 2 or 3')
-        n = self.E + self.N
+        n = self.E + self.N + len(self.depots)
         ext = self.matrices or {}
         ext_km, ext_min = ext.get('km', {}), ext.get('minutes', {})
         self.km_mode, self.tt = {}, {}

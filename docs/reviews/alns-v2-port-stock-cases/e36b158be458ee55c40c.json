@@ -1,0 +1,2325 @@
+{
+  "scenario": {
+    "schema_version": "1.0",
+    "id": "Югоцентр-2026-08-17",
+    "region": "Югоцентр",
+    "date": "2026-08-17",
+    "office_address": "г.Москва проезд Симферопольский, д.7",
+    "requests": [
+      {
+        "id": "32840",
+        "region": "Югоцентр",
+        "address": "Город Москва, проезд.3-й Павелецкий, д. 9",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 2,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "78540",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Восточная, д. 2 к 2",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 3,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/vostochnaya_ulitsa_2k2/Z04YcAFgSkAOQFtvfXtwdnxgZQ%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "66376",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Дубининская, д. 59 к 2",
+        "locality": "GPON Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 4,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://www.openstreetmap.org/way/118566367; approximate",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "23637",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Шверника, д. 18 к 2",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 5,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "97770",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Нагорная, д. 44 к 2",
+        "locality": "Котловка",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 6,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "55711",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Херсонская, д. 18",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 7,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "76944",
+        "region": "Югоцентр",
+        "address": "Город Москва, пр-кт.60-летия Октября, д. 18 к 2",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 8,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "75881",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Дмитрия Ульянова, д. 27",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 9,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "85188",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Усачёва, д. 29 к 1",
+        "locality": "Хамовники",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 10,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "19376",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Винокурова, д. 12 к 4",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 11,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "6185",
+        "region": "Югоцентр",
+        "address": "Город Москва, пр-кт.Балаклавский, д. 20 к 4",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 12,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "80548",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Садовники, д. 10 к 1",
+        "locality": "Нагатино - Садовники",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 13,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/ulitsa_sadovniki_10k1/Z04YcAJiTkcEQFtvfXp2cHxnYw%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "76452",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Каховка, д. 7 к 1",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 14,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "47560",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Большая Пионерская, д. 33 к 2",
+        "locality": "Замоскворечье",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 15,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "79707",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Плющиха, д. 42",
+        "locality": "Хамовники",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 16,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "23142",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Судостроительная, д. 31 к 3",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 17,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/sudostroitelnaya_ulitsa_31k3/Z04YcA9gTUQPQFtvfXp5dXRmZw==/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "10776",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Судостроительная, д. 36",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 18,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "94447",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Затонная, д. 11 к 3",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 19,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/zatonnaya_ulitsa_11k3/Z04YcA9oTUEHQFtvfXp2eHxkZg==/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "94575",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Автозаводская, д. 11",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 20,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/avtozavodskaya_ulitsa_11/Z04YcAJnTEcHQFtvfXtxd3hnYw%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "94431",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Шверника, д. 12/2 к 3",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 21,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "52576",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Судостроительная, д. 27 к 2",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заявка на подключение",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 22,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "66315",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Шверника, д. 3",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 23,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "93544",
+        "region": "Югоцентр",
+        "address": "Город Москва, б-р.Черноморский, д. 19 к 2",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 24,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "19203",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Керченская, д. 6 к 2",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 25,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "16024",
+        "region": "Югоцентр",
+        "address": "Город Москва, б-р.Кленовый, д. 10 к 1",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заявка на подключение",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 26,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "90373",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Коломенская, д. 5",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 27,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "79719",
+        "region": "Югоцентр",
+        "address": "Город Москва, б-р.Смоленский, д. 17 стр. 1",
+        "locality": "Хамовники",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 28,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "6957",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Усачёва, д. 25",
+        "locality": "Хамовники",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 29,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://flatinfo.ru/h_info1.asp?hid=20168; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "78036",
+        "region": "Югоцентр",
+        "address": "Город Москва, пр-кт.60-летия Октября, д. 17",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Дозаказ",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 20,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 30,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "49105",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Ремизова, д. 15 к 2",
+        "locality": "Котловка",
+        "date": "2026-08-17",
+        "bk_type": "Дозаказ",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 20,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 31,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "27023",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Шверника, д. 5 к 2",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 32,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "26177",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Академика Миллионщикова, д. 13 к 1",
+        "locality": "Нагатино - Садовники",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 33,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://flatinfo.ru/h_info1.asp?hid=14098; manual",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "77795",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Винокурова, д. 5/6 к 2",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "TVE/ENT. Другие ошибки",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 34,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "24132",
+        "region": "Югоцентр",
+        "address": "Город Москва, пр-кт.Балаклавский, д. 50",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 35,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "99841",
+        "region": "Югоцентр",
+        "address": "Город Москва, б-р.Симферопольский, д. 27",
+        "locality": "Нагорный",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 36,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "20263",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Болотниковская, д. 9 к 2",
+        "locality": "Нагорный",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 37,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "51133",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Трофимова, д. 4А",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 38,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "90709",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Коломенская, д. 21",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Разрывы",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 39,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "84074",
+        "region": "Югоцентр",
+        "address": "Город Москва, наб.Нагатинская, д. 60 к 2",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 40,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "12263",
+        "region": "Югоцентр",
+        "address": "Город Москва, проезд.Коломенский, д. 27 к 3",
+        "locality": "Нагатино - Садовники",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 41,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "95501",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Затонная, д. 12 к 1",
+        "locality": "Нагатинский Затон",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 42,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "86002",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Городская, д. 9",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 43,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "92618",
+        "region": "Югоцентр",
+        "address": "Город Москва, пр-кт.Севастопольский, д. 9 к 1",
+        "locality": "Донской",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "IP-адрес 169...",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 44,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "26845",
+        "region": "Югоцентр",
+        "address": "Город Москва, проезд.3-й Павелецкий, д. 7 к 2",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Роутер. Замена техническим специалистом",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 45,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "80308",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Большая Серпуховская, д. 31 к 6",
+        "locality": "Замоскворечье",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "IP-адрес 169...",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 46,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "93276",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.2-я Рощинская, д. 11",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Разрывы",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 47,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "61311",
+        "region": "Югоцентр",
+        "address": "Город Москва, пер.Ослябинский, д. 3",
+        "locality": "Даниловский",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "ТВ. Замена приставки техником",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 48,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "46513",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Шверника, д. 14/1 к 2",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Рост ошибок на порту",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 49,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "35265",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Профсоюзная, д. 8 к 2",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Работа с кабелем",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 50,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/profsoyuznaya_ulitsa_8k2/Z04YcwFpTUUCQFtvfXp5d3hhYg==/; manual",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "13203",
+        "region": "Югоцентр",
+        "address": "Город Москва, пр-кт.Нахимовский, д. 50",
+        "locality": "Академический",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "ТВ. Замена приставки техником",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 51,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "26896",
+        "region": "Югоцентр",
+        "address": "Город Москва, б-р.Чонгарский, д. 22 к 2",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Переключение на Гбит/с",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 52,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "87819",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Люсиновская, д. 4",
+        "locality": "Замоскворечье",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Переключение на Гбит/с",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 53,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "5406",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Ремизова, д. 15 к 2",
+        "locality": "Котловка",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Переключение на Гбит/с",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 54,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "86864",
+        "region": "Югоцентр",
+        "address": "Город Москва, б-р.Чонгарский, д. 1 к 4",
+        "locality": "Нагорный",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Работа с кабелем",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 55,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "17896",
+        "region": "Югоцентр",
+        "address": "Город Москва, ул.Керченская, д. 10 к 2",
+        "locality": "Зюзино",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "IP-адрес 169...",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 56,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "18023",
+        "region": "Югоцентр",
+        "address": "г.Город Москва, пр-кт.Ленинский, д. 70/11",
+        "locality": "Гагаринский",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Информация",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 57,
+        "provenance": {
+          "source": "data/Обезличивание/Югоцентр Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/leninskiy_prospekt_70_11/Z04YcwNjSk0OQFtvfXp5dnliZg%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      }
+    ],
+    "engineers": [
+      {
+        "id": "Югоцентр-01",
+        "name": "Инженер 01",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection",
+          "emergency"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-02",
+        "name": "Инженер 02",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-03",
+        "name": "Инженер 03",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "connection"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-04",
+        "name": "Инженер 04",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-05",
+        "name": "Инженер 05",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "emergency"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-06",
+        "name": "Инженер 06",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection",
+          "emergency"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-07",
+        "name": "Инженер 07",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-08",
+        "name": "Инженер 08",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "connection"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-09",
+        "name": "Инженер 09",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local"
+        ],
+        "transport": "public",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-10",
+        "name": "Инженер 10",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "emergency"
+        ],
+        "transport": "car",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-11",
+        "name": "Инженер 11",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "connection",
+          "emergency"
+        ],
+        "transport": "car",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-12",
+        "name": "Инженер 12",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "connection"
+        ],
+        "transport": "car",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-13",
+        "name": "Инженер 13",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "connection"
+        ],
+        "transport": "walk",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-14",
+        "name": "Инженер 14",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local"
+        ],
+        "transport": "walk",
+        "stock": null
+      },
+      {
+        "id": "Югоцентр-15",
+        "name": "Инженер 15",
+        "region": "Югоцентр",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "emergency"
+        ],
+        "transport": "bicycle",
+        "stock": null
+      }
+    ],
+    "points": {},
+    "travel_config": {
+      "modes": {
+        "car": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-car",
+          "profile": "car",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 39.71092039
+        },
+        "walk": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-foot",
+          "profile": "walk",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 39.71092039
+        },
+        "bicycle": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-bike",
+          "profile": "bicycle",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 39.71092039
+        },
+        "public": {
+          "kind": "estimate",
+          "model": "multimodal-v3",
+          "network_signature": "a76977baf7925f0876de135574c86633cd7db7ca7ea5191f06f6b4a3ddecfb9f",
+          "pedestrian_access": "road-to-station-point",
+          "source": "HH open metro directory 2026-09-20; corrected service topology for demo 2026-08-17, see METRO-SOURCE.txt; GTFS Moscow, MobilityDatabase mdb-3226, snapshot 2026-06-30",
+          "service_date": "2026-08-17",
+          "description": "Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. Рельсовые поездки оценочные. Автобусы/трамваи: P90 времени сегмента и половина P90 интервала из GTFS, частое дневное движение. Нет расчёта под минуту отправления; вне подтверждённой сети используется только пеший маршрут.",
+          "assumptions": {
+            "walk_kmh": null,
+            "walk_detour_factor": null,
+            "max_access_straight_metres": 2500,
+            "nearest_stations": 6,
+            "nearest_surface_stops": 3,
+            "max_surface_access_straight_metres": 800,
+            "metro_kmh": 35,
+            "stop_minutes": 1,
+            "wait_minutes": 3,
+            "entry_exit_minutes": 2,
+            "transfer_radius_metres": 700,
+            "max_approach_minutes": 45,
+            "max_transfer_walk_minutes": 20
+          },
+          "journey_counts": {
+            "walk": 787,
+            "multimodal": 2462
+          }
+        }
+      }
+    },
+    "assumptions": [
+      "A01: время на объекте отдельно от дороги; нормативы сохранены в generation_config.work_rules",
+      "A02: Информация/Мониторинг используют норматив глобальной проблемы из конфигурации (норматив организаторов: 100 минут)",
+      "A03–A07: заменяемый справочник инженеров; фактический состав и смены сохранены в сценарии",
+      "A08–A11: роутеры/приставки под план; stock=null означает достаточную утреннюю выдачу, заданные остатки ограничивают маршрут; днем нет передач и пополнения",
+      "I01: порядок поступления = порядок строк CSV; приоритет задается work_rules: urgent (аварии) выше high (подключения), затем normal (ремонт/дозаказ); в демо новые подключения high, аварии urgent; политика пересматривается конфигурацией, исходные окна CSV не изменяются",
+      "I02: распределение смен/транспорта/навыков задается конфигурацией; при импорте используются предоставленные инженеры",
+      "I03: правила BK заданы таблицей; дополнительные устройства не добавляют время поверх норматива",
+      "I04: независимая синтетическая потребность в одном роутере/приставке с вероятностями из сохраненной конфигурации; явные замены требуют соответствующее устройство",
+      "I34: ВК — Beekeeper, HD — HelpDesk; соответствие классификаторов задается work_rules, это не отдельные виды работ",
+      "I35: время поступления исходных аварий не указано; исходные окна сохраняются. Для новых аварий время события — поступление, начало не раньше него",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка"
+    ],
+    "metadata": {
+      "geography": "wgs84",
+      "seed": 40,
+      "config_version": "demo-3-organizer-2026-09-20",
+      "config_sha256": "297c894685be51fd808693d59e2e27069a82ce281ee08d71eec34efdd89cde60",
+      "source_encoding": "cp1251",
+      "office_rows_separated": true,
+      "engineers_source": "synthetic",
+      "generation_config": {
+        "version": "demo-3-organizer-2026-09-20",
+        "seed": 40,
+        "engineers": {
+          "count": 15,
+          "early_count": 8,
+          "early_shift": [
+            540,
+            1080
+          ],
+          "late_shift": [
+            780,
+            1320
+          ],
+          "transports": [
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "car",
+            "car",
+            "car",
+            "walk",
+            "walk",
+            "bicycle"
+          ],
+          "skill_sets": [
+            [
+              "local",
+              "connection",
+              "emergency"
+            ],
+            [
+              "local",
+              "connection"
+            ],
+            [
+              "connection"
+            ],
+            [
+              "local"
+            ],
+            [
+              "local",
+              "emergency"
+            ]
+          ]
+        },
+        "work_rules": {
+          "Подключение": {
+            "skill": "connection",
+            "duration_minutes": 70,
+            "priority": "high"
+          },
+          "Дозаказ": {
+            "skill": "connection",
+            "duration_minutes": 20,
+            "priority": "normal"
+          },
+          "Локальная заявка": {
+            "skill": "local",
+            "duration_minutes": 30,
+            "priority": "normal"
+          },
+          "Глобальная проблема": {
+            "skill": "emergency",
+            "duration_minutes": 100,
+            "priority": "urgent"
+          }
+        },
+        "equipment": {
+          "router_probability": 0.5,
+          "tv_box_probability": 0.2
+        },
+        "geography": {
+          "radius_km": 8.0,
+          "cluster_radius_km": 1.5
+        },
+        "travel": {
+          "kind": "synthetic_euclidean",
+          "speed_kmh": {
+            "car": 25.0,
+            "walk": 4.5,
+            "bicycle": 12.0,
+            "public": 18.0
+          },
+          "distance_factor": {
+            "car": 1.3,
+            "walk": 1.15,
+            "bicycle": 1.2,
+            "public": 1.3
+          },
+          "boarding_minutes": {
+            "car": 0.0,
+            "walk": 0.0,
+            "bicycle": 0.0,
+            "public": 7.0
+          }
+        },
+        "assumptions": [
+          "A01: время на объекте отдельно от дороги; нормативы сохранены в generation_config.work_rules",
+          "A02: Информация/Мониторинг используют норматив глобальной проблемы из конфигурации (норматив организаторов: 100 минут)",
+          "A03–A07: заменяемый справочник инженеров; фактический состав и смены сохранены в сценарии",
+          "A08–A11: роутеры/приставки под план; stock=null означает достаточную утреннюю выдачу, заданные остатки ограничивают маршрут; днем нет передач и пополнения",
+          "A12: синтетические координаты в километрах, НЕ геокодирование московских адресов",
+          "I01: порядок поступления = порядок строк CSV; приоритет задается work_rules: urgent (аварии) выше high (подключения), затем normal (ремонт/дозаказ); в демо новые подключения high, аварии urgent; политика пересматривается конфигурацией, исходные окна CSV не изменяются",
+          "I02: распределение смен/транспорта/навыков задается конфигурацией; при импорте используются предоставленные инженеры",
+          "I03: правила BK заданы таблицей; дополнительные устройства не добавляют время поверх норматива",
+          "I04: независимая синтетическая потребность в одном роутере/приставке с вероятностями из сохраненной конфигурации; явные замены требуют соответствующее устройство",
+          "I05: расстояние по синтетической плоскости с коэффициентом; скорости/посадка условны и не являются измерениями Москвы",
+          "I34: ВК — Beekeeper, HD — HelpDesk; соответствие классификаторов задается work_rules, это не отдельные виды работ",
+          "I35: время поступления исходных аварий не указано; исходные окна сохраняются. Для новых аварий время события — поступление, начало не раньше него"
+        ]
+      },
+      "geography_signature": "1c50a90353c94848ddb51f41c14faa30a3a0850908fccee47bd1235293c3dc1d",
+      "emergency_norm": "100 total = 20 travel allowance + 80 service; actual travel replaces allowance, pending confirmation; no max(20,t)"
+    }
+  },
+  "reference": null
+}

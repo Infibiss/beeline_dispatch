@@ -65,7 +65,7 @@ class ALNS:
         # Адаптивные веса операторов по умолчанию выключены: в наших замерах и в мета-анализе
         # Turkeš et al. (2021) они не дают выигрыша, а итераций становится меньше.
         self.adaptive, self.blink, self.c_bar, self.l_max = adaptive, blink, c_bar, l_max
-        order = inst.km[inst.E:, inst.E:].argsort(axis=1) if inst.N else []
+        order = inst.km[inst.E:inst.E + inst.N, inst.E:inst.E + inst.N].argsort(axis=1) if inst.N else []
         self.neigh = [[int(k) for k in order[j] if k != j] for j in range(inst.N)]
         # нормированная «связанность» заявок для Shaw
         self.span = max(1.0, float(inst.km.max())) if inst.km.size else 1.0

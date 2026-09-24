@@ -27,5 +27,6 @@ Integration changes:
   - Not ported:
     - upstream multistart processes and PyVRP, because the app keeps one process per request;
     - column generation, which stays disabled here.
+- Optional mid-day equipment replenishment (`Instance.depots`, not wired into the adapter): an engineer with known stock reloads to the morning loading at the fastest depot just before the first job whose demand exceeds equipment on hand. The detour is part of that job's inbound leg (`RouteEval.legs`) and counts in windows, shift, travel and the exact profile schedule. Without depots the original code path runs (`legs is None`). See `docs/reviews/equipment-replenishment.md`.
 
 The application adapter owns day facts, residual stock/availability, conversions, authoritative objective comparison, independent validation, and fallback. `tests/test_alns_core.py` exercises the internal contract and audited defects.

@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 
-def stable_starts(inst, e, seq, earliest, latest, reference, targets=()):
+def stable_starts(inst, e, seq, earliest, latest, reference, targets=(), legs=None):
     """Minimize targeted response first, then deviation in disjoint windows.
 
     The feasibility bounds already include the engineer's actual start location,
@@ -20,6 +20,8 @@ def stable_starts(inst, e, seq, earliest, latest, reference, targets=()):
         return tuple(earliest)
     engineer, tasks = inst.engineers[e], inst.tasks
     travel = inst.ttl[engineer.mode]
+    # legs[k] = minutes from the previous stop to job k, including a replenishment detour.
+    leg = (lambda k, prev, node: legs[k]) if legs is not None else (lambda k, prev, node: travel[prev][node])
 
     # Every target's earliest bound and zero deviation elsewhere give a lower
     # bound. Preserve that schedule without allocating DP arrays when feasible.
@@ -28,7 +30,7 @@ def stable_starts(inst, e, seq, earliest, latest, reference, targets=()):
     result, ready, previous = [], engineer.shift_start, engineer.idx
     for k, j in enumerate(seq):
         task = tasks[j]
-        arrival = ready + travel[previous][inst.node(j)]
+        arrival = ready + leg(k, previous, inst.node(j))
         wanted = earliest[k] if targets and targets[k] else reference[k]
         start = wanted if wanted is not None else min(
             (max(arrival, a) for a, b in task.service_windows if max(arrival, a) <= b),
@@ -68,7 +70,7 @@ def stable_starts(inst, e, seq, earliest, latest, reference, targets=()):
             improvements[0] = True
             improvements[1:] = costs[1:] < prefix[:-1]
             best_indices = np.maximum.accumulate(np.where(improvements, np.arange(len(costs)), 0))
-            lag = tasks[seq[k - 1]].service + travel[inst.node(seq[k - 1])][inst.node(j)]
+            lag = tasks[seq[k - 1]].service + leg(k, inst.node(seq[k - 1]), inst.node(j))
             limits = np.minimum(times - lag - offsets[-1], len(costs) - 1)
             # Forward earliest bounds guarantee limits >= 0.
             parent = best_indices[limits]

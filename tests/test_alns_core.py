@@ -214,3 +214,59 @@ def test_empty_problem_returns_immediately_and_fixed_prefix_survives():
     result, _ = solve(inst, time_limit_seconds=.1, fixed={1: [2, 1]}, seed=42)
     assert result.routes[1].seq[:2] == [2, 1]
     assert not validate(inst, result)
+
+
+# ---- v2: SISR + равномерный выбор операторов + фазы по «отсутствиям» ----
+
+def _spread(n=12, engineers=3):
+    rng = np.random.default_rng(0)
+    pts = rng.uniform(0, 30, size=(n + engineers, 2))
+    matrix = np.ceil(np.linalg.norm(pts[:, None] - pts[None], axis=2))
+    return instance([task(j, duration=10, end=240) for j in range(n)], end=240, matrix=matrix, engineers=engineers)
+
+
+@pytest.mark.parametrize("ruins,adaptive", [("mixed", False), ("sisr", False), ("classic", True)])
+def test_v2_operator_sets_return_valid_incumbents(ruins, adaptive):
+    from field_router._alns.alns import ALNS
+    inst = _spread()
+    alns = ALNS(inst, seed=1, ruins=ruins, adaptive=adaptive)
+    best = alns.run(time_limit=0.5, deadline=time.perf_counter() + 0.5)
+    assert not validate(inst, best)
+
+
+def test_blink_insertion_skips_positions_but_never_returns_infeasible():
+    inst = _spread(n=6, engineers=1)
+    route = RouteEval(inst, 0, [0, 1, 2])
+    rng = np.random.default_rng(3)
+    for _ in range(50):
+        ins = route.insertion(inst, 3, blink=0.5, rng=rng)
+        if ins is not None:
+            seq = list(route.seq)
+            seq.insert(ins[1], 3)
+            assert RouteEval(inst, 0, seq).ok
+
+
+def test_absence_reduction_keeps_fixed_prefix_and_never_worsens_coverage():
+    from field_router._alns.alns import coverage, reduce_by_absences
+    inst = _spread()
+    start = solution(inst, [0, 1])
+    fixed = {0: [0]}
+    target = coverage(inst, start)
+    found = reduce_by_absences(inst, start, deadline=time.perf_counter() + 1.0, seed=0, fixed=fixed,
+                               goal=lambda s: coverage(inst, s) < target)
+    assert found is not None
+    assert not validate(inst, found)
+    assert found.routes[0].seq[0] == 0
+    assert coverage(inst, found) < target
+
+
+def test_solve_with_absence_phases_respects_shared_deadline():
+    from field_router._alns.solver import solve
+    inst = _spread(n=20, engineers=4)
+    t0 = time.perf_counter()
+    best, info = solve(inst, time_limit_seconds=3.0, seed=0)
+    assert time.perf_counter() - t0 < 3.0 + 0.5
+    assert not validate(inst, best)
+    assert 'absence' in info
+    _, short = solve(inst, time_limit_seconds=1.0, seed=0)     # короткий бюджет: только основной поиск
+    assert 'absence' not in short

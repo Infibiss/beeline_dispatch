@@ -117,7 +117,7 @@ class RouteEval:
         values = self.objective_values(inst)
         return tuple(values[tier] for tier in inst.objective_tiers)
 
-    def insertion(self, inst: Instance, j: int, min_pos: int = 0):
+    def insertion(self, inst: Instance, j: int, min_pos: int = 0, blink: float = 0.0, rng=None):
         """Best feasible insertion (delta_km, position), including window gaps."""
         eng, tj = inst.engineers[self.e], inst.tasks[j]
         if not self.ok or j in self.seq or not inst.compatible(eng, tj):
@@ -128,6 +128,8 @@ class RouteEval:
         tt, kmm = inst.ttl[eng.mode], inst.kml[eng.mode]
         nj, n, best, best_key = inst.node(j), len(self.seq), None, None
         for p in range(min_pos, n + 1):
+            if blink and rng.random() < blink:      # SISR blink: случайно пропускаем позицию
+                continue
             if p == 0:
                 prev_node, ready = eng.idx, eng.shift_start
             else:

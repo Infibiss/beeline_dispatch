@@ -1,0 +1,3263 @@
+{
+  "scenario": {
+    "schema_version": "1.0",
+    "id": "Юго-восток-2026-08-17",
+    "region": "Юго-восток",
+    "date": "2026-08-17",
+    "office_address": "г. Москва, ул Бирюлёвская, д 1с1",
+    "requests": [
+      {
+        "id": "67472",
+        "region": "Юго-восток",
+        "address": "Домодедово, проезд.Советский 1-й, д. 1А",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 2,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "84466",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Гурьевский, д. 23 к 1",
+        "locality": "Орехово Борисово Южное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 3,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "14416",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Кустанайская, д. 8 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 4,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "68359",
+        "region": "Юго-восток",
+        "address": "Город Москва, ш.Каширское, д. 136",
+        "locality": "Орехово Борисово Южное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 5,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "66944",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Зеленая, д. 85",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 6,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "52041",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Москворечье, д. 4 к 6",
+        "locality": "Москворечье - Сабурово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 7,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "23807",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Загорьевский, д. 9",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 8,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/zagoryevskiy_proyezd_9/Z04YcABnTU0GQFtvfXl2eXxqZQ==/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "60484",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.6-я Радиальная, д. 5 к 3",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 9,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.md/maps/213/moscow/house/6_ya_radialnaya_ulitsa_5k3/Z04YcAFhSEUCQFtvfXpxdXpqZg%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "63591",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Бирюлёвская, д. 39",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 10,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "53552",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Победы, д. 9",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 11,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "58066",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Братеевская, д. 18 к 1",
+        "locality": "Братеево",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 12,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "2915",
+        "region": "Юго-восток",
+        "address": "Город Москва, б-р.Ореховый, д. 35 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 13,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "3566",
+        "region": "Юго-восток",
+        "address": "Город Москва, б-р.Ореховый, д. 35 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 14,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "68946",
+        "region": "Юго-восток",
+        "address": "Город Москва, пр-кт.Пролетарский, д. 14А",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 15,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "55454",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Корнеева, д. 50",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 16,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "35057",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Корнеева, д. 40",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 17,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "75745",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Зеленая, д. 85",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 18,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "65717",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Ереванская, д. 29",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 19,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "44117",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Севанская, д. 15 к 1",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 20,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "76173",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.6-я Радиальная, д. 7/1 к 2",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 21,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "876",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Загорьевский, д. 9",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 22,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/zagoryevskiy_proyezd_9/Z04YcABnTU0GQFtvfXl2eXxqZQ==/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "62011",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Садовая, д. 18",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 23,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "57353",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Садовая, д. 2/11",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 24,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "2245",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Паромная, д. 9 к 1",
+        "locality": "Братеево",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заявка на подключение",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 25,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "14494",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Братеевская, д. 16 к 1",
+        "locality": "Братеево",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 26,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "78920",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Борисовские Пруды, д. 20 к 1",
+        "locality": "Братеево",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заявка на подключение",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 27,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/ulitsa_borisovskiye_prudy_20k1/Z04YcQJhT0QOQFtvfXpyeX1rYg==/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "78876",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Юбилейная, д. 9",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 28,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "23094",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.8 Марта, д. 22",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 29,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/10732/kashira/house/ulitsa_8_marta_22/Z0EYdARpSUwOQFtufXR1dXljbA==/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "79144",
+        "region": "Юго-восток",
+        "address": "Город Москва, б-р.Ореховый, д. 7 к 1",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заявка на подключение",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 30,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "60141",
+        "region": "Юго-восток",
+        "address": "Город Москва, ш.Каширское, д. 94 к 1",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 31,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "79450",
+        "region": "Юго-восток",
+        "address": "Город Москва, б-р.Ореховый, д. 11 к 1",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 32,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/orekhovy_bulvar_11k1/Z04YcQZiTkEOQFtvfXpwcXVjYg%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "58129",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Борисовский, д. 44 к 3",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Заявка на подключение",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 33,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "93798",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Ореховый, д. 41",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 34,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "89696",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Ильюшина, д. 20",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 35,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "20362",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Юбилейная, д. 8",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 36,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "40698",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Кустанайская, д. 9 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Подключение",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 70,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "high",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 37,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Подключение].priority=high; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "2427",
+        "region": "Юго-восток",
+        "address": "Город Москва, пр-кт.Пролетарский, д. 18 к 4",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Дозаказ",
+        "hd_type": "Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 20,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 38,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "51603",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Борисовские Пруды, д. 20 к 1",
+        "locality": "Братеево",
+        "date": "2026-08-17",
+        "bk_type": "Дозаказ",
+        "hd_type": "Заказ подключения/Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 20,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 39,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/ulitsa_borisovskiye_prudy_20k1/Z04YcQJhT0QOQFtvfXpyeX1rYg==/; manual",
+          "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "13404",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Кржижановского, д. 7",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Дозаказ",
+        "hd_type": "Конвергенция абонента",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 20,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 40,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "72476",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Медынская, д. 5 к 1",
+        "locality": "Бирюлево Западное",
+        "date": "2026-08-17",
+        "bk_type": "Дозаказ",
+        "hd_type": "Дозаказ оборудования",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 20,
+        "skill": "connection",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 41,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Дозаказ].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "90989",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Гагарина, д. 55/2",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 42,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/10725/domodedovo/house/ulitsa_gagarina_55_2/Z04YcQRpTEYAQFtvfXh0cHljYw==/; manual",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "7660",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.1-я Коммунистическая, д. 39",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 43,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "89067",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Борисовские Пруды, д. 48 к 2",
+        "locality": "Братеево",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Работа с кабелем",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 44,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "65268",
+        "region": "Юго-восток",
+        "address": "Ступино, ул.Калинина, д. 34",
+        "locality": "Ступино",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Работа с кабелем",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 45,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "33880",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Шипиловский, д. 59 к 2",
+        "locality": "Орехово Борисово Южное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Низкая скорость",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 46,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "37590",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Востряковский, д. 15 к 2",
+        "locality": "Бирюлево Западное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 47,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "33507",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Бирюлёвская, д. 58 к 3",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 48,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/?text=Москва%2C+ул.+Бирюлевская%2C++дом+58%2C+корпус+3; manual",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "88209",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Домодедовская, д. 31",
+        "locality": "Орехово Борисово Южное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Низкая скорость",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 49,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "24482",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Весёлая, д. 33 к 7",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Рост ошибок на порту",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 50,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "40111",
+        "region": "Юго-восток",
+        "address": "Ступино, ул.Калинина, д. 34",
+        "locality": "Ступино",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Работа с кабелем",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 51,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "46199",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Ильюшина, д. 11 к 2",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 52,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "75282",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Востряковский, д. 15 к 4",
+        "locality": "Бирюлево Западное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Роутер. Замена техническим специалистом",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 53,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "63577",
+        "region": "Юго-восток",
+        "address": "Домодедово, ул.Корнеева, д. 48",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 54,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "7610",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Луганская, д. 4 к 1",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Переключение на Гбит/с",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 55,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "19216",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Луганская, д. 3 к 1",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "TVE/ENT. Замена приставки техником",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 56,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "11872",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Весёлая, д. 33 к 7",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Рост ошибок на порту",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 57,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "54422",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Луганская, д. 1",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "IP-адрес 169...",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 58,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/luganskaya_ulitsa_1/Z04YcAFjQUcAQFtvfXpzeXlhZA%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "4724",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Кантемировская, д. 5 к 2",
+        "locality": "Царицыно",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Низкая скорость",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 59,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/213/moscow/house/kantemirovskaya_ulitsa_5k2/Z04YcABnSkYAQFtvfXpydH1gYw==/; manual",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "11899",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Загорьевский, д. 7 к 2",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Низкая скорость",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 60,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "60886",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Маршала Захарова, д. 18 к 1",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Переключение на Гбит/с",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 61,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "32066",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Генерала Белова, д. 45 к 2",
+        "locality": "Орехово Борисово Южное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 62,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "63894",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Шипиловская, д. 38",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "IP-адрес 169...",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 63,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "64168",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Гурьевский, д. 19 к 2",
+        "locality": "Орехово Борисово Южное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "TVE/ENT. Замена приставки техником",
+        "windows": [
+          {
+            "start": 960,
+            "end": 1080
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 64,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "40919",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Борисовский, д. 44 к 3",
+        "locality": "Орехово Борисово Северное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Рост ошибок на порту",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 65,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "36961",
+        "region": "Юго-восток",
+        "address": "Город Москва, проезд.Ореховый, д. 23 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 1080,
+            "end": 1200
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 66,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "12329",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Булатниковская, д. 4 к 1",
+        "locality": "Бирюлево Западное",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Разрывы",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 67,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "95692",
+        "region": "Юго-восток",
+        "address": "Город Москва, б-р.Ореховый, д. 61 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 600,
+            "end": 720
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 68,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "13583",
+        "region": "Юго-восток",
+        "address": "Домодедово, проезд.Кутузовский, д. 16",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 69,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "3151",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Ленина, д. 11 к 3",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Нет линка",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 1
+        },
+        "source_line": 70,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "45778",
+        "region": "Юго-восток",
+        "address": "Кашира, ул.Металлургов, д. 5 к 3",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "Рост ошибок на порту",
+        "windows": [
+          {
+            "start": 840,
+            "end": 960
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 71,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "20055",
+        "region": "Юго-восток",
+        "address": "Город Москва, ул.Мусы Джалиля, д. 9 к 1",
+        "locality": "Зябликово",
+        "date": "2026-08-17",
+        "bk_type": "Локальная заявка",
+        "hd_type": "IP-адрес 169...",
+        "windows": [
+          {
+            "start": 720,
+            "end": 840
+          }
+        ],
+        "duration_minutes": 30,
+        "skill": "local",
+        "required_transport": null,
+        "priority": "normal",
+        "equipment": {
+          "router": 0,
+          "tv_box": 1
+        },
+        "source_line": 72,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "A01/A02/I03: config.work_rules, XLSX technical + documents",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Локальная заявка].priority=normal; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "7258",
+        "region": "Юго-восток",
+        "address": "обл.Московская область, г.Домодедово, пгт.Востряково-1, ул.Жуковского, д. 14/18",
+        "locality": "Домодедово",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1200,
+            "end": 1320
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 73,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.ru/maps/10725/domodedovo/house/ulitsa_zhukovskogo_14_18/Z04YfgRpTk0OQFtvfXhwcHthZQ==/; approximate",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "78673",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Центральная ул. д. 21",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 74,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "98998",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Кржижановского ул. д. 5/1",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 75,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://www.openstreetmap.org/way/106326987; approximate",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "32589",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Кржижановского ул. д. 7к2",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 76,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "51774",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Кржижановского ул. д. 5/3",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 77,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://www.openstreetmap.org/way/106326939; approximate",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "90915",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Кржижановского ул. д. 5/2",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 78,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://www.openstreetmap.org/way/106326943; approximate",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "45243",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Кржижановского ул. д. 5/1",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 79,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://www.openstreetmap.org/way/106326987; approximate",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "81698",
+        "region": "Юго-восток",
+        "address": "МО, г. Ступино Андропова ул. д. 37",
+        "locality": "Ступино",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 80,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "97168",
+        "region": "Юго-восток",
+        "address": "МО, г. Ступино Андропова ул. д. 33",
+        "locality": "Ступино",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 0,
+          "tv_box": 0
+        },
+        "source_line": 81,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "65034",
+        "region": "Юго-восток",
+        "address": "МО, г. Кашира Центральная ул. д. 19",
+        "locality": "Кашира",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 82,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "Photon / OpenStreetMap; building_match",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "1287",
+        "region": "Юго-восток",
+        "address": "Москва Бирюлевская ул. д. 44",
+        "locality": "Бирюлево Восточное",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 83,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://www.openstreetmap.org/way/32632061; approximate",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      },
+      {
+        "id": "31495",
+        "region": "Юго-восток",
+        "address": "Москва Булатниковский пр-зд. д. 6к1",
+        "locality": "Бирюлево Западное",
+        "date": "2026-08-17",
+        "bk_type": "Глобальная проблема",
+        "hd_type": "Авария",
+        "windows": [
+          {
+            "start": 1,
+            "end": 1439
+          }
+        ],
+        "duration_minutes": 80,
+        "skill": "emergency",
+        "required_transport": null,
+        "priority": "urgent",
+        "equipment": {
+          "router": 1,
+          "tv_box": 0
+        },
+        "source_line": 84,
+        "provenance": {
+          "source": "data/Обезличивание/Юго-восток Синтетические данные.csv",
+          "duration": "Organizer clarification: 100 total = 20 travel allowance + 80 on site. Actual model travel is separate.",
+          "equipment": "A09/I04: seeded synthetic demand",
+          "coordinates": "https://yandex.com/maps/213/moscow/house/Z04YcAJhSUIGQFtvfXl4cnRkZw%3D%3D/; manual",
+          "priority": "I01: config.work_rules[Глобальная проблема].priority=urgent; urgent > high > normal",
+          "windows": "Original CSV start/end preserved; priority does not alter customer windows",
+          "order": "I01: CSV row order"
+        }
+      }
+    ],
+    "engineers": [
+      {
+        "id": "Юго-восток-01",
+        "name": "Инженер 01",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection",
+          "emergency"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 5,
+          "tv_box": 0
+        }
+      },
+      {
+        "id": "Юго-восток-02",
+        "name": "Инженер 02",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 2,
+          "tv_box": 0
+        }
+      },
+      {
+        "id": "Юго-восток-03",
+        "name": "Инженер 03",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "connection"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 2,
+          "tv_box": 1
+        }
+      },
+      {
+        "id": "Юго-восток-04",
+        "name": "Инженер 04",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 2,
+          "tv_box": 0
+        }
+      },
+      {
+        "id": "Юго-восток-05",
+        "name": "Инженер 05",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "emergency"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 1,
+          "tv_box": 2
+        }
+      },
+      {
+        "id": "Юго-восток-06",
+        "name": "Инженер 06",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection",
+          "emergency"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 3,
+          "tv_box": 1
+        }
+      },
+      {
+        "id": "Юго-восток-07",
+        "name": "Инженер 07",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "local",
+          "connection"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 3,
+          "tv_box": 1
+        }
+      },
+      {
+        "id": "Юго-восток-08",
+        "name": "Инженер 08",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 540,
+          "end": 1080
+        },
+        "skills": [
+          "connection"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 2,
+          "tv_box": 3
+        }
+      },
+      {
+        "id": "Юго-восток-09",
+        "name": "Инженер 09",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local"
+        ],
+        "transport": "public",
+        "stock": {
+          "router": 3,
+          "tv_box": 2
+        }
+      },
+      {
+        "id": "Юго-восток-10",
+        "name": "Инженер 10",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "emergency"
+        ],
+        "transport": "car",
+        "stock": {
+          "router": 3,
+          "tv_box": 0
+        }
+      },
+      {
+        "id": "Юго-восток-11",
+        "name": "Инженер 11",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "connection",
+          "emergency"
+        ],
+        "transport": "car",
+        "stock": {
+          "router": 4,
+          "tv_box": 0
+        }
+      },
+      {
+        "id": "Юго-восток-12",
+        "name": "Инженер 12",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "connection"
+        ],
+        "transport": "car",
+        "stock": {
+          "router": 3,
+          "tv_box": 2
+        }
+      },
+      {
+        "id": "Юго-восток-13",
+        "name": "Инженер 13",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "connection"
+        ],
+        "transport": "walk",
+        "stock": {
+          "router": 1,
+          "tv_box": 1
+        }
+      },
+      {
+        "id": "Юго-восток-14",
+        "name": "Инженер 14",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local"
+        ],
+        "transport": "walk",
+        "stock": {
+          "router": 2,
+          "tv_box": 0
+        }
+      },
+      {
+        "id": "Юго-восток-15",
+        "name": "Инженер 15",
+        "region": "Юго-восток",
+        "start_location": "office",
+        "start_address": null,
+        "shift": {
+          "start": 780,
+          "end": 1320
+        },
+        "skills": [
+          "local",
+          "emergency"
+        ],
+        "transport": "bicycle",
+        "stock": {
+          "router": 1,
+          "tv_box": 1
+        }
+      }
+    ],
+    "points": {},
+    "travel_config": {
+      "modes": {
+        "car": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-car",
+          "profile": "car",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 72.03718946
+        },
+        "walk": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-foot",
+          "profile": "walk",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 28.2529481
+        },
+        "bicycle": {
+          "kind": "road",
+          "source": "https://routing.openstreetmap.de/routed-bike",
+          "profile": "bicycle",
+          "traffic": "без актуальных пробок",
+          "data_version": "not supplied",
+          "max_snap_metres": 28.2529481
+        },
+        "public": {
+          "kind": "estimate",
+          "model": "multimodal-v3",
+          "network_signature": "a76977baf7925f0876de135574c86633cd7db7ca7ea5191f06f6b4a3ddecfb9f",
+          "pedestrian_access": "road-to-station-point",
+          "source": "HH open metro directory 2026-09-20; corrected service topology for demo 2026-08-17, see METRO-SOURCE.txt; GTFS Moscow, MobilityDatabase mdb-3226, snapshot 2026-06-30",
+          "service_date": "2026-08-17",
+          "description": "Подходы и наземные пересадки по пешеходной сети OSRM до точек станций, без гарантии конкретного входа. Рельсовые поездки оценочные. Автобусы/трамваи: P90 времени сегмента и половина P90 интервала из GTFS, частое дневное движение. Нет расчёта под минуту отправления; вне подтверждённой сети используется только пеший маршрут.",
+          "assumptions": {
+            "walk_kmh": null,
+            "walk_detour_factor": null,
+            "max_access_straight_metres": 2500,
+            "nearest_stations": 6,
+            "nearest_surface_stops": 3,
+            "max_surface_access_straight_metres": 800,
+            "metro_kmh": 35,
+            "stop_minutes": 1,
+            "wait_minutes": 3,
+            "entry_exit_minutes": 2,
+            "transfer_radius_metres": 700,
+            "max_approach_minutes": 45,
+            "max_transfer_walk_minutes": 20
+          },
+          "journey_counts": {
+            "walk": 6018,
+            "multimodal": 1038
+          }
+        }
+      }
+    },
+    "assumptions": [
+      "A01: время на объекте отдельно от дороги; нормативы сохранены в generation_config.work_rules",
+      "A02: Информация/Мониторинг используют норматив глобальной проблемы из конфигурации (норматив организаторов: 100 минут)",
+      "A03–A07: заменяемый справочник инженеров; фактический состав и смены сохранены в сценарии",
+      "A08–A11: роутеры/приставки под план; stock=null означает достаточную утреннюю выдачу, заданные остатки ограничивают маршрут; днем нет передач и пополнения",
+      "I01: порядок поступления = порядок строк CSV; приоритет задается work_rules: urgent (аварии) выше high (подключения), затем normal (ремонт/дозаказ); в демо новые подключения high, аварии urgent; политика пересматривается конфигурацией, исходные окна CSV не изменяются",
+      "I02: распределение смен/транспорта/навыков задается конфигурацией; при импорте используются предоставленные инженеры",
+      "I03: правила BK заданы таблицей; дополнительные устройства не добавляют время поверх норматива",
+      "I04: независимая синтетическая потребность в одном роутере/приставке с вероятностями из сохраненной конфигурации; явные замены требуют соответствующее устройство",
+      "I34: ВК — Beekeeper, HD — HelpDesk; соответствие классификаторов задается work_rules, это не отдельные виды работ",
+      "I35: время поступления исходных аварий не указано; исходные окна сохраняются. Для новых аварий время события — поступление, начало не раньше него",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка",
+      "G01: координаты из OSM или ручной проверки; разрешенные приближения явно помечены",
+      "G02: дорожные времена модельные, без актуальных пробок; общественный транспорт без расписаний — только явно разрешенная оценка"
+    ],
+    "metadata": {
+      "geography": "wgs84",
+      "seed": 40,
+      "config_version": "demo-3-organizer-2026-09-20",
+      "config_sha256": "297c894685be51fd808693d59e2e27069a82ce281ee08d71eec34efdd89cde60",
+      "source_encoding": "cp1251",
+      "office_rows_separated": true,
+      "engineers_source": "synthetic",
+      "generation_config": {
+        "version": "demo-3-organizer-2026-09-20",
+        "seed": 40,
+        "engineers": {
+          "count": 15,
+          "early_count": 8,
+          "early_shift": [
+            540,
+            1080
+          ],
+          "late_shift": [
+            780,
+            1320
+          ],
+          "transports": [
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "public",
+            "car",
+            "car",
+            "car",
+            "walk",
+            "walk",
+            "bicycle"
+          ],
+          "skill_sets": [
+            [
+              "local",
+              "connection",
+              "emergency"
+            ],
+            [
+              "local",
+              "connection"
+            ],
+            [
+              "connection"
+            ],
+            [
+              "local"
+            ],
+            [
+              "local",
+              "emergency"
+            ]
+          ]
+        },
+        "work_rules": {
+          "Подключение": {
+            "skill": "connection",
+            "duration_minutes": 70,
+            "priority": "high"
+          },
+          "Дозаказ": {
+            "skill": "connection",
+            "duration_minutes": 20,
+            "priority": "normal"
+          },
+          "Локальная заявка": {
+            "skill": "local",
+            "duration_minutes": 30,
+            "priority": "normal"
+          },
+          "Глобальная проблема": {
+            "skill": "emergency",
+            "duration_minutes": 100,
+            "priority": "urgent"
+          }
+        },
+        "equipment": {
+          "router_probability": 0.5,
+          "tv_box_probability": 0.2
+        },
+        "geography": {
+          "radius_km": 8.0,
+          "cluster_radius_km": 1.5
+        },
+        "travel": {
+          "kind": "synthetic_euclidean",
+          "speed_kmh": {
+            "car": 25.0,
+            "walk": 4.5,
+            "bicycle": 12.0,
+            "public": 18.0
+          },
+          "distance_factor": {
+            "car": 1.3,
+            "walk": 1.15,
+            "bicycle": 1.2,
+            "public": 1.3
+          },
+          "boarding_minutes": {
+            "car": 0.0,
+            "walk": 0.0,
+            "bicycle": 0.0,
+            "public": 7.0
+          }
+        },
+        "assumptions": [
+          "A01: время на объекте отдельно от дороги; нормативы сохранены в generation_config.work_rules",
+          "A02: Информация/Мониторинг используют норматив глобальной проблемы из конфигурации (норматив организаторов: 100 минут)",
+          "A03–A07: заменяемый справочник инженеров; фактический состав и смены сохранены в сценарии",
+          "A08–A11: роутеры/приставки под план; stock=null означает достаточную утреннюю выдачу, заданные остатки ограничивают маршрут; днем нет передач и пополнения",
+          "A12: синтетические координаты в километрах, НЕ геокодирование московских адресов",
+          "I01: порядок поступления = порядок строк CSV; приоритет задается work_rules: urgent (аварии) выше high (подключения), затем normal (ремонт/дозаказ); в демо новые подключения high, аварии urgent; политика пересматривается конфигурацией, исходные окна CSV не изменяются",
+          "I02: распределение смен/транспорта/навыков задается конфигурацией; при импорте используются предоставленные инженеры",
+          "I03: правила BK заданы таблицей; дополнительные устройства не добавляют время поверх норматива",
+          "I04: независимая синтетическая потребность в одном роутере/приставке с вероятностями из сохраненной конфигурации; явные замены требуют соответствующее устройство",
+          "I05: расстояние по синтетической плоскости с коэффициентом; скорости/посадка условны и не являются измерениями Москвы",
+          "I34: ВК — Beekeeper, HD — HelpDesk; соответствие классификаторов задается work_rules, это не отдельные виды работ",
+          "I35: время поступления исходных аварий не указано; исходные окна сохраняются. Для новых аварий время события — поступление, начало не раньше него"
+        ]
+      },
+      "geography_signature": "67448a810c8053a044297866e406af526be993aeaaad256e773bd14dd2370b98",
+      "emergency_norm": "100 total = 20 travel allowance + 80 service; actual travel replaces allowance, pending confirmation; no max(20,t)"
+    }
+  },
+  "reference": null
+}

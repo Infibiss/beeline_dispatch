@@ -37,10 +37,11 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     await page.screenshot({path:path.join(tmp,'risk-desktop.png'),fullPage:true});
     await page.click('#risk-demo');
     assert.equal(await page.locator('#risk-demo-notice').isVisible(),true);
-    assert.match(await page.locator('[data-risk="capacity"] .risk-probability').textContent(),/72/);
-    assert.equal(await page.locator('[data-risk="equipment"] .risk-probability').textContent(),'15 / 100');
-    await page.locator('[data-risk="capacity"] summary').click();
-    assert.ok((await page.locator('[data-risk="capacity"]').textContent()).includes('резервного инженера'));
+    assert.match(await page.locator('[data-risk="sla"] .risk-probability').textContent(),/31/);
+    assert.equal(await page.locator('[data-risk="vehicle"] .risk-probability').textContent(),'—');
+    assert.match(await page.locator('#risk-engine-meta').textContent(),/условных ед/);
+    await page.locator('[data-risk="sla"] summary').click();
+    assert.ok((await page.locator('[data-risk="sla"]').textContent()).includes('нарушения окна'));
     assert.deepEqual(await get('/api/state'),before);assert.deepEqual(posts,[]);
     await page.screenshot({path:path.join(tmp,'risk-example.png'),fullPage:true});
     for(const width of [320,390,768]){
@@ -67,6 +68,41 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.equal(await page.locator('[data-risk="windows"] .risk-probability').textContent(),'—');
     forecast={...forecast,region:snapshot.context.region,risks:[{...forecast.risks[0],value:7}]};await refresh();
     assert.equal(await page.locator('[data-risk="windows"] .risk-probability').textContent(),'—');
+    // Real Risk Engine contract: aggregates, route/visit quantiles, assumptions and preview-only advisories.
+    forecast={status:'ready',region:snapshot.context.region,plan_version:snapshot.context.plan_version,
+      model_version:'risk-engine-v1.1',calibrated:false,iterations:600,loss_unit:'conditional_loss_units',
+      duration_evidence:{status:'empirical_update',observation_count:3,group_count:1},
+      loss_weights:{late_start:.25,sla_breach:10,overtime_minute:.05},expected_loss:4.2,
+      expected_affected_customers:.7,p_sla_breach:.41,p_window_sla_breach:.41,
+      p_emergency_response_sla_breach:null,p_late_start:.52,p_overtime:.18,expected_overtime_minutes:9.5,
+      risks:[{id:'vehicle',measure:'heuristic_score',value:64,reasons:['ТО просрочено'],recommendation:'Проверить машину'}],
+      routes:[{engineer_id:'E-1',p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
+        expected_affected_customers:.7,visits:[{request_id:'R-1',planned_start:620,planned_sla_deadline:690,
+          p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
+          service_duration:{p50_minutes:70,p80_minutes:88,p90_minutes:101,observation_count:3}}]}],
+      assumptions:['synthetic priors; not calibrated'],advisories:[{id:'sla-1',risk_id:'sla',severity:'high',
+        title:'Проверить SLA',summary:'Сравнить варианты плана',engineer_id:'E-1',request_id:'R-1'}]};
+    await refresh();
+    assert.equal(await page.locator('.risk-prediction').count(),4);
+    assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'41%');
+    assert.equal(await page.locator('[data-risk="vehicle"] .risk-probability').textContent(),'64 / 100');
+    assert.doesNotMatch(await page.locator('#risk-model-status').textContent(),/калибр/);
+    assert.match(await page.locator('#risk-engine-meta').textContent(),/не подтверждена/);
+    assert.match(await page.locator('#risk-engine-meta').textContent(),/3 подтверждённых фактов/);
+    assert.match(await page.locator('[data-risk="sla"] .risk-prediction-label').textContent(),/600 сценариям/);
+    assert.match(await page.locator('#risk-engine-meta').textContent(),/4,2 условных ед/);
+    await page.locator('#risk-route-details summary').click();
+    assert.match(await page.locator('#risk-routes').textContent(),/70 \/ 88 \/ 101 мин/);
+    await page.locator('#risk-assumption-details summary').click();
+    assert.match(await page.locator('#risk-assumptions').textContent(),/synthetic priors/);
+    const previewResponse=page.waitForResponse(r=>r.url().endsWith('/api/preview'));
+    await page.locator('[data-advisory="sla-1"]').click();await previewResponse;
+    await page.waitForSelector('.candidate');
+    assert.equal(await page.locator('#panel-events').isVisible(),true);
+    assert.equal(await page.locator('#approve').isDisabled(),true);
+    assert.equal(posts.filter(url=>url.endsWith('/api/preview')).length,1);
+    assert.equal(posts.filter(url=>url.endsWith('/api/approve')).length,0);
+    posts.length=0;
     await page.unroute('**/api/risk');
     await page.route('**/api/risk',r=>r.fulfill({status:503,json:{error:'test failure'}}));
     await refresh();assert.equal(await page.locator('#risk-error').isVisible(),true);

@@ -18,6 +18,9 @@ from .recommendation import LABELS, STRATEGY_ORDER, eligible_candidates
 from .solvers.selection import get_solver
 from .ordinary_insertion import PRESERVATION_ERROR, insertion_candidates
 from .completion import pending_completions
+from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
+                          application_risk_seed)
+from .service_observations import confirmed_service_observations
 
 
 WORK_KINDS = {'connection': ('Подключение', Skill.CONNECTION, 'high'),
@@ -51,6 +54,29 @@ class Event(Model):
 
 def fingerprint(value):
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+
+
+def preview_risk_seed(session, event, payload):
+    """Stable seed for semantically identical preview requests.
+
+    The browser's event ID is an idempotency/audit token, not a model input.
+    Excluding it prevents a second click with unchanged fields from producing
+    different percentages solely because the UI generated another UUID.
+    """
+    event_context = event.model_dump(mode='json')
+    event_context.pop('id', None)
+    event_context['engineer_ids'] = sorted(event_context.get('engineer_ids', []))
+    return application_risk_seed(
+        session.plan,
+        session.scenario,
+        context={
+            'surface': 'candidate-preview',
+            'event': event_context,
+            'allow_redirect': payload.get('allow_redirect', False),
+            'preserve_in_progress': True,
+            'local_scope_engineer_ids': sorted(payload.get('local_scope_engineer_ids', [])),
+        },
+    )
 
 
 def _assignments(plan):
@@ -494,6 +520,12 @@ class ScenarioSession:
             raise ValueError('Список инженеров поддерживается только для события недоступности')
         for key in ('allow_redirect','preserve_in_progress'):
             if type(payload.get(key,False)) is not bool:raise ValueError('Ожидается явный переключатель '+key)
+        local_scope=payload.get('local_scope_engineer_ids',[])
+        if (not isinstance(local_scope,list) or len(local_scope)>5 or
+                any(not isinstance(eid,str) or not eid for eid in local_scope) or len(set(local_scope))!=len(local_scope)):
+            raise ValueError('Некорректный локальный контур перепланирования')
+        if local_scope and event.type!='replan':raise ValueError('Локальный контур поддерживается только для перепланирования')
+        if set(local_scope)-set(self.initial_engineers):raise ValueError('В локальном контуре указан неизвестный инженер')
         s,frozen,inventory=self._residual(event,payload.get('allow_redirect',False),True)
         travel=self._travel(s)
         ref_routes={r.engineer_id:r for r in self.plan.routes}
@@ -516,6 +548,14 @@ class ScenarioSession:
         targets=response_targets(s,focus)
         prior=reference_visits(s,reference)
         available={e.id for e in s.engineers}
+        # Every alternative receives the same deterministic random streams, so
+        # its risk delta is caused by the plan rather than Monte Carlo noise.
+        duration_evidence = confirmed_service_observations(self)
+        risk_seed = preview_risk_seed(self, event, payload)
+        risk_engine=RiskEngine(
+            application_risk_config(risk_seed),
+            service_observations=duration_evidence.observations,
+            service_group_key=duration_evidence.group_key(self))
         if event.type=='new_request':
             pool=insertion_candidates(s,travel,reference,'request:'+event.id)
         else:
@@ -527,12 +567,16 @@ class ScenarioSession:
             diff_ids={r.id for r in s.requests}
             if event.type=='cancel':diff_ids.add(event.request_id)
             diff=differences(reference,plan,diff_ids)
-            facts=facts_for(s,plan,[d for d in diff if not (event.type=='cancel' and d['request_id']==event.request_id)])
+            operational_diff=[d for d in diff if not (event.type=='cancel' and d['request_id']==event.request_id)]
+            facts=facts_for(s,plan,operational_diff)
             assignments=_assignments(plan)
             facts.update(avoidable_reassigned=sum(old[0] in available and assignments[key][0]!=old[0]
                          for key,old in prior.items() if key in assignments),
                          priority_start_sum=sum(assignments[key][1] for key in targets if key in assignments),
                          response_target_count=len(targets),response_unassigned=len(targets-set(assignments)))
+            facts['outside_scope_changes']=sum(
+                old[0] not in local_scope and assignments.get(key)!=old
+                for key,old in prior.items()) if local_scope else 0
             by_id={r.id:r for r in s.requests}
             lost={d['request_id'] for d in diff if d['before_engineer'] and d['after_engineer'] is None}
             emergency=None
@@ -551,13 +595,36 @@ class ScenarioSession:
                     'end':match[1].end if match else None}
             unassigned_details=[{'request_id':u.request_id,'address':by_id[u.request_id].address,
                 'reason':u.reason,'lost_assignment':u.request_id in lost} for u in plan.unassigned]
+            affected_clients=sum(d['before_engineer'] is not None for d in operational_diff)
+            try:
+                estimate=risk_engine.analyze(plan,s)
+                risk_data=estimate.to_dict()
+                risk={'status':'ready','model_version':RISK_MODEL_VERSION,'calibrated':False,
+                    'method':'monte_carlo','loss_unit':'условные единицы','affected_clients':affected_clients,
+                    'summary':{key:risk_data[key] for key in ('p_late_start','p_sla_breach','p_overtime',
+                        'expected_overtime_minutes','expected_loss','expected_affected_customers','affected_customer_count')},
+                    'routes':risk_data['routes'],'iterations':risk_data['iterations'],
+                    'assumptions':list(estimate.assumptions),
+                    'duration_evidence':duration_evidence.metadata()}
+            except Exception:
+                # Risk is an advisory layer: a forecast failure must not make a
+                # valid operational plan impossible to inspect or approve.
+                risk={'status':'error','model_version':RISK_MODEL_VERSION,'calibrated':False,
+                    'method':'monte_carlo','loss_unit':'условные единицы','affected_clients':affected_clients,
+                    'summary':None,'routes':[],'iterations':0,'assumptions':[],
+                    'duration_evidence':duration_evidence.metadata()}
             candidates.append({'id':profile,'label':LABELS[profile],'plan':plan.model_dump(mode='json'),'diff':diff,'facts':facts,
                 'objective_key':list(objective_key(plan,s,profile=profile,reference=reference,focus_request_id=focus)),
-                'emergency':emergency,'ordinary_request':ordinary,'unassigned_details':unassigned_details,'explanation':explanation(facts),'duplicate_of':None,
+                'emergency':emergency,'ordinary_request':ordinary,'unassigned_details':unassigned_details,
+                'risk':risk,'explanation':explanation(facts),'duplicate_of':None,
                 'llm':{'status':'not_connected','facts_only':True,'instruction':'Объясни компромиссы только по facts и diff. Не придумывай SLA, деньги, причины невозможности или оптимальность. Решение принимает диспетчер.'}})
         group_candidates(candidates)
         batch={'request_labels':labels,'observation_warnings':[f"{self.initial_engineers[eid].name}: последний ручной факт в {f['time']//60:02}:{f['time']%60:02}; последующее выполнение не подтверждено." for eid,f in self.statuses.items() if f['time']<event.time],'id':uuid4().hex,'version':self.version,'event':event.model_dump(),'candidates':candidates,'frozen':frozen,'inventory':inventory,
-            'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам.'}
+            'local_scope':{'engineer_ids':list(local_scope),'mode':'minimal_disruption_priority','hard_isolation':False} if local_scope else None,
+            'risk_model':{'version':RISK_MODEL_VERSION,'method':'monte_carlo','calibrated':False,
+                'loss_unit':'условные единицы','iterations':risk_engine.config.iterations,
+                'seed_fingerprint':risk_seed,'duration_evidence':duration_evidence.metadata()},
+            'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам. Риски оценены Монте-Карло по априорным распределениям'+(f" и {duration_evidence.observation_count} подтверждённым длительностям" if duration_evidence.observation_count else '')+'; калибровка вероятностей на независимой истории исходов пока не подтверждена, потери — условные единицы.'}
         batch['recommended_candidate_id']=eligible_candidates(batch)[0]['id']
         batch['response_focus_request_id']=focus
         if event.type=='new_request':

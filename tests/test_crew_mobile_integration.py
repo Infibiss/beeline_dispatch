@@ -111,7 +111,9 @@ def test_added_engineer_completes_job_and_receives_approved_remaining_plan(make_
         risk = api('/api/risk')
         assert risk['context']['plan_version'] == mobile['version']
         assert not risk['context']['needs_replanning']
-        assert risk['forecast']['status'] == 'not_connected'
+        assert risk['forecast']['status'] == 'ready'
+        assert risk['forecast']['model_version'].startswith('risk-engine-v1')
+        assert {item['id'] for item in risk['forecast']['risks']} == {'sla', 'late', 'overtime', 'vehicle'}
         tasks = {t['id']: t for t in mobile['tasks']}
         assert tasks['a']['status'] == 'completed' and tasks['a']['completed_at'] == 580
         assert tasks['a']['history'][-1]['comment'] == 'Установил роутер, связь проверена'

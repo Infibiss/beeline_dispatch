@@ -1,6 +1,7 @@
 """Optional, bounded explanations of allowlisted aggregates. Never plans."""
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import threading
@@ -17,9 +18,37 @@ PROMPT = """Ты выбираешь важные тезисы для объяс�
 coverage — охват; reaction — время до начала аварии; changes — смена исполнителей;
 travel — время дороги; priorities — охват аварий и подключений.
 Первый тезис всегда coverage. Затем важные различия: reaction для новой аварии,
-changes при смене исполнителей, travel при разнице дороги. Не сочиняй другие идентификаторы.
-Все стратегии соблюдают одинаковый порядок приоритетов: аварии, подключения, остальные.
+  risk — P(SLA), ожидаемые потери, затронутые клиенты и P(переработки);
+  changes при смене исполнителей, travel при разнице дороги. Не сочиняй другие идентификаторы.
+ Все стратегии соблюдают одинаковый порядок приоритетов: аварии, подключения, остальные.
 """
+
+
+def risk_metrics(candidate):
+    """Return only finite, non-sensitive aggregates used by the server rank."""
+    risk=candidate.get('risk')
+    if not isinstance(risk,dict) or risk.get('status')!='ready':return None
+    summary=risk.get('summary')
+    if not isinstance(summary,dict):return None
+    affected=risk.get('affected_clients',summary.get('expected_affected_customers'))
+    values={
+        'p_sla_breach':summary.get('p_sla_breach'),
+        'expected_loss':summary.get('expected_loss'),
+        'affected_clients':affected,
+        'p_overtime':summary.get('p_overtime'),
+    }
+    if not all(type(value) in (int,float) and math.isfinite(value) for value in values.values()):return None
+    if not 0<=values['p_sla_breach']<=1 or not 0<=values['p_overtime']<=1:return None
+    if values['expected_loss']<0 or values['affected_clients']<0:return None
+    return values
+
+
+def _number(value):
+    return f'{value:.2f}'.rstrip('0').rstrip('.')
+
+
+def _percent(value):
+    return f'{value*100:.1f}'.rstrip('0').rstrip('.')+'%'
 
 def verified_points(batch):
     candidates=[c for c in batch['candidates'] if not c.get('duplicate_of')]
@@ -37,6 +66,12 @@ def verified_points(batch):
     if all(all(k in c['facts'] for k in required) for c in candidates):
         points['priorities']='Приоритетные заявки — '+comparison(lambda c:
             f"аварии {c['facts']['emergency_assigned']}/{c['facts']['emergency_total']}, подключения {c['facts']['connection_assigned']}/{c['facts']['connection_total']}")
+    if candidates and all(risk_metrics(c) is not None for c in candidates):
+        points['risk']='Риски — '+comparison(lambda c:(
+            f"P(SLA) {_percent(risk_metrics(c)['p_sla_breach'])}, "
+            f"ожидаемые потери {_number(risk_metrics(c)['expected_loss'])} усл. ед., "
+            f"затронуто клиентов {_number(risk_metrics(c)['affected_clients'])}, "
+            f"P(переработки) {_percent(risk_metrics(c)['p_overtime'])}"))
     return points
 
 def recommendation_text(batch,choice,order):
@@ -71,6 +106,14 @@ def recommendation_text(batch,choice,order):
             f=choice['facts']
             if all(k in f for k in ('emergency_assigned','emergency_total','connection_assigned','connection_total')):
                 parts.append(f"Назначены аварии {f['emergency_assigned']}/{f['emergency_total']} и подключения {f['connection_assigned']}/{f['connection_total']} — максимальный охват приоритетов среди этих вариантов.")
+        elif key=='risk':
+            risk=risk_metrics(choice)
+            if risk is not None and all(risk_metrics(c) is not None for c in candidates):
+                parts.append(
+                    f"P(SLA) — {_percent(risk['p_sla_breach'])}; ожидаемые потери — "
+                    f"{_number(risk['expected_loss'])} усл. ед.; затронуто клиентов — "
+                    f"{_number(risk['affected_clients'])}; P(переработки) — {_percent(risk['p_overtime'])}."
+                )
     return ' '.join(parts)
 
 
@@ -120,13 +163,16 @@ class Explainer:
             facts={k:v for k,v in c['facts'].items() if k in FIELDS and type(v) in (int,float,bool)}
             emergency={k:v for k,v in (c.get('emergency') or {}).items()
                 if k in ('assigned','response_minutes') and (v is None or type(v) in (int,float,bool))}
-            summaries.append({'strategy':c['id'],'facts':facts,'emergency':emergency})
+            summary={'strategy':c['id'],'facts':facts,'emergency':emergency}
+            risk=risk_metrics(c)
+            if risk is not None:summary['risk']=risk
+            summaries.append(summary)
         points=verified_points(batch)
         instruction=PROMPT
         if recommend:
             example={'candidate_id':candidate_id,'points':['coverage','reaction' if 'reaction' in points else 'changes']}
             instruction=instruction.replace('{"points":["coverage","reaction","changes"]}',json.dumps(example,separators=(',',':')))
-            instruction+='\nВерни candidate_id из eligible_candidates: сервер уже выбрал рекомендацию по правилу. Сначала охват аварий, затем подключений, затем остальных заявок. Для новой аварии далее реакция на неё; в остальных случаях далее сохранение исполнителей и времени. Затем минуты дороги и метры. Объясни выгоды и компромиссы, не меняй эту политику.\n'
+            instruction+='\nВерни candidate_id из eligible_candidates: сервер уже выбрал рекомендацию по правилу. Сначала охват аварий, затем подключений, затем остальных заявок. При равном охвате далее риск: P(SLA), ожидаемые потери, затронутые клиенты и P(переработки). Для новой аварии затем реакция на неё; далее сохранение исполнителей и времени, минуты дороги и метры. Объясни выгоды и компромиссы, не меняй эту политику.\n'
         context={'variants':summaries,'available_points':list(points)}
         if recommend:context['eligible_candidates']=[c['id'] for c in eligible_candidates(batch)]
         else:context['selected']=candidate_id
@@ -137,8 +183,8 @@ class Explainer:
             if key in self.cache:return dict(self.cache[key])
             result={'text':candidate['explanation'],'source':'template','notice':'LLM недоступна; показано объяснение по проверенным показателям.'}
             if recommend:
-                result.update(candidate_id=candidate_id,source='rule',notice='Объяснение по правилу: охват по приоритетам → реакция на новую аварию → стабильность → дорога.')
-                order=['coverage']+(['reaction'] if 'reaction' in points else [])+[k for k in ('changes','travel','priorities') if k in points]
+                result.update(candidate_id=candidate_id,source='rule',notice='Объяснение по правилу: охват по приоритетам → риск → реакция на новую аварию → стабильность → дорога.')
+                order=['coverage']+(['risk'] if 'risk' in points else [])+(['reaction'] if 'reaction' in points else [])+[k for k in ('changes','travel','priorities') if k in points]
                 result['text']=recommendation_text(batch,candidate,order[:4])
             if self.calls>=self.max_calls:result['notice']='Лимит вызовов LLM исчерпан; показано обычное объяснение.'
             else:
@@ -165,7 +211,7 @@ class Explainer:
                         if choice is None or choice['id'] not in {c['id'] for c in eligible_candidates(batch)}:raise ValueError('Нарушены приоритеты')
                         # Essential reason and stability price stay visible even
                         # when the model chooses different secondary accents.
-                        essential=['coverage']+(['reaction'] if 'reaction' in points else [])+(['changes'] if 'changes' in points else [])
+                        essential=['coverage']+(['risk'] if 'risk' in points else [])+(['reaction'] if 'reaction' in points else [])+(['changes'] if 'changes' in points else [])
                         order=(essential+[k for k in order if k not in essential])[:4]
                     text=recommendation_text(batch,choice,order) if recommend else ' '.join(points[k] for k in order)+' План утверждает диспетчер; оптимальность не доказана.'
                     result={'text':text,'source':'yandexgpt','notice':'YandexGPT выбрала акценты; текст и числа сформированы из проверенных показателей.'}

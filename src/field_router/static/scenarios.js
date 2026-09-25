@@ -43,7 +43,11 @@
       }
     }
     else if (input.type !== 'replan') throw new Error('Неизвестный тип события.');
-    return {version, event, allow_redirect: input.type === 'emergency' && !!input.redirect, preserve_in_progress: true};
+    const payload = {version, event, allow_redirect: input.type === 'emergency' && !!input.redirect, preserve_in_progress: true};
+    if (input.type === 'replan' && Array.isArray(input.localScopeEngineerIds) && input.localScopeEngineerIds.length) {
+      payload.local_scope_engineer_ids = [...new Set(input.localScopeEngineerIds)];
+    }
+    return payload;
   }
   const factLabels = {available: 'Свободен', traveling: 'В пути', working: 'Работает', completion_pending:'Ожидает подтверждения', completed: 'Завершил заявку', interrupted: 'Работа прервана', unavailable: 'Недоступен'};
   function factPayload(version, input) {
@@ -80,7 +84,7 @@
   const $ = id => document.getElementById(id);
   const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
   const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
-  let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false;
+  let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false, localScopeEngineerIds = [];
   const strategyNames = {sla:'Быстрее к аварии', stable:'Меньше изменений', cost:'Меньше дороги'};
   function strategyName(c) { return strategyNames[c.id] || c.label; }
   function requestName(id) { return ((batch && batch.request_labels) || (state && state.request_labels) || {})[id] || id || '—'; }
@@ -386,6 +390,14 @@
   function candidateOrder(candidate, order) {
     const f = candidate.facts, preference = ['stable', 'sla', 'cost'].indexOf(candidate.id);
     const stability = [f.lost_assignments ?? 0, f.avoidable_reassigned ?? f.reassigned, f.time_shift_minutes, f.travel_minutes, f.distance_m];
+    const risk = candidate.risk?.status === 'ready' && candidate.risk.summary ? candidate.risk : null;
+    const r = risk?.summary || {};
+    if (order === 'risk') return risk
+      ? [f.emergency_total - f.emergency_assigned, f.connection_total - f.connection_assigned, f.unassigned,
+          r.p_sla_breach ?? Infinity, r.expected_loss ?? Infinity,
+          risk.affected_clients ?? r.expected_affected_customers ?? Infinity, r.p_overtime ?? Infinity,
+          candidate.emergency ? (candidate.emergency.response_minutes ?? Infinity) : 0, ...stability, preference]
+      : [preference];
     if (order === 'coverage') return [f.emergency_total - f.emergency_assigned, f.connection_total - f.connection_assigned, f.unassigned, preference];
     if (order === 'response') return [f.response_unassigned ?? (candidate.emergency?.assigned === false ? 1 : 0), candidate.emergency ? (candidate.emergency.response_minutes ?? Infinity) : (f.priority_start_sum ?? Infinity), ...stability, preference];
     if (order === 'stable') return [...stability, preference];
@@ -432,10 +444,18 @@
     $('comparison-tools').hidden = ordered.length < 2;
     $('comparison-metrics').hidden = !ordered.length;
     const merged = ordered.length < data.candidates.length;
+    const riskReady = ordered.some(c => c.risk?.status === 'ready' && c.risk.summary);
+    const durationEvidence = data.risk_model?.duration_evidence || {};
+    const durationFacts = Number.isInteger(durationEvidence.observation_count) && durationEvidence.observation_count > 0
+      ? durationEvidence.observation_count : 0;
     const notes = [];
     if (data.insertion_policy) notes.push('Новая заявка добавляется без изменения прежних назначений и времени начала.');
     if (merged) notes.push(ordered.length === 1 ? 'Один уникальный план: все стратегии нашли одинаковые маршруты и время.' : 'Совпавшие планы объединены в одну карточку.');
     if (!newEmergency && !responseTargets && merged) notes.push('Аварий в остатке дня нет: «Быстрее к аварии» совпадает с «Меньше изменений».');
+    if (riskReady) notes.push('Риски: Монте-Карло · ' + (data.risk_model?.iterations || '—') + ' прогонов'
+      + (durationFacts ? ' · доступно ' + durationFacts + ' подтверждённых фактов длительности' : ' · априорные длительности')
+      + ' · калибровка вероятностей не подтверждена · потери в условных единицах.');
+    if (data.local_scope?.engineer_ids?.length) notes.push('Локальный приоритет: сначала минимизируются изменения вокруг ' + data.local_scope.engineer_ids.map(engineerName).join(', ') + '; изменения вне контура явно посчитаны.');
     $('variants-note').textContent = notes.join(' ');
     const table = element('table'), head = element('tr');
     ['Показатель', ...ordered.map(strategyName)].forEach(label => head.append(element('th', label))); table.append(head);
@@ -455,6 +475,15 @@
         const assigned = c.facts.response_target_count - c.facts.response_unassigned;
         return assigned > 0 ? time(Math.round(c.facts.priority_start_sum / assigned)) : '—';
       }]);
+    if (riskReady) metricsRows.push(
+      ['P(SLA), %', c => c.risk?.status === 'ready' ? (100 * c.risk.summary.p_sla_breach).toFixed(1) : '—', c => c.risk?.status === 'ready' ? 100 * c.risk.summary.p_sla_breach : null, n => n.toFixed(1)],
+      ['P(позднего начала), %', c => c.risk?.status === 'ready' ? (100 * c.risk.summary.p_late_start).toFixed(1) : '—', c => c.risk?.status === 'ready' ? 100 * c.risk.summary.p_late_start : null, n => n.toFixed(1)],
+      ['P(переработки), %', c => c.risk?.status === 'ready' ? (100 * c.risk.summary.p_overtime).toFixed(1) : '—', c => c.risk?.status === 'ready' ? 100 * c.risk.summary.p_overtime : null, n => n.toFixed(1)],
+      ['Ожидаемые потери, усл. ед.', c => c.risk?.status === 'ready' ? c.risk.summary.expected_loss.toFixed(2) : '—', c => c.risk?.status === 'ready' ? c.risk.summary.expected_loss : null, n => n.toFixed(2)],
+      ['Клиентов с изменённым обещанием', c => c.risk?.status === 'ready' ? c.risk.affected_clients : '—', c => c.risk?.status === 'ready' ? c.risk.affected_clients : null],
+      ['Ожидаемо клиентов под SLA-риском', c => c.risk?.status === 'ready' ? c.risk.summary.expected_affected_customers.toFixed(2) : '—', c => c.risk?.status === 'ready' ? c.risk.summary.expected_affected_customers : null, n => n.toFixed(2)]);
+    if (data.local_scope?.engineer_ids?.length) metricsRows.push(
+      ['Изменений вне локального контура', c => c.facts.outside_scope_changes ?? '—', c => c.facts.outside_scope_changes ?? null]);
     metricsRows.push(
       ['Смена исполнителя', c => c.facts.reassigned, c => c.facts.reassigned],
       ['Из них предотвратимые', c => c.facts.avoidable_reassigned],
@@ -478,6 +507,12 @@
       const f = candidate.facts || {}, dl = element('dl');
       card.append(element('p', 'Назначено: аварии ' + f.emergency_assigned + '/' + f.emergency_total + ' · подключения ' + f.connection_assigned + '/' + f.connection_total, 'priority-coverage'));
       const metrics = [['Без назначения', f.unassigned], ['Смена исполнителя', f.reassigned], ['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Дорога, мин', f.travel_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
+      const risk = candidate.risk?.status === 'ready' && candidate.risk.summary ? candidate.risk : null;
+      if (risk) metrics.unshift(
+        ['P(SLA)', (risk.summary.p_sla_breach * 100).toFixed(1) + '%'],
+        ['Ожидаемые потери', risk.summary.expected_loss.toFixed(2) + ' усл. ед.'],
+        ['Изменено обещаний', risk.affected_clients],
+        ['Ожидаемо под SLA-риском', risk.summary.expected_affected_customers.toFixed(2)]);
       if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
       if (candidate.emergency) {
         const e = candidate.emergency;
@@ -489,7 +524,10 @@
         card.append(element('p', added.assigned ? 'Новая заявка: ' + engineerName(added.engineer_id) + ', начало ' + time(added.start) + '. Прежние назначения сохранены.' : 'Для новой заявки нет свободного интервала с нужными навыками и оборудованием. Прежние назначения сохранены.', 'emergency-summary'));
       }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
-      card.append(dl); const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
+      card.append(dl);
+      if (risk) card.append(element('p', 'Risk Engine · ' + risk.iterations + ' прогонов'
+        + (durationFacts ? ' · доступно фактов: ' + durationFacts : ''), 'risk-candidate-note'));
+      const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
 
       const button = element('button', 'Посмотреть изменения', 'secondary'); button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.addEventListener('click', () => select(candidate)); card.append(button);
       return card;
@@ -525,7 +563,7 @@
     catch(error){failure(error);}finally{busy=false;controls();}
   });
   $('candidate-sort').addEventListener('change', () => { if (batch) { const choice=selected; renderBatch(batch); if (choice) select(choice); } });
-  $('event-form').addEventListener('input', () => { const hadBatch = !!batch; resetCandidates('Параметры изменены. Рассчитайте варианты.'); if (hadBatch) $('status').textContent = 'Параметры изменены — предыдущий расчёт сброшен.'; });
+  $('event-form').addEventListener('input', () => { localScopeEngineerIds=[]; const hadBatch = !!batch; resetCandidates('Параметры изменены. Рассчитайте варианты.'); if (hadBatch) $('status').textContent = 'Параметры изменены — предыдущий расчёт сброшен.'; });
   function defaultDuration() { $('duration').value = $('event-type').value === 'new_request' ? ({connection:70,local:30,addon:20}[$('work-kind').value]) : 80; }
   $('event-type').addEventListener('change', () => { targets(); defaultDuration(); });
   $('work-kind').addEventListener('change', defaultDuration);
@@ -534,7 +572,8 @@
     let payload;
     try { payload = eventPayload(state.version, {id: uniqueEventId(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value,
       engineerIds:[...$('event-engineers').querySelectorAll('input:checked:not(:disabled)')].map(input=>input.value),
-      duration: $('duration').value, router: $('router').value, tvBox:$('new-tv').value, workKind:$('work-kind').value, windowStart:$('window-start').value, windowEnd:$('window-end').value, redirect: $('redirect').checked, preserve: true}); }
+      duration: $('duration').value, router: $('router').value, tvBox:$('new-tv').value, workKind:$('work-kind').value, windowStart:$('window-start').value, windowEnd:$('window-end').value, redirect: $('redirect').checked, preserve: true,
+      localScopeEngineerIds}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Расчёт может занять несколько секунд…';
     try { renderBatch(await request('/api/preview', payload)); $('status').textContent = 'Расчёт завершён. Выберите вариант и проверьте изменения.'; }
@@ -580,8 +619,26 @@
   });
   window.addEventListener('risk-intent', event => {
     if (!state || busy) return;
-    if (event.detail?.action === 'facts') {activateTab('facts');$('fact-engineer').focus();}
+    if (event.detail?.action === 'facts') {
+      activateTab('facts');
+      if (event.detail.engineerId && [...$('fact-engineer').options].some(option=>option.value===event.detail.engineerId)) {
+        $('fact-engineer').value=event.detail.engineerId; factRequests(); factFields();
+      }
+      $('fact-engineer').focus();
+    }
     if (event.detail?.action === 'replan') {activateTab('events');$('event-type').focus();}
+    if (event.detail?.action === 'preview') {
+      if (event.detail.planVersion !== state.version) {
+        $('error').textContent = 'Рекомендация относится к другой версии плана. Обновите показатели риска.';
+        $('error').hidden = false; $('error').scrollIntoView({block:'center'}); return;
+      }
+      localScopeEngineerIds = event.detail.engineerId ? [event.detail.engineerId] : [];
+      $('event-type').value = 'replan'; $('event-time').value = time(state.time); targets();
+      resetCandidates('Рассчитываем варианты по рекомендации Risk Engine…');
+      $('status').textContent = 'Рекомендация открыта как безопасный предпросмотр. Применение потребует отдельного выбора и подтверждения.';
+      activateTab('events'); $('panel-events').scrollIntoView({block:'start'});
+      $('event-form').requestSubmit();
+    }
   });
   tabs.forEach((name, index) => {
     $('tab-' + name).addEventListener('click', () => activateTab(name));

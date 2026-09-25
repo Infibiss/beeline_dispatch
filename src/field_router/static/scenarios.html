@@ -38,11 +38,18 @@
   <div class="risk-section-label"><h3>По утверждённому плану</h3><span>Проценты загрузки, не вероятности срыва</span></div>
   <div id="risk-indicators" class="risk-grid" aria-label="Показатели плана"></div>
   <section class="risk-forecast" aria-labelledby="risk-forecast-title">
-    <div class="risk-heading"><div><p class="risk-eyebrow">ПРОГНОЗ</p><h3 id="risk-forecast-title">На что обратить внимание заранее</h3></div><button id="risk-demo" class="secondary" type="button" aria-pressed="false">Показать пример ML-прогноза</button></div>
-    <p id="risk-model-status" role="status">ML-модель ещё не подключена. Вероятности пока не рассчитываются.</p>
+    <div class="risk-heading"><div><p class="risk-eyebrow">RISK ENGINE V1</p><h3 id="risk-forecast-title">Вероятностный запас утверждённого плана</h3></div><button id="risk-demo" class="secondary" type="button" aria-pressed="false">Показать пример Risk Engine</button></div>
+    <p id="risk-model-status" role="status">Risk Engine ещё не подключён. Вероятности пока не рассчитываются.</p>
     <p id="risk-demo-notice" class="risk-demo-notice" hidden>ДЕМОНСТРАЦИЯ · Все оценки и причины ниже вымышлены и не относятся к вашему плану. Показатели выше остаются расчётными.</p>
+    <div id="risk-engine-meta" class="risk-engine-meta" hidden aria-label="Параметры расчёта риска"></div>
     <div id="risk-forecasts" class="risk-grid" aria-label="Прогноз и объяснения"></div>
-    <p class="hint">Прогноз помогает выбрать, что проверить. Изменения плана применяет диспетчер после сравнения вариантов.</p>
+    <section id="risk-advisory-section" class="risk-advisory-section" hidden aria-labelledby="risk-advisory-title">
+      <div class="risk-section-label"><h3 id="risk-advisory-title">Рекомендации диспетчеру</h3><span>Кнопка только рассчитывает варианты; применение всегда отдельно</span></div>
+      <div id="risk-advisories" class="risk-advisories"></div>
+    </section>
+    <details id="risk-route-details" class="risk-route-details" hidden><summary>Маршруты и визиты</summary><div id="risk-routes"></div></details>
+    <details id="risk-assumption-details" class="risk-assumption-details" hidden><summary>Допущения расчёта</summary><ul id="risk-assumptions"></ul></details>
+    <p class="hint">Это симуляционная оценка поверх готового плана. Она помогает выбрать, что проверить; диспетчер отдельно сравнивает варианты и отдельно применяет выбранный план.</p>
   </section>
   <div class="risk-next"><div><strong>Проверить решение на плане</strong><p>Запишите новую информацию или откройте расчёт вариантов. Переход сам по себе ничего не изменяет.</p></div><div class="risk-actions"><button id="risk-facts" type="button" class="secondary">Уточнить статусы</button><button id="risk-replan" type="button" class="primary">Открыть перепланирование</button></div></div>
 </section>
@@ -119,12 +126,12 @@
 <section class="comparison"><div class="section-heading"><h2>Варианты плана</h2></div>
 <p id="excluded-summary" class="notice" hidden></p>
 
-<div id="comparison-tools" class="comparison-controls" hidden><label for="candidate-sort">Порядок вариантов</label><select id="candidate-sort"><option value="default">Сначала меньше изменений</option><option value="coverage">Меньше неназначенных</option><option value="response">Раньше начало аварии</option><option value="stable">По числу изменений</option><option value="distance">Дорога</option></select></div>
+<div id="comparison-tools" class="comparison-controls" hidden><label for="candidate-sort">Порядок вариантов</label><select id="candidate-sort"><option value="risk">Рекомендация по риску</option><option value="default">Сначала меньше изменений</option><option value="coverage">Меньше неназначенных</option><option value="response">Раньше начало аварии</option><option value="stable">По числу изменений</option><option value="distance">Дорога</option></select></div>
 <p id="observation-warnings" class="hint"></p><p id="variants-note" class="hint" role="status"></p>
 <section id="ai-panel" class="ai-panel" hidden aria-live="polite"><div class="section-heading"><h3>Рекомендация</h3><button id="ai-recommend" type="button" class="secondary">Объяснить с помощью ИИ</button></div><p id="ai-result">Проверьте изменения перед применением.</p></section>
 <div id="candidates" class="cards" data-count="0"><div class="empty">Задайте событие и рассчитайте варианты.</div></div>
 <details id="comparison-metrics" class="comparison-metrics" hidden><summary>Все показатели и разница</summary><p class="hint">Изменения в скобках — относительно «Меньше изменений». Минус означает уменьшение показателя, плюс — увеличение.</p><div id="comparison-table" class="table-scroll"></div></details>
-<details class="help"><summary>Как сравниваются варианты</summary><p>Сначала сохраняется лучший найденный охват: аварии → подключения → остальные заявки. Затем «Меньше изменений» сохраняет назначения и время, «Быстрее к аварии» ускоряет новую аварию, «Меньше дороги» сокращает минуты пути.</p><p>Если новой аварии нет, сравнивается сумма времени начала оставшихся аварий. Если аварий не осталось, этот вариант совпадает с «Меньше изменений». Показатели относятся к остатку дня без закреплённых работ.</p><p id="notice" class="hint"></p></details>
+<details class="help"><summary>Как сравниваются варианты</summary><p>Сначала сохраняется лучший найденный охват: аварии → подключения → остальные заявки. Среди вариантов с одинаковым охватом рекомендация сравнивает P(SLA), ожидаемые условные потери и число клиентов, чьи обещания изменятся; затем учитывает скорость реакции, стабильность и дорогу.</p><p>Risk Engine использует одинаковые сценарии Монте-Карло для Stable/SLA/Cost, поэтому разница связана с планом, а не со случайным шумом. Подтверждённые интервалы работы уточняют только совместимые будущие заявки; статус калибровки вероятностей показан один раз над вариантами.</p><p>Если новой аварии нет, сравнивается сумма времени начала оставшихся аварий. Если аварий не осталось, этот вариант может совпасть с «Меньше изменений». Показатели относятся к остатку дня без закреплённых работ.</p><p id="notice" class="hint"></p></details>
 <section class="panel diff-panel" hidden><div class="section-heading"><h2 id="diff-title">Изменения</h2></div><div class="table-scroll"><table><caption class="sr-only">Изменения инженера и времени начала заявки</caption><thead><tr><th>Заявка</th><th>Инженер: было → станет</th><th>Начало: было → станет</th></tr></thead><tbody id="diff-body"><tr><td colspan="3" class="muted">Выберите вариант для просмотра изменений.</td></tr></tbody></table></div><div class="approval"><p id="approval-note">План изменится только после вашего утверждения.</p><button id="approve" type="button" disabled class="primary">Применить план</button></div></section>
 </section></div>
 <details class="panel commitments"><summary id="commitments-title">Закреплённые работы и оборудование</summary><div class="details-content">

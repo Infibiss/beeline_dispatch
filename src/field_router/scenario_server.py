@@ -184,8 +184,13 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 return self.reply(200,manifest)
             if route.path=='/api/risk':
                 try:
-                    from .risk_dashboard import dashboard
-                    with lock: result=dashboard(holder['session'])
+                    from .risk_dashboard import capture_dashboard_session, dashboard
+                    # Freeze a coherent, compact view quickly; Monte Carlo must
+                    # neither hold the mutation lock nor copy road matrices and
+                    # historical workbench views.
+                    with lock: risk_session=capture_dashboard_session(holder['session'])
+                    gps_status,gps_snapshot=gps.request('GET','/api/gps','channel=device')
+                    result=dashboard(risk_session,gps_snapshot if gps_status==200 else None)
                     return self.reply(200,result)
                 except Exception:
                     return self.reply(503,{'error':'Показатели риска временно недоступны. Планирование продолжает работать.'})

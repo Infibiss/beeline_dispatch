@@ -27,6 +27,36 @@ def test_preview_does_not_publish_and_approval_invalidates_old_batch(make_scenar
     with pytest.raises(ValueError,match='повтор'):session.preview({**payload,'version':2},time_limit=.03)
 
 
+def test_preview_risk_seed_ignores_random_event_id_but_tracks_inputs(make_scenario):
+    from field_router.replanning import Event, ScenarioSession, preview_risk_seed
+    s,p=demo(make_scenario);session=ScenarioSession(s,p)
+    base={'version':1,'allow_redirect':False,'local_scope_engineer_ids':['e1']}
+    first=Event(id='random-browser-id-1',type='replan',time=540)
+    repeated=Event(id='random-browser-id-2',type='replan',time=540)
+    changed=Event(id='random-browser-id-3',type='replan',time=541)
+    assert preview_risk_seed(session,first,base)==preview_risk_seed(session,repeated,base)
+    assert preview_risk_seed(session,first,base)!=preview_risk_seed(session,changed,base)
+
+    one=session.preview({**base,'event':first.model_dump()},time_limit=.03)
+    two=session.preview({**base,'event':repeated.model_dump()},time_limit=.03)
+    assert one['risk_model']['seed_fingerprint']==two['risk_model']['seed_fingerprint']
+
+
+def test_local_replan_scope_is_validated_and_reported_without_auto_apply(make_scenario):
+    from copy import deepcopy
+    from field_router.replanning import ScenarioSession
+    s,p=demo(make_scenario);session=ScenarioSession(s,p)
+    before=deepcopy(session.dump())
+    batch=session.preview({'version':1,'event':{'id':'local-1','type':'replan','time':540},
+        'local_scope_engineer_ids':['e1']},time_limit=.03)
+    assert batch['local_scope']=={'engineer_ids':['e1'],'mode':'minimal_disruption_priority','hard_isolation':False}
+    assert all(isinstance(candidate['facts']['outside_scope_changes'],int) for candidate in batch['candidates'])
+    assert session.dump()==before
+    with pytest.raises(ValueError,match='неизвестный инженер'):
+        session.preview({'version':1,'event':{'id':'bad-local','type':'replan','time':540},
+            'local_scope_engineer_ids':['missing']},time_limit=.03)
+
+
 def test_started_work_is_always_preserved_and_reserves_equipment(make_scenario):
     from field_router.replanning import ScenarioSession
     s,p=demo(make_scenario);session=ScenarioSession(s,p)

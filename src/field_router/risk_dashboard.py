@@ -1,10 +1,66 @@
-"""Read-only plan indicators and the hand-off contract for a future risk model.
+"""Read-only plan indicators, Monte Carlo forecast and fleet data quality."""
 
-No inference, optimizer invocation or persistence belongs in this projection.
-Percentages describe the plan, never a probability of failure.
-"""
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Any
+
+from .advisory import build_advisories
+from .fleet_risk import fleet_snapshot
+from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
+                          application_risk_seed)
+from .service_observations import confirmed_service_observations
+
 SCHEMA_VERSION = '1.0'
 WINDOW_BUFFER_MINUTES = 15
+
+
+@dataclass(frozen=True, slots=True)
+class DashboardSessionSnapshot:
+    """Small coherent view used outside the dispatcher mutation lock.
+
+    Road matrices, saved workbench views and candidate batches are deliberately
+    excluded: the dashboard never reads them, while copying them can exhaust a
+    small deployment container.
+    """
+
+    scenario: Any
+    plan: Any
+    version: int
+    time: int
+    initial_engineers: dict[str, Any]
+    statuses: dict[str, Any]
+    fact_log: list[dict[str, Any]]
+    frozen: list[dict[str, Any]]
+    inventory: list[dict[str, Any]]
+    catalog: dict[str, Any]
+    execution_mode: str
+    needs_replanning: bool
+    excluded_engineer_ids: frozenset[str]
+
+    def excluded_engineers(self):
+        return set(self.excluded_engineer_ids)
+
+    def mode(self):
+        return 'manual' if self.execution_mode == 'manual' else 'mixed' if self.statuses else 'simulation'
+
+
+def capture_dashboard_session(session):
+    """Capture only the immutable models and mutable journals used by dashboard()."""
+    return DashboardSessionSnapshot(
+        scenario=session.scenario,
+        plan=session.plan,
+        version=session.version,
+        time=session.time,
+        initial_engineers=dict(session.initial_engineers),
+        statuses=deepcopy(session.statuses),
+        fact_log=deepcopy(session.fact_log),
+        frozen=deepcopy(session.frozen),
+        inventory=deepcopy(session.inventory),
+        catalog=dict(session.catalog),
+        execution_mode=session.execution_mode,
+        needs_replanning=session.needs_replanning,
+        excluded_engineer_ids=frozenset(session.excluded_engineers()),
+    )
 
 
 def ratio(numerator, denominator):
@@ -21,14 +77,94 @@ def _occupied(intervals, lower, upper):
     return total
 
 
-def forecast_placeholder(context):
-    """Replace with a validated cached worker result; do not run ML under a lock."""
-    return {'status': 'not_connected', 'region': context['region'],
+def forecast_placeholder(context, status='not_connected'):
+    """Stable failure envelope: the deterministic indicators remain available."""
+    return {'status': status, 'region': context['region'],
             'plan_version': context['plan_version'], 'model_version': None,
             'horizon_minutes': None, 'risks': []}
 
 
-def dashboard(session):
+def _top_visit_reason(session, risk, field, title):
+    visits = sorted(risk.visits, key=lambda row: getattr(row, field), reverse=True)
+    if not visits or getattr(visits[0], field) <= 0:
+        return f'{title}: в симуляции не выявлено.'
+    visit = visits[0]
+    request = session.catalog.get(visit.request_id)
+    label = request.address if request else visit.request_id
+    return f'{title}: {label} — {getattr(visit, field) * 100:.1f}%.'
+
+
+def _forecast(session, context, fleet):
+    """Calculate a reproducible prior-based forecast for the approved plan."""
+    evidence = confirmed_service_observations(session)
+    try:
+        seed = application_risk_seed(
+            session.plan,
+            session.scenario,
+            context={"surface": "approved-plan"},
+        )
+        engine = RiskEngine(
+            application_risk_config(seed),
+            service_observations=evidence.observations,
+            service_group_key=evidence.group_key(session),
+        )
+        result = engine.analyze(session.plan, session.scenario)
+    except Exception:
+        return forecast_placeholder(context, 'error')
+    horizon = max((engineer.shift.end for engineer in session.scenario.engineers), default=context['time']) - context['time']
+    horizon = max(1, min(1440, horizon))
+    vehicle_value = fleet['max_score']
+    if vehicle_value is None:
+        vehicle_reasons = [f"Данные связаны с 0 из {fleet['total']} автомобильных бригад.",
+                           'Без vehicle_id, пробега, сроков ТО и истории отказов вероятность поломки не рассчитывается.']
+        vehicle_status = 'insufficient_data'
+    else:
+        worst = max((row for row in fleet['rows'] if row['score'] is not None), key=lambda row: row['score'])
+        vehicle_reasons = [f"Максимальный индекс готовности: {worst['engineer_name']} — {worst['score'] * 100:.0f}/100.",
+                           *worst['reasons'][:3]]
+        vehicle_status = 'ready'
+    risks = [
+        {'id': 'sla', 'measure': 'probability', 'value': result.p_sla_breach, 'status': 'ready',
+         'reasons': [_top_visit_reason(session, result, 'p_sla_breach', 'Наибольший риск нарушения окна/SLA'),
+                     f'Ожидаемо затронуто клиентов: {result.expected_affected_customers:.2f}.'],
+         'recommendation': 'Сравните Stable/SLA/Cost по вероятности нарушения и ожидаемому числу затронутых клиентов; применение остаётся за диспетчером.'},
+        {'id': 'late', 'measure': 'probability', 'value': result.p_late_start, 'status': 'ready',
+         'reasons': [_top_visit_reason(session, result, 'p_late_start', 'Наибольший риск начать позже плана'),
+                     'Задержки распространяются по маршруту с учётом ожидания начала клиентского окна.'],
+         'recommendation': 'Уточните фактическое окончание текущей работы и GPS. При подтверждённом отклонении рассчитайте варианты заново.'},
+        {'id': 'overtime', 'measure': 'probability', 'value': result.p_overtime, 'status': 'ready',
+         'reasons': [_top_visit_reason(session, result, 'p_overtime', 'Наибольший риск переработки'),
+                     f'Ожидаемая переработка по маршрутам: {result.expected_overtime_minutes:.1f} мин.'],
+         'recommendation': 'Проверьте конец смены и последний визит рискованного маршрута; при необходимости выберите более устойчивый вариант.'},
+        {'id': 'vehicle', 'measure': 'score', 'value': vehicle_value, 'status': vehicle_status,
+         'reasons': vehicle_reasons[:5],
+         'recommendation': ('Проверьте ТО и подготовьте резервный автомобиль.' if vehicle_value is not None
+                            else 'Загрузите фактические автомобили, показания одометра, ТО и историю отказов.')},
+    ]
+    payload = result.to_dict()
+    if evidence.observation_count:
+        evidence_notice = (
+            f"Доступно {evidence.observation_count} подтверждённых наблюдений "
+            f"в {evidence.group_count} группах; они уточняют только совместимые будущие работы. "
+        )
+    else:
+        evidence_notice = "Длительности пока основаны на прозрачных априорных распределениях. "
+    return {**payload, 'status': 'ready', 'region': context['region'],
+            'plan_version': context['plan_version'], 'model_version': RISK_MODEL_VERSION,
+            'method': 'monte_carlo', 'calibrated': False, 'horizon_minutes': horizon,
+            'loss_unit': 'условные единицы', 'risks': risks,
+            'summary': {key: payload[key] for key in ('p_late_start', 'p_sla_breach', 'p_overtime',
+                        'expected_overtime_minutes', 'expected_loss', 'expected_affected_customers',
+                        'affected_customer_count')},
+            'assumptions': list(result.assumptions),
+            'duration_evidence': evidence.metadata(),
+            'fleet': fleet,
+            'notice': ('Оценка получена методом Монте-Карло. ' + evidence_notice
+                       + 'Калибровка вероятностей на независимой истории исходов пока не подтверждена; '
+                       'потери указаны в условных единицах.')}
+
+
+def dashboard(session, gps_snapshot=None):
     now = session.time
     excluded = session.excluded_engineers()
     eligible = {key: e for key, e in session.initial_engineers.items()
@@ -86,6 +222,7 @@ def dashboard(session):
     equipment_value = limiting['percent'] if any(supply.values()) or any(demand.values()) else None
     context = {'region': session.scenario.region, 'date': session.scenario.date, 'plan_version': session.version,
                'time': now, 'needs_replanning': session.needs_replanning, 'mode': session.mode()}
+    fleet = fleet_snapshot(session.scenario)
     return {'schema_version': SCHEMA_VERSION, 'context': context,
             'summary': {'engineers': len(eligible), 'roster': len(session.initial_engineers),
                         'unassigned': len(session.plan.unassigned)},
@@ -108,4 +245,6 @@ def dashboard(session):
                  'explanation': 'Потребность оставшихся визитов относительно физического остатка у доступных бригад. Показан наиболее занятый тип устройств. Сумма по району не означает, что оборудование можно передать между инженерами.',
                  'recommendation': 'Проверьте запас нужного типа у конкретного исполнителя. Пополнение или передача требуют отдельного подтверждения; пересчёт сам не создаёт оборудование.',
                  'facts': {'equipment': equipment}}],
-            'forecast': forecast_placeholder(context)}
+            'forecast': _forecast(session, context, fleet),
+            'fleet': fleet,
+            'advisories': build_advisories(session, gps_snapshot)}

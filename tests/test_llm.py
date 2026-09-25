@@ -5,6 +5,18 @@ import pytest
 def batch():
     return {'id':'batch-private','version':1,'candidates':[{'id':'sla','facts':{'assigned':5,'unassigned':1,'distance_m':1000,'reassigned':2,'address':'PRIVATE'},'emergency':{'assigned':True,'response_minutes':15,'engineer_id':'PRIVATE'},'explanation':'Резервное объяснение','plan':{'secret':'PRIVATE'}}]}
 
+
+def add_risk(candidate, *, p_sla=.125, loss=3.4, affected=1, p_overtime=.075):
+    candidate['risk']={
+        'status':'ready','affected_clients':affected,
+        'summary':{'p_sla_breach':p_sla,'expected_loss':loss,
+                   'expected_affected_customers':.5,'p_overtime':p_overtime},
+        'routes':[{'request_id':'PRIVATE'}],
+        'assumptions':['PRIVATE'],
+        'duration_evidence':{'PRIVATE':'PRIVATE'},
+    }
+    return candidate
+
 def test_private_fields_never_sent_and_response_cached():
     from field_router.llm import Explainer
     calls=[]
@@ -138,3 +150,44 @@ def test_llm_cannot_override_verified_recommendation_with_travel_tradeoff():
  e=Explainer(send=lambda _: {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"cost","points":["coverage","travel"]}'}]}]})
  result=e.recommend(b)
  assert result['candidate_id']=='stable' and result['source']=='rule'
+
+
+def test_only_allowlisted_risk_aggregates_are_sent_and_rendered_by_server():
+ from field_router.llm import Explainer
+ b=batch();add_risk(b['candidates'][0])
+ def send(body):
+  context=json.loads(body['input'].splitlines()[-1]);variant=context['variants'][0]
+  assert set(variant['risk'])=={'p_sla_breach','expected_loss','affected_clients','p_overtime'}
+  assert variant['risk']=={'p_sla_breach':.125,'expected_loss':3.4,'affected_clients':1,'p_overtime':.075}
+  assert 'routes' not in json.dumps(context) and 'duration_evidence' not in json.dumps(context)
+  assert 'PRIVATE' not in json.dumps(context)
+  return {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"sla","points":["coverage","risk"]}'}]}]}
+ result=Explainer(send=send).recommend(b)
+ assert result['source']=='yandexgpt'
+ assert 'P(SLA) — 12.5%' in result['text']
+ assert 'ожидаемые потери — 3.4 усл. ед.' in result['text']
+ assert 'затронуто клиентов — 1' in result['text']
+ assert 'P(переработки) — 7.5%' in result['text']
+
+
+@pytest.mark.parametrize('bad', [float('nan'),float('inf'),True,-.1,1.1])
+def test_invalid_risk_is_not_sent_or_available_as_a_point(bad):
+ from field_router.llm import Explainer
+ b=batch();add_risk(b['candidates'][0],p_sla=bad)
+ def send(body):
+  context=json.loads(body['input'].splitlines()[-1])
+  assert 'risk' not in context['variants'][0]
+  assert 'risk' not in context['available_points']
+  return {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"sla","points":["coverage","risk"]}'}]}]}
+ result=Explainer(send=send).recommend(b)
+ assert result['source']=='rule' and 'P(SLA)' not in result['text']
+
+
+def test_llm_cannot_override_lower_risk_verified_recommendation():
+ from field_router.llm import Explainer
+ b=batch();best=b['candidates'][0];best['id']='stable';add_risk(best,p_sla=.1,loss=1,affected=1,p_overtime=.1)
+ worse=deepcopy(best);worse['id']='cost';add_risk(worse,p_sla=.2,loss=.1,affected=0,p_overtime=0)
+ b['candidates'].append(worse)
+ response={'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"cost","points":["coverage","risk"]}'}]}]}
+ result=Explainer(send=lambda _:response).recommend(b)
+ assert result['source']=='rule' and result['candidate_id']=='stable'

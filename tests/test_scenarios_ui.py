@@ -45,6 +45,12 @@ def test_replan_has_no_request_target():
     assert result == {'version': 4, 'event': {'id': 'replan-1', 'type': 'replan', 'time': 660}, 'allow_redirect': False, 'preserve_in_progress': True}
 
 
+def test_risk_advisory_can_send_an_explicit_local_scope():
+    result = client("console.log(JSON.stringify(core.eventPayload(4,{id:'local-1',type:'replan',time:'11:00',target:'',localScopeEngineerIds:['e1','e1']})))")
+    assert result['local_scope_engineer_ids'] == ['e1']
+    assert result['event']['type'] == 'replan'
+
+
 def test_completion_omits_blank_consumption_for_server_defaults():
     result = client("console.log(JSON.stringify(core.factPayload(4,{engineer_id:'E-1',status:'completed',request_id:'R-1',time:'11:00',consumed_router:'',consumed_tv_box:''})))")
     assert result == {'version': 4, 'mode': 'manual', 'engineer_id': 'E-1', 'status': 'completed', 'request_id': 'R-1', 'time': 660}

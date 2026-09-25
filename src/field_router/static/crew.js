@@ -8,7 +8,7 @@ const appUrl=path=>window.FieldRouter?window.FieldRouter.url(path):regionURL(pat
 const uniqueId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
 const labelTransport={public:'Общественный транспорт',car:'Авто',walk:'Пешком',bicycle:'Велосипед'};
 const labelSkill={local:'Ремонт',connection:'Подключение',emergency:'Аварии'};
-const labelField={name:'Имя',transport:'Транспорт',shift:'Смена',skills:'Навыки',start_location:'Старт',start_candidate_id:'Другой адрес',stock_mode:'Выдача',router:'Роутеры, шт.',tv_box:'ТВ-приставки, шт.'};
+const labelField={name:'Имя',transport:'Транспорт',vehicle_id:'Автомобиль',shift:'Смена',skills:'Навыки',start_location:'Старт',start_candidate_id:'Другой адрес',stock_mode:'Выдача',router:'Роутеры, шт.',tv_box:'ТВ-приставки, шт.'};
 function node(tag,text){const n=document.createElement(tag);if(text!=null)n.textContent=text;return n;}
 function canEdit(){return !busy&&state?.editable;}
 function reset(){draft=null;$('preview').hidden=true;$('plan-link').removeAttribute('href');controls();}
@@ -54,7 +54,7 @@ table.append(node('caption','Аварии и подключения: назна�
 function field(parent,label,key,value,type='text',options){const box=node('div');const id='f-'+uniqueId();const l=node('label',label);l.htmlFor=id;const input=node(options?'select':'input');input.id=id;input.dataset.key=key;
 if(options){for(const [value,text] of options){const o=node('option',text);o.value=value;input.append(o);}}else{input.type=type;if(type==='number'){input.min=0;input.max=100;input.step=1;}input.required=true;}
 input.value=value;box.append(l,input);parent.append(box);return input;}
-function row(e){const card=node('section');card.className='crew-row';card.dataset.id=e.id;const grid=node('div');grid.className='crew-grid';
+function row(e){const card=node('section');card.className='crew-row';card.dataset.id=e.id;card.dataset.vehicleId=e.vehicle_id||'';const grid=node('div');grid.className='crew-grid';
 const saved=state.engineers.some(person=>person.id===e.id);
 const membership=node('p',state.region+' · '+(saved?'В системе · заявок в текущем плане: '+(state.assignments?.[e.id]||0):'Новая бригада · ещё не сохранена'));membership.className='crew-membership';card.append(membership,grid);
 field(grid,'Имя','name',e.name).maxLength=100;field(grid,'Транспорт','transport',e.transport,'text',Object.entries(labelTransport));
@@ -72,11 +72,11 @@ details.append(search,results,hint);card.append(details);const remove=node('butt
 if(saved){const mobile=node('a','Открыть приложение инженера ↗');mobile.className='crew-mobile-link';mobile.href=appUrl('/engineer?engineer_id='+encodeURIComponent(e.id));mobile.target='_blank';mobile.rel='noopener';card.append(mobile);}
 $('rows').append(card);
 }
-function collect(){return [...$('rows').children].map(card=>{const get=k=>card.querySelector('[data-key="'+k+'"]').value;return {id:card.dataset.id,name:get('name').trim(),transport:get('transport'),shift:{start:minutes(get('start')),end:minutes(get('end'))},skills:[...card.querySelectorAll('[data-skill]:checked')].map(x=>x.value),start_location:get('start_location'),start_candidate_id:card.dataset.candidate||null,stock_mode:get('stock_mode'),router:Number(get('router')),tv_box:Number(get('tv_box'))};});}
+function collect(){return [...$('rows').children].map(card=>{const get=k=>card.querySelector('[data-key="'+k+'"]').value;const transport=get('transport');return {id:card.dataset.id,name:get('name').trim(),transport,vehicle_id:transport==='car'?(card.dataset.vehicleId||null):null,shift:{start:minutes(get('start')),end:minutes(get('end'))},skills:[...card.querySelectorAll('[data-skill]:checked')].map(x=>x.value),start_location:get('start_location'),start_candidate_id:card.dataset.candidate||null,stock_mode:get('stock_mode'),router:Number(get('router')),tv_box:Number(get('tv_box'))};});}
 $('rows').addEventListener('input',markDirty);$('rows').addEventListener('change',markDirty);
 $('preset-select').onchange=()=>{if(canEdit())describePreset();};
 $('recommend').onclick=()=>{if(!canEdit())return;const preset=selectedPreset();if(!preset)return;$('rows').replaceChildren();preset.engineers.forEach(row);markDirty();status('Форма заполнена: «'+preset.label+'». Рассчитайте и сравните план перед применением.');};
-$('add').onclick=()=>{if(!canEdit())return;row({id:'crew-'+uniqueId(),name:'Новая бригада',transport:'public',shift:{start:540,end:1080},skills:['local'],start_location:'office',stock_mode:'plan',router:1,tv_box:0});markDirty();};
+$('add').onclick=()=>{if(!canEdit())return;row({id:'crew-'+uniqueId(),name:'Новая бригада',transport:'public',vehicle_id:null,shift:{start:540,end:1080},skills:['local'],start_location:'office',stock_mode:'plan',router:1,tv_box:0});markDirty();};
 $('crew-form').onsubmit=e=>{e.preventDefault();if(!canEdit())return;return run(async()=>{reset();status('Расчёт состава, дорог и нового плана…');draft=await api('/api/crew/preview',{version:state.version,engineers:collect()});showComparison();showChanges($('changes'),draft.changes);showAssumptions($('assumptions'),draft.assumptions);$('participation').replaceChildren(...(draft.engineers||[]).map(e=>node('p',e.name+' · '+e.region+' · заявок: '+e.assigned+(e.assigned?'':' — участвовал в расчёте, назначений в найденном плане нет'))));$('unassigned-summary').textContent='Без назначения: '+draft.before.unassigned+' → '+draft.after.unassigned;$('unassigned').replaceChildren(...draft.unassigned.map(x=>node('p',x.request_id+': '+x.reason)));$('issue').replaceChildren(...draft.issue.map(x=>node('p',x.name+': роутеры '+x.router+', ТВ '+x.tv_box)));$('plan-link').href=appUrl('/crew-plan?id='+encodeURIComponent(draft.id)+'&version='+state.version);$('preview').hidden=false;status('Проверьте план и выдачу. Состав пока не изменён.');});};
 $('apply').onclick=()=>{if(!canEdit()||!draft)return;return run(async()=>{await api('/api/crew/apply',{id:draft.id,version:state.version});dirty=false;location.href=appUrl('/');});};
 window.addEventListener('region-change',event=>{if(busy||dirty){event.preventDefault();$('error').textContent='Примените состав после предпросмотра или обновите страницу, чтобы отменить изменения.';$('error').hidden=false;window.scrollTo({top:0});}});

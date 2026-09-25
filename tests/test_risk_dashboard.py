@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 from field_router.replanning import ScenarioSession
-from field_router.risk_dashboard import dashboard
+from field_router.risk_dashboard import capture_dashboard_session, dashboard
 from field_router.models import TimeWindow
 from test_replanning import demo
 from test_auth import Client, secured
@@ -11,19 +11,85 @@ def indicators(result):
     return {item['id']: item for item in result['indicators']}
 
 
-def test_readonly_indicators_do_not_invent_probabilities(make_scenario):
+def test_readonly_dashboard_returns_deterministic_prior_forecast(make_scenario):
     scenario,plan=demo(make_scenario)
     session=ScenarioSession(scenario,plan)
     before=deepcopy(session.dump())
-    result=dashboard(session); rows=indicators(result)
+    result=dashboard(session)
+    repeated=dashboard(session)
+    rows=indicators(result)
     # Two 9-hour shifts; 2 minutes on the road and 60 working, waiting excluded.
     assert rows['capacity']['facts']=={'occupied_minutes':62,'capacity_minutes':1080}
     assert rows['capacity']['value']==5.7
     assert rows['windows']['facts']['tight_visits']==0
     assert rows['equipment']['value']==100
-    assert result['forecast']['status']=='not_connected'
-    assert result['forecast']['risks']==[]
+    assert repeated==result
     assert session.dump()==before
+
+    forecast=result['forecast']
+    assert forecast['status']=='ready'
+    assert forecast['method']=='monte_carlo'
+    assert forecast['calibrated'] is False
+    assert forecast['iterations']>0
+    assert forecast['loss_unit']=='условные единицы'
+    assert forecast['summary']['p_sla_breach']==next(
+        risk['value'] for risk in forecast['risks'] if risk['id']=='sla')
+
+    risks={risk['id']:risk for risk in forecast['risks']}
+    assert list(risks)==['sla','late','overtime','vehicle']
+    for risk_id in ('sla','late','overtime'):
+        assert risks[risk_id]['status']=='ready'
+        assert risks[risk_id]['measure']=='probability'
+        assert 0<=risks[risk_id]['value']<=1
+    assert risks['vehicle']['status']=='insufficient_data'
+    assert risks['vehicle']['measure']=='score'
+    assert risks['vehicle']['value'] is None
+
+    fleet=forecast['fleet']
+    assert fleet==result['fleet']
+    assert fleet['probability'] is False
+    assert fleet['covered']==0 and fleet['total']==2
+    assert all(row['status']=='not_linked' for row in fleet['rows'])
+
+    visits=[visit for route in forecast['routes'] for visit in route['visits']]
+    assert visits
+    for visit in visits:
+        duration=visit['service_duration']
+        assert duration['p50_minutes']<=duration['p80_minutes']<=duration['p90_minutes']
+
+    assumptions=set(forecast['assumptions'])
+    assert {
+        'planned travel_minutes is the travel-duration P50',
+        'request.duration_minutes is the service-duration prior P50',
+        'probabilities are synthetic prior-based estimates until calibrated on actual history',
+        'travel variation is synthetic and does not represent live traffic',
+        'loss units are defined solely by LossWeights',
+        'expected_affected_customers, not the finite-run at-risk count, is intended for ranking',
+    }<=assumptions
+    notice=forecast['notice'].lower()
+    assert ('монте-карло' in notice and 'калибровка вероятностей' in notice
+            and 'не подтверждена' in notice and 'условных единицах' in notice)
+    assert forecast['duration_evidence']['status']=='prior_only'
+    assert forecast['duration_evidence']['observation_count']==0
+
+
+def test_dashboard_snapshot_is_coherent_and_isolated_from_later_mutations(make_scenario):
+    scenario,plan=demo(make_scenario)
+    session=ScenarioSession(scenario,plan)
+    snapshot=capture_dashboard_session(session)
+    before=dashboard(snapshot)
+
+    session.time=700
+    session.statuses['e1']={'status':'unavailable'}
+    session.fact_log.append({'id':'later','engineer_id':'e1','request_id':'a','status':'available',
+                             'time':700,'consumed':{'router':0,'tv_box':0}})
+    session.frozen.clear()
+    session.inventory[0]['available']['router']=999
+    session.plan=session.plan.model_copy(update={'unassigned':['a']})
+
+    assert dashboard(snapshot)==before
+    assert snapshot.version==before['context']['plan_version']
+    assert before['forecast']['plan_version']==before['context']['plan_version']
 
 
 def test_window_endpoint_and_later_separate_window_are_not_extra_buffer(make_scenario):
@@ -76,6 +142,18 @@ def test_risk_endpoint_requires_dispatcher_and_is_region_scoped(secured):
         assert code==200 and data['context']['region']==region
         assert data['forecast']['region']==region
     assert session.version==1 and not session.fact_log
+
+
+def test_risk_endpoint_does_not_copy_unrelated_heavy_session_state(secured):
+    class NoDeepcopy:
+        def __deepcopy__(self, memo):
+            raise AssertionError('unrelated workbench state must not be copied')
+
+    server,_,session=secured
+    session.views['unrelated-heavy-state']=NoDeepcopy()
+    admin=Client(server);admin.login('admin')
+    code,data,_=admin.request('/api/risk')
+    assert code==200 and data['forecast']['status']=='ready'
 
 
 def test_failed_dashboard_does_not_break_planning(secured,monkeypatch):

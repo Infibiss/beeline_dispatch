@@ -66,6 +66,8 @@ class Element {
   querySelectorAll(selector) {return this.children.flatMap(x=>[...(x.matches(selector)?[x]:[]),...x.querySelectorAll(selector)]);}
   querySelector(selector) {return this.querySelectorAll(selector)[0]||null;}
   focus() {}
+  scrollIntoView() {}
+  requestSubmit() {return this.dispatch('submit');}
 }
 const ids={};
 function build(item) {
@@ -118,7 +120,8 @@ def client(expression, before=''):
     script = 'const markup=' + json.dumps(markup) + ';' + HARNESS + before
     script += '\nrequire(' + json.dumps(str(STATIC / 'scenarios.js')) + ');'
     script += '\n(async()=>{await settle();' + expression + '})().catch(error=>{console.error(error);process.exitCode=1;});'
-    result = subprocess.run([node, '-e', script], capture_output=True, text=True)
+    # Keep the full-page DOM harness off the Windows command line (32K limit).
+    result = subprocess.run([node, '-'], input=script, capture_output=True, text=True, encoding='utf-8')
     assert result.returncode == 0, result.stderr
 
 
@@ -190,6 +193,24 @@ assert.equal($('candidate-sort').options.find(o=>o.value==='distance').textConte
 ''')
 
 
+def test_risk_sort_and_comparison_expose_monte_carlo_tradeoffs():
+    client('''
+await submit();
+assert.deepEqual(cards().map(c=>c.dataset.id),['cost','sla','stable']);
+assert.deepEqual(row('P(SLA), %'),['8.0 (−12.0)','12.0 (−8.0)','20.0']);
+assert.deepEqual(row('Ожидаемые потери, усл. ед.'),['1.20 (−1.80)','1.80 (−1.20)','3.00']);
+assert.deepEqual(row('Клиентов с изменённым обещанием'),['1 (−2)','2 (−1)','3']);
+assert.match(cards()[0].textContent,/Risk Engine · 600 прогонов/);
+assert.doesNotMatch(cards()[0].textContent,/калибр/);
+assert.match($('variants-note').textContent,/Монте-Карло/);
+assert.match($('variants-note').textContent,/калибровка вероятностей не подтверждена/);
+''', before='''
+preview.risk_model={version:'risk-engine-v1.1',iterations:600,calibrated:false};
+const values={stable:[.20,3,3,.4,.25],sla:[.12,1.8,2,.3,.18],cost:[.08,1.2,1,.2,.11]};
+for(const c of preview.candidates){const [p,loss,affected,late,overtime]=values[c.id];c.risk={status:'ready',iterations:600,affected_clients:affected,summary:{p_sla_breach:p,expected_loss:loss,expected_affected_customers:affected/2,p_late_start:late,p_overtime:overtime}};}
+''')
+
+
 def test_no_remaining_emergencies_explains_matching_response_profile():
     client('''
 await submit();
@@ -243,4 +264,22 @@ assert.equal($('candidates').dataset.count,'0');
 assert.equal($('variants-note').textContent,'');
 await $('approve').dispatch('click');
 assert.equal(requests.filter(r=>r.url.endsWith('/approve')).length,0);
+''')
+
+
+def test_risk_advisory_runs_preview_only_and_rejects_stale_version():
+    client('''
+const previewCount=()=>requests.filter(r=>r.url.endsWith('/preview')).length;
+const before=previewCount();
+window.dispatchEvent(new CustomEvent('risk-intent',{detail:{action:'preview',planVersion:7,riskId:'sla',advisoryId:'risk-sla'}}));
+await settle(); await settle();
+assert.equal(previewCount(),before+1,'Explicit advisory click starts one preview');
+assert.equal(requests.filter(r=>r.url.endsWith('/approve')).length,0,'Advisory must never approve');
+assert.equal($('panel-events').hidden,false);
+assert.equal($('event-type').value,'replan');
+assert.equal($('approve').disabled,true,'Dispatcher must select a candidate before approval');
+window.dispatchEvent(new CustomEvent('risk-intent',{detail:{action:'preview',planVersion:6,riskId:'late'}}));
+await settle();
+assert.equal(previewCount(),before+1,'Stale advisory must not start another preview');
+assert.equal($('error').hidden,false);
 ''')

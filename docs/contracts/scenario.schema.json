@@ -48,6 +48,18 @@
         "transport": {
           "$ref": "#/$defs/Transport"
         },
+        "vehicle_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vehicle Id"
+        },
         "stock": {
           "anyOf": [
             {
@@ -260,6 +272,219 @@
       ],
       "title": "Transport",
       "type": "string"
+    },
+    "Vehicle": {
+      "additionalProperties": false,
+      "description": "Optional physical vehicle data used by the transparent fleet risk score.",
+      "properties": {
+        "id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "kind": {
+          "default": "car",
+          "enum": [
+            "car",
+            "van",
+            "special"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "odometer_km": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Odometer Km"
+        },
+        "odometer_observed_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Odometer Observed On"
+        },
+        "next_service_km": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Service Km"
+        },
+        "next_service_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Service Date"
+        },
+        "open_defects": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Open Defects",
+          "type": "integer"
+        },
+        "maintenance": {
+          "items": {
+            "$ref": "#/$defs/VehicleMaintenance"
+          },
+          "maxItems": 500,
+          "title": "Maintenance",
+          "type": "array"
+        },
+        "failures": {
+          "items": {
+            "$ref": "#/$defs/VehicleFailure"
+          },
+          "maxItems": 500,
+          "title": "Failures",
+          "type": "array"
+        },
+        "active": {
+          "default": true,
+          "title": "Active",
+          "type": "boolean"
+        },
+        "source": {
+          "default": "provided",
+          "enum": [
+            "provided",
+            "synthetic_demo",
+            "unknown"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "Vehicle",
+      "type": "object"
+    },
+    "VehicleFailure": {
+      "additionalProperties": false,
+      "description": "A factual fleet incident. It is evidence, not a calibrated probability.",
+      "properties": {
+        "occurred_on": {
+          "title": "Occurred On",
+          "type": "string"
+        },
+        "kind": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "severity": {
+          "default": "minor",
+          "enum": [
+            "minor",
+            "major",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "odometer_km": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Odometer Km"
+        },
+        "downtime_hours": {
+          "default": 0,
+          "maximum": 8760,
+          "minimum": 0,
+          "title": "Downtime Hours",
+          "type": "number"
+        },
+        "resolved": {
+          "default": true,
+          "title": "Resolved",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "occurred_on",
+        "kind"
+      ],
+      "title": "VehicleFailure",
+      "type": "object"
+    },
+    "VehicleMaintenance": {
+      "additionalProperties": false,
+      "description": "A completed maintenance action used to audit the fleet data lineage.",
+      "properties": {
+        "performed_on": {
+          "title": "Performed On",
+          "type": "string"
+        },
+        "odometer_km": {
+          "minimum": 0,
+          "title": "Odometer Km",
+          "type": "integer"
+        },
+        "kind": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "performed_on",
+        "odometer_km",
+        "kind"
+      ],
+      "title": "VehicleMaintenance",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -298,6 +523,13 @@
       },
       "minItems": 1,
       "title": "Engineers",
+      "type": "array"
+    },
+    "vehicles": {
+      "items": {
+        "$ref": "#/$defs/Vehicle"
+      },
+      "title": "Vehicles",
       "type": "array"
     },
     "points": {

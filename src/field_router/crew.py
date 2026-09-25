@@ -19,13 +19,14 @@ def current_rows(session):
     saved=session.scenario.metadata.get('crew_inputs')
     if saved is not None:return deepcopy(saved)
     return [dict(id=e.id,name=e.name,shift=e.shift.model_dump(),skills=e.skills,transport=e.transport,
-        start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
+        vehicle_id=e.vehicle_id,start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
         for e in session.initial_engineers.values()]
 
 
 def _engineer(session,row,**changes):
     return Engineer(id=row['id'],name=row['name'],region=session.scenario.region,
         shift=row['shift'],skills=row['skills'],transport=row['transport'],
+        vehicle_id=row.get('vehicle_id'),
         start_location=row['start_location'],stock=Equipment(router=row['router'],tv_box=row['tv_box'])
         if row['stock_mode']=='fixed' else None).model_copy(update=changes)
 
@@ -119,7 +120,7 @@ def skill_gaps(session,rows):
 
 def roster_changes(before,after):
     old={r['id']:r for r in before};new={r['id']:r for r in after};changes=[]
-    fields=('name','shift','skills','transport','start_location','start_candidate_id','stock_mode','router','tv_box')
+    fields=('name','shift','skills','transport','vehicle_id','start_location','start_candidate_id','stock_mode','router','tv_box')
     for eid in sorted(old.keys()|new.keys()):
         a,b=old.get(eid),new.get(eid)
         diff={'crew':{'before':a,'after':b}} if a is None or b is None else {
@@ -183,6 +184,7 @@ class CrewInput(Model):
     shift: TimeWindow
     skills: list[Skill] = Field(min_length=1,max_length=3)
     transport: Transport
+    vehicle_id: str | None = None
     start_location: str = Field(min_length=1)
     start_candidate_id: str | None = None
     stock_mode: Literal['plan','fixed'] = 'plan'
@@ -255,7 +257,8 @@ class CrewService:
                     points[start]=points[source];address=catalog.get(source,source)
             stock=Equipment(router=row.router,tv_box=row.tv_box) if row.stock_mode=='fixed' else None
             engineers.append(Engineer(id=row.id,name=row.name.strip(),region=session.scenario.region,shift=row.shift,
-                skills=row.skills,transport=row.transport,start_location=start,start_address=address,stock=stock))
+                skills=row.skills,transport=row.transport,vehicle_id=row.vehicle_id,
+                start_location=start,start_address=address,stock=stock))
             inputs.append({**row.model_dump(mode='json'),'start_location':start,'start_candidate_id':None})
         active_starts={e.start_location for e in engineers}
         points={k:v for k,v in points.items() if not k.startswith('home:') or k in active_starts}

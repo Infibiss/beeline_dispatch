@@ -118,6 +118,7 @@
 
   if (usingLeaflet) {
     map = window.L.map('map',{scrollWheelZoom:false}).setView([55.75,37.62],10);
+    map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
     mapLayer = window.L.layerGroup().addTo(map);
     const tiles = window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
       referrerPolicy:'strict-origin-when-cross-origin',

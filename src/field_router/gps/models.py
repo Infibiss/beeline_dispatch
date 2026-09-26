@@ -1,6 +1,6 @@
 """Baseline: constant-velocity Kalman filter + explicit operational rules.
 
-No learned weights, probability calibration, live traffic, or network calls.
+No learned weights, probability calibration or live traffic. Routing uses an optional bounded adapter.
 Replace BaselineGpsModel through the worker entrypoint, keeping analyze(job).
 """
 import math
@@ -43,20 +43,34 @@ def smooth_track(points):
     }
 
 
-def choose_target(engineer):
+def choose_target(engineer, minute):
     status = engineer.get('status') or {}
-    tasks = engineer['tasks']
-    if status.get('status') == 'traveling':
-        return next((t for t in tasks if t['id'] == status.get('request_id')), None), 0
-    if status.get('status') == 'working':
+    tasks = sorted(engineer['tasks'], key=lambda t: (t['start'], t['id']))
+    phase = status.get('status')
+    if phase == 'traveling':
+        return next((t for t in tasks if t['id'] == status.get('request_id')), None), 0, 'confirmed'
+    if phase == 'working':
         current = next((t for t in tasks if t['id'] == status.get('request_id')), None)
         following = [t for t in tasks if current and t['id'] != current['id'] and t['start'] >= current['start']]
-        return (following[0] if following else None), status.get('remaining_minutes') or 0
-    return None, 0
+        remaining = status.get('remaining_minutes') or 0  # Match the planner's conservative unconfirmed-work policy.
+        return (following[0] if following else None), remaining, 'after_work'
+    if phase in (None, 'available', 'completed'):
+        # Assignments are not proof of travel: label the target as inferred from the plan.
+        return (tasks[0] if tasks else None), 0, 'plan'
+    return None, 0, 'none'
+
+
+def hhmm(minute):
+    day, value = divmod(minute, 1440)
+    return f'{value//60:02}:{value%60:02}' + (f' ({day:+d} дн.)' if day else '')
 
 
 class BaselineGpsModel:
-    name = 'kalman-motion-v1'
+    name = 'kalman-schedule-v3'
+
+    def __init__(self):
+        from .eta import RoutingEta
+        self.routing = RoutingEta()
 
     def analyze(self, job):
         config = GpsConfig(**job['config'])
@@ -69,7 +83,22 @@ class BaselineGpsModel:
         if not clock['date_matches']:
             return result
         engineer = job['engineer']
-        target, work_remaining = choose_target(engineer)
+        minute = clock['minute']
+        if not engineer['shift']['start'] <= minute < engineer['shift']['end']:
+            return result
+        status = engineer.get('status') or {}
+        if status.get('status') == 'working':
+            current = next((t for t in engineer['tasks'] if t['id']==status.get('request_id')), None)
+            recent = [p for p in points if 0 <= job['now']-p['measured_at_ms']/1000 <= config.stale_seconds
+                      and (clock['minute'] if job.get('demo_minute') is not None else plan_clock(p['measured_at_ms']/1000,config,job['date'])['minute']) >= status.get('time',0)]
+            if current and current['point'] and len(recent)>=3:
+                span=(recent[-1]['measured_at_ms']-recent[0]['measured_at_ms'])/1000
+                lower=min(max(0,distance(p,current['point'])-p['accuracy_m']) for p in recent)
+                if span>=config.worksite_span_seconds and lower>config.worksite_distance_m:
+                    result['alerts'].append(alert('worksite_mismatch','Начало работы требует уточнения',
+                        f"Статус «Работает» по заявке № {current['id']}, но {len(recent)} свежих измерений за {round(span)} сек показывают не менее {round(lower)} м до адреса даже с учётом погрешности.",
+                        'Уточните прибытие и адрес у инженера. GPS не отменяет отметку и не доказывает нарушение.'))
+        target, work_remaining, basis = choose_target(engineer, minute)
         if not target or not target['point']:
             return result
         latest = points[-1]
@@ -77,18 +106,41 @@ class BaselineGpsModel:
             return result
         metres = distance(filtered, target['point'])
         result['target'] = {'id': target['id'], 'address': target['address'], 'point': target['point'],
-                            'distance_m': round(metres)}
-        # An explicitly approximate band, not confidence bounds or OSRM routing.
-        slow, fast, boarding = {
-            'car': (18, 40, 0), 'walk': (3, 5, 0),
-            'bicycle': (10, 18, 0), 'public': (11, 24, 7),
-        }[engineer['transport']]
+                            'distance_m': round(metres), 'basis': basis}
         accuracy = latest['accuracy_m']
-        low = math.ceil(max(0, metres - accuracy) * 1.1 / (fast * 1000 / 60) + boarding + work_remaining)
-        high = math.ceil((metres + accuracy) * 1.6 / (slow * 1000 / 60) + boarding + work_remaining)
-        minute = clock['minute']
+        # The same route estimator is used for device and demo points.
+        # Demo jobs never receive external routing URLs from the service.
+        route = self.routing.estimate(latest, target['point'], engineer['transport'],
+                                      job.get('routing', {}), job['date'], minute)
+        nominal = route['minutes'] + work_remaining
+        margin = max(2, math.ceil(route['minutes']*.25 + accuracy/75))
+        low, high = max(work_remaining, nominal-margin), nominal+margin
+        leave_by = target['start'] - (high-work_remaining)
+        slack = target['start'] - minute - high
+        schedule = {'now_minute': minute, 'planned_start': target['start'],
+                    'arrival_low': minute+low, 'arrival_high': minute+high,
+                    'leave_by': leave_by, 'slack_minutes': slack,
+                    'remaining_work_minutes': work_remaining,
+                    'source': 'demo' if job.get('demo_minute') is not None else 'server'}
         result['eta'] = {'low_minutes': low, 'high_minutes': high, 'approximate': True,
-                         'description': 'Расстояние по прямой, поправка на дорогу и тип транспорта; без пробок и дорожного запроса.'}
+            'estimate_minutes': nominal, 'route': route, 'schedule': schedule,
+            'description': route['description']+' Диапазон — сценарный запас, не доверительный интервал.'}
+        timing = (f"Сейчас {hhmm(minute)}; начало по плану {hhmm(target['start'])}. "
+                  f"Прибытие при отправлении сейчас {hhmm(minute+low)}–{hhmm(minute+high)}"
+                  + (f" с учётом заявленного остатка работы {work_remaining} мин. " if work_remaining else ". ")
+                  + (f"Запас до планового начала {slack} мин." if slack>=0 else f"Медленная оценка позже плана на {-slack} мин."))
+        if minute+low > target['start']:
+            result['alerts'].append(alert('plan_late', 'Плановое начало под угрозой',
+                timing+' Это отклонение от плана; окно клиента проверяется отдельно.',
+                'Уточните фактическое прибытие и проверьте варианты перепланирования. GPS не подтверждает вину сотрудника.'))
+        elif minute+high > target['start']:
+            result['alerts'].append(alert('plan_risk', 'Запас до планового начала исчерпан', timing,
+                'Уточните время выезда; проверьте, можно ли сохранить плановое начало.', 'info'))
+        if basis == 'plan' and metres > config.near_target_m+accuracy and minute >= leave_by:
+            result['alerts'].append(alert('departure_due', 'Пора выезжать по плану',
+                f"Следующая заявка № {target['id']}: {round(metres)} м по прямой; путь {low}–{high} мин. "
+                f"Расчётный выезд не позднее {hhmm(leave_by)}. Сейчас {hhmm(minute)}. Отметки «В пути» нет.",
+                'Попросите подтвердить выезд или уточнить готовность. Это плановая проверка, а не доказательство, что инженер стоит на месте.'))
         if all(minute + low > window['end'] for window in target['windows']):
             result['alerts'].append(alert(
                 'late', 'Есть риск не попасть в окно',
@@ -110,7 +162,7 @@ class BaselineGpsModel:
             if spread <= max(30, uncertainty) and metres > config.near_target_m + accuracy:
                 result['alerts'].append(alert(
                     'stopped', 'Остановка во время выезда',
-                    f"Несколько точек за {round(span / 60, 1)} мин остаются рядом; до адреса ещё около {round(metres)} м.",
+                    f"Несколько точек за {round(span / 60, 1)} мин остаются рядом; до адреса ещё около {round(metres)} м по прямой. " + timing,
                     'Уточните причину остановки: это может быть светофор, пробка или остановка по делу. При подтверждённой задержке пересчитайте план.'))
         if len(recent) >= 3 and span >= 30:
             first, middle, last = recent[0], recent[len(recent)//2], recent[-1]

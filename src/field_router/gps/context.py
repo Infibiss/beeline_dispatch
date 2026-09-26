@@ -6,7 +6,7 @@ def project_context(session):
     if not hasattr(session, 'initial_engineers'):
         return {'version': session.version, 'date': '', 'engineers': {}}
     done = {f['request_id'] for f in session.fact_log if f['status'] in ('completed', 'completion_pending')}
-    result = {'version': session.version, 'date': session.scenario.date, 'engineers': {}}
+    result = {'version': session.version, 'date': session.scenario.date, 'time': session.time, 'engineers': {}}
     for engineer in session.initial_engineers.values():
         visits = {}
         for route in session.frozen:
@@ -26,7 +26,7 @@ def project_context(session):
                 'point': {'lat': point.lat, 'lon': point.lon} if point else None,
                 'windows': [w.model_dump() for w in job.windows],
                 'start': visit['start'], 'end': visit['end'],
-                'duration_minutes': job.duration_minutes,
+                'duration_minutes': job.duration_minutes, 'travel_minutes': visit.get('travel_minutes',0),
             })
         tasks.sort(key=lambda t: (t['start'], t['id']))
         result['engineers'][engineer.id] = {

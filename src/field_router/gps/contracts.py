@@ -30,9 +30,20 @@ def validate_packet(payload, now, config):
     if point is not None:
         if payload['state'] != 'active':
             raise GpsInputError('Координаты принимаются только от включённого трекера')
-        if not isinstance(point, dict) or set(point) != {'lat', 'lon', 'accuracy_m', 'measured_at_ms'}:
+        required = {'lat', 'lon', 'accuracy_m', 'measured_at_ms'}
+        if not isinstance(point, dict) or not required <= set(point) <= required | {'provider','is_mock'}:
             raise GpsInputError('GPS: нужна координата, точность и время измерения')
+        metadata = {}
+        if 'provider' in point:
+            if point['provider'] not in ('gps','network','fused','browser','unknown'):
+                raise GpsInputError('GPS: неизвестный источник координаты')
+            metadata['provider'] = point['provider']
+        if 'is_mock' in point:
+            if type(point['is_mock']) is not bool:
+                raise GpsInputError('GPS: неверная отметка тестовой координаты')
+            metadata['is_mock'] = point['is_mock']
         point = {
+            **metadata,
             'lat': number(point.get('lat'), 'lat', -90, 90),
             'lon': number(point.get('lon'), 'lon', -180, 180),
             'accuracy_m': number(point.get('accuracy_m'), 'accuracy_m', .1, 100000),

@@ -188,12 +188,12 @@ def test_real_worker_runs_demo_and_context_change_invalidates_results():
             run_demo(gps, {'engineer_id': 'e1', 'case': case})
             wait_for(lambda: expected in codes(gps.snapshot('demo')['rows'][0]))
         c = context(); c['version'] = 2; c['engineers']['e1']['status'] = None
-        # Device inference must stop predicting a route once its confirmed target is gone.
+        # Without a travel fact, use the next assignment and label it as a plan assumption.
         gps.ingest(packet(point()))
         wait_for(lambda: gps.snapshot()['rows'][0]['analysis'])
         gps.update_context(c)
         wait_for(lambda: gps.snapshot()['rows'][0]['analysis'] is not None)
-        assert gps.snapshot()['rows'][0]['analysis']['target'] is None
+        assert gps.snapshot()['rows'][0]['analysis']['target']['basis'] == 'plan'
 
 
 @pytest.mark.parametrize('model', ['FailingDemoModel', 'HangingDemoModel', 'CrashingDemoModel'])

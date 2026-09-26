@@ -53,6 +53,11 @@ table.append(node('caption','Аварии и подключения: назна�
 }
 function field(parent,label,key,value,type='text',options){const box=node('div');const id='f-'+uniqueId();const l=node('label',label);l.htmlFor=id;const input=node(options?'select':'input');input.id=id;input.dataset.key=key;
 if(options){for(const [value,text] of options){const o=node('option',text);o.value=value;input.append(o);}}else{input.type=type;if(type==='number'){input.min=0;input.max=100;input.step=1;}input.required=true;}
+if(type==='time'){
+input.type='text';input.dataset.time24='';input.inputMode='numeric';input.maxLength=5;
+input.pattern='([01][0-9]|2[0-3]):[0-5][0-9]';input.placeholder='ЧЧ:ММ';
+input.title='Время в формате ЧЧ:ММ, от 00:00 до 23:59';input.autocomplete='off';
+}
 input.value=value;box.append(l,input);parent.append(box);return input;}
 function row(e){const card=node('section');card.className='crew-row';card.dataset.id=e.id;card.dataset.vehicleId=e.vehicle_id||'';const grid=node('div');grid.className='crew-grid';
 const saved=state.engineers.some(person=>person.id===e.id);

@@ -11,6 +11,9 @@
   <script src="/assets/leaflet.js" defer></script>
   <script src="/engineer.js" defer></script>
   <script src="/gps-engineer.js" defer></script>
+  <script src="/gps-android.js" defer></script>
+  <script src="/apk-download.js" defer></script>
+<script src="/time-input.js" defer></script>
 </head>
 <body>
   <a href="#main" class="skip-link">К заданиям</a>
@@ -45,17 +48,47 @@
     <section id="panel-shift" class="tab-panel" aria-labelledby="tab-shift" hidden>
       <div class="page-heading"><div><p class="eyebrow">РАБОЧИЙ ПРОФИЛЬ</p><h1>Моя смена</h1></div></div>
       <article class="surface"><div class="section-top"><h2 id="engineer-name">Инженер</h2><span id="engineer-status" class="pill">Нет отметки</span></div><dl id="shift-details" class="detail-grid"></dl><div class="button-row"><button type="button" class="primary" id="shift-start">На смене / свободен</button><button type="button" class="secondary" id="shift-problem">Сообщить о недоступности</button></div></article>
+      <article id="android-app" class="surface app-install" aria-labelledby="android-app-title">
+        <h2 id="android-app-title">Приложение для Android</h2>
+        <p id="android-apk-help" class="muted">Установите приложение инженера или скачайте обновление. В приложении доступны ваши задания и встроенный GPS.</p>
+        <p><a id="android-apk-download" class="primary app-install-download" href="/engineer-app.apk" download>Скачать APK для Android</a></p>
+        <p id="android-apk-status" role="status" class="gps-message"></p>
+      </article>
       <article class="surface gps-box" aria-labelledby="gps-title">
         <div class="section-top"><h2 id="gps-title">Геолокация</h2><span id="gps-state" class="pill">Выключена</span></div>
-        <p id="gps-explanation">Включите передачу координат, чтобы диспетчер видел ваше положение и мог уточнить задержку.</p>
+        <p id="gps-explanation">Включите передачу координат, чтобы диспетчер видел ваше положение. История сохраняется на сервере до 7 дней (срок может настроить администратор), отдельно от плана.</p>
         <div class="button-row"><button id="gps-start" class="primary" type="button" disabled>Включить GPS</button><button id="gps-stop" class="secondary" type="button" disabled>Выключить</button></div>
         <p id="gps-feedback" role="status" class="gps-message">Передача начинается только с вашего разрешения.</p>
+        <label><input id="gps-keep-awake" type="checkbox"> Не выключать экран во время передачи из браузера</label>
         <dl class="detail-grid"><dt>Последняя точка</dt><dd id="gps-fix">Ещё нет</dd><dt>Передано серверу</dt><dd id="gps-sent">Ещё нет</dd></dl>
-        <p class="muted">GPS работает при открытой странице. При блокировке телефона или сворачивании браузера передача может остановиться. Статусы работ подтверждайте отдельно.</p>
+        <p class="muted">± метры — погрешность измерения, не расстояние до заявки. Для высокой точности разрешите точное местоположение в настройках телефона и выйдите на открытое место. Браузер не гарантирует передачу при блокировке экрана.</p>
+        <details id="gps-native-panel"><summary>Передача при закрытом экране</summary>
+          <p>Traccar Client — дополнительный вариант фоновой передачи. В нашем Android-приложении GPS уже встроен; скачать приложение можно отдельной кнопкой выше.</p>
+          <p>Заявки и рабочие отметки остаются в этом кабинете. Настройка ниже сама по себе не включает передачу.</p>
+          <ol class="gps-setup-steps">
+            <li><a href="https://www.traccar.org/client/" target="_blank" rel="noopener noreferrer">Установите Traccar Client для Android или iPhone</a>.</li>
+            <li>Подготовьте подключение и нажмите «Открыть приложение и настроить». Адрес сервера и личный ключ передадутся автоматически.</li>
+            <li>В приложении разрешите точное местоположение и работу в фоне, включите передачу (Service status). Вернитесь сюда, чтобы проверить получение первой точки.</li>
+          </ol>
+          <div class="button-row"><button id="gps-native-connect" class="primary" type="button">Подготовить подключение</button><button id="gps-native-revoke" class="secondary" type="button">Отключить телефон</button></div>
+          <p id="gps-native-status" role="status" class="gps-message">Проверяем подключение телефона…</p>
+          <button id="gps-native-refresh" class="secondary" type="button">Проверить получение координаты</button>
+          <div id="gps-native-credentials" hidden>
+            <a id="gps-native-open" class="primary gps-open-app">Открыть приложение и настроить</a>
+            <p class="muted">Если приложение не открылось, установите его по ссылке выше и нажмите ещё раз. После обновления страницы для повторной настройки понадобится подготовить новое подключение.</p>
+            <details id="gps-native-manual"><summary>Ручная настройка, если приложение не открылось</summary>
+              <p>Эти поля нужны только для ручной настройки Traccar Client. Личный ключ не пересылайте.</p>
+              <label for="gps-native-url">Адрес сервера (Server URL)</label><input id="gps-native-url" readonly autocomplete="off">
+              <label for="gps-native-id">Личный ключ (Device identifier)</label><input id="gps-native-id" readonly autocomplete="off" type="password"><button id="gps-native-reveal" class="secondary" type="button">Показать ключ</button>
+              <p>Точность: Highest; интервал: 15 сек; расстояние: 0; при остановке: 30 сек; сохранение без сети: Offline buffering. Затем включите Service status.</p>
+            </details>
+          </div>
+          <p class="muted">Подключение действует 12 часов. Пока фоновая передача не подтверждена, можно пользоваться кнопкой «Включить GPS» выше и держать страницу открытой. Выход из кабинета не останавливает отдельное приложение: в конце смены нажмите «Выключить» и остановите передачу в Traccar Client.</p>
+        </details>
       </article>
       <article class="surface"><h2>Оборудование</h2><p class="muted">Выдано утром, использовано и доступно с учётом резерва текущей работы.</p><div id="equipment" class="equipment"></div></article>
       <article class="surface"><h2>Мои отметки</h2><p class="muted">Отправленные статусы и комментарии видны диспетчеру.</p><div id="fact-list"></div></article>
-      <p class="demo-note">Данные относятся к дате плана; время события задаётся при отправке. GPS включается в этой вкладке. Фоновый трекинг и push-уведомления не подключены.</p>
+      <p class="demo-note">Данные относятся к дате плана; время события задаётся при отправке. Здесь можно включить браузерный GPS или подключить фоновую передачу через Traccar Client. Push-уведомления не подключены.</p>
     </section>
   </main>
   <nav class="bottom-nav" aria-label="Разделы инженера">
@@ -72,7 +105,7 @@
       <fieldset id="action-fields">
         <h3 id="action-title"></h3>
         <p id="action-day" class="muted"></p>
-        <label for="action-time">Время факта</label><input id="action-time" type="time" step="60" required>
+        <label for="action-time">Время факта</label><input id="action-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" required>
         <p class="muted">Проверьте время перед отправкой. Это отметка в демонстрационном дне, а не часы телефона.</p>
         <div id="location-field"><label for="action-location">Где вы сейчас</label><select id="action-location"></select></div>
         <div id="remaining-field"><label for="action-remaining" id="remaining-label">Осталось работы, мин</label><input id="action-remaining" type="number" inputmode="numeric" min="1" max="1440" step="1"></div>

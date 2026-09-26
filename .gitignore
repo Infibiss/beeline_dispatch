@@ -26,3 +26,12 @@ ALNS-OptimizationKernel/
 *.pfx
 *.crt
 *.csr
+
+# Android build outputs, SDK paths and signing credentials.
+android/.gradle/
+android/**/build/
+android/local.properties
+*.apk
+*.aab
+*.jks
+*.keystore

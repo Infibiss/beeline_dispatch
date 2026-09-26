@@ -68,6 +68,34 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     const after=await (await admin.request.get(base+'/api/state')).json();assert.deepEqual(after,before);
     const real=await (await admin.request.get(base+'/api/gps?channel=device')).json();
     assert.equal(real.rows.find(r=>r.engineer_id===eid).tracking_state,'active');
+    // A manual fact increments the data version, without rerouting the selected job.
+    const own=await(await employee.request.get(base+'/r/east/api/engineer?engineer_id='+encodeURIComponent(eid))).json();
+    const identity=await(await employee.request.get(base+'/api/auth/me')).json();
+    const typedTime=await page.inputValue('#gps-replay-time');
+    const target=await page.inputValue('#gps-replay-task');
+    const fact=await employee.request.post(base+'/r/east/api/engineer/facts',{
+      headers:{'X-CSRF-Token':identity.csrf},
+      data:{version:own.version,engineer_id:eid,status:'available',time:Math.max(own.time,own.engineer.shift.start),
+        location_id:own.engineer.start_location,comment:'Browser test: confirmed shift'}
+    });
+    assert.equal(fact.status(),200,await fact.text());
+    const withFact=await(await admin.request.get(base+'/api/state')).json();
+    await page.click('#gps-replay-run');
+    await page.locator('#gps-replay-changes').waitFor({state:'visible'});
+    assert.match(await page.locator('#gps-replay-changes').textContent(),/Фактический статус/);
+    assert.match(await page.locator('#gps-replay-changes').textContent(),/не изменились/);
+    for(const width of [320,390,768]){
+      await page.setViewportSize({width,height:844});
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Plan comparison overflow '+width);
+    }
+    await page.locator('#gps-replay-changes').screenshot({path:path.join(tmp,'plan-comparison.png')});
+    assert.equal(await page.inputValue('#gps-track-text'),sample);
+    assert.equal(await page.inputValue('#gps-replay-time'),typedTime);
+    assert.equal(await page.inputValue('#gps-replay-task'),target);
+    await page.click('#gps-replay-run');
+    await page.waitForFunction(()=>document.querySelector('#gps-replay-status').textContent.includes('Принято: 3'));
+    assert.equal(await page.locator('#gps-replay-changes').isVisible(),false);
+    assert.deepEqual(await(await admin.request.get(base+'/api/state')).json(),withFact);
     await mobile.click('#sign-out');await mobile.waitForURL('**/login');
     const stopped=await (await admin.request.get(base+'/api/gps?channel=device')).json();
     assert.equal(stopped.rows.find(r=>r.engineer_id===eid).tracking_state,'off');
@@ -93,7 +121,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     }
     await mobile.screenshot({path:path.join(tmp,'login.png'),fullPage:true});
-    assert.deepEqual(errors,[]);console.log('PASS accounts + personal mobile + real GPS + own-track replay + revocation + responsive UI');
+    assert.deepEqual(errors,[]);console.log('PASS accounts + personal mobile + GPS replay + explained version conflict preserving input + revocation + responsive UI');
     console.log('Screenshots: '+tmp);
   } finally {
     if(browser)await browser.close();

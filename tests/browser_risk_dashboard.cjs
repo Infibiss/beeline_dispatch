@@ -30,8 +30,8 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     await page.goto(base);await page.click('#tab-risk');
     await page.waitForSelector('[data-indicator="capacity"]');
     assert.equal(await page.locator('.risk-card').count(),3);
-    assert.equal(await page.locator('.risk-prediction').count(),3);
-    assert.ok((await page.locator('#risk-model-status').textContent()).includes('не подключена'));
+    assert.equal(await page.locator('.risk-prediction').count(),4);
+    assert.match(await page.locator('#risk-model-status').textContent(),/risk-engine-v/);
     await page.locator('.risk-card').first().locator('summary').click();
     assert.equal(await page.locator('.risk-card').first().locator('details').getAttribute('open'),'');
     await page.screenshot({path:path.join(tmp,'risk-desktop.png'),fullPage:true});
@@ -76,12 +76,12 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
       expected_affected_customers:.7,p_sla_breach:.41,p_window_sla_breach:.41,
       p_emergency_response_sla_breach:null,p_late_start:.52,p_overtime:.18,expected_overtime_minutes:9.5,
       risks:[{id:'vehicle',measure:'heuristic_score',value:64,reasons:['ТО просрочено'],recommendation:'Проверить машину'}],
-      routes:[{engineer_id:'E-1',p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
+      routes:[{engineer_id:before.engineers[0].id,p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
         expected_affected_customers:.7,visits:[{request_id:'R-1',planned_start:620,planned_sla_deadline:690,
           p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
           service_duration:{p50_minutes:70,p80_minutes:88,p90_minutes:101,observation_count:3}}]}],
       assumptions:['synthetic priors; not calibrated'],advisories:[{id:'sla-1',risk_id:'sla',severity:'high',
-        title:'Проверить SLA',summary:'Сравнить варианты плана',engineer_id:'E-1',request_id:'R-1'}]};
+        title:'Проверить SLA',summary:'Сравнить варианты плана',engineer_id:before.engineers[0].id,request_id:'R-1'}]};
     await refresh();
     assert.equal(await page.locator('.risk-prediction').count(),4);
     assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'41%');
@@ -104,6 +104,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.equal(posts.filter(url=>url.endsWith('/api/approve')).length,0);
     posts.length=0;
     await page.unroute('**/api/risk');
+    await page.click('#tab-risk');
     await page.route('**/api/risk',r=>r.fulfill({status:503,json:{error:'test failure'}}));
     await refresh();assert.equal(await page.locator('#risk-error').isVisible(),true);
     await page.click('#tab-plan');assert.equal(await page.locator('#panel-plan').isVisible(),true);

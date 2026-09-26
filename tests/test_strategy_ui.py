@@ -283,3 +283,14 @@ await settle();
 assert.equal(previewCount(),before+1,'Stale advisory must not start another preview');
 assert.equal($('error').hidden,false);
 ''')
+
+
+def test_gps_replan_does_not_inherit_previous_risk_local_scope():
+    client("""
+window.dispatchEvent(new CustomEvent('risk-intent',{detail:{action:'preview',planVersion:7,engineerId:'e1'}}));
+await settle();await settle();
+assert.deepEqual(requests.filter(r=>r.url.endsWith('/preview')).at(-1).payload.local_scope_engineer_ids,['e1']);
+window.dispatchEvent(new CustomEvent('gps-intent',{detail:{action:'replan'}}));
+await submit();
+assert.equal(requests.filter(r=>r.url.endsWith('/preview')).at(-1).payload.local_scope_engineer_ids,undefined);
+""")

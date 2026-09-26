@@ -254,7 +254,7 @@
   function renderFacts() {
     const rows = (state.fact_journal || state.statuses || []).map(fact => {
       const row = element('tr'), location = (state.locations || []).find(item => item.id === fact.location_id);
-      [engineerName(fact.engineer_id), factLabels[fact.status] || fact.status, requestName(fact.request_id), time(fact.time), location ? location.label : fact.location_id || '—', fact.remaining_minutes ?? '—', fact.recorded_at && !fact.recorded_at.startsWith('unknown') ? new Date(fact.recorded_at).toLocaleString('ru-RU') : '—'].forEach(value => row.append(element('td', value)));
+      [engineerName(fact.engineer_id), factLabels[fact.status] || fact.status, requestName(fact.request_id), time(fact.time), location ? location.label : fact.location_id || '—', fact.remaining_minutes ?? '—', fact.recorded_at && !fact.recorded_at.startsWith('unknown') ? new Date(fact.recorded_at).toLocaleString('ru-RU', {hourCycle:'h23'}) : '—'].forEach(value => row.append(element('td', value)));
       const report = element('td', (fact.source === 'engineer' ? 'Инженер' : 'Диспетчер') + (fact.comment ? ': ' + fact.comment : ''));
       report.className = 'fact-comment'; row.append(report);
       return row;
@@ -287,6 +287,7 @@
     }));
   }
   async function reload() {
+    clearGpsDelay();
     busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Загрузка состояния…';
     try { renderState(await request('/api/state')); $('status').textContent = ''; }
     catch (error) { failure(error); }
@@ -594,9 +595,35 @@
     if (name === 'plan') requestAnimationFrame(() => $('plan-frame').resizePlan?.());
     window.dispatchEvent(new CustomEvent('workbench-tab', {detail: {name}}));
   }
+  let gpsDelayDraft=null;
+  function clearGpsDelay() {
+    gpsDelayDraft=null; $('gps-delay-note').hidden=true;
+    $('facts-form').querySelector('button[type="submit"]').textContent='Сохранить статус';
+  }
   window.addEventListener('gps-intent', event => {
     if (!state || busy) return;
-    if (event.detail.action === 'facts') {
+    localScopeEngineerIds=[];
+    if(event.detail.action==='delay') {
+      const draft=event.detail.draft;
+      if(draft.version!==state.version) {
+        $('error').textContent='Загрузите изменения плана и повторите оценку GPS.';$('error').hidden=false;return;
+      }
+      clearGpsDelay(); $('fact-edit').value='';$('fact-late').checked=false;
+      $('fact-engineer').value=draft.engineer_id;factRequests();
+      $('fact-status').value='traveling';$('fact-request').value=draft.request_id;
+      $('fact-time').value=time(draft.time);$('fact-location').value=draft.location_id||'';
+      $('fact-remaining').value=draft.remaining_minutes;factFields();
+      gpsDelayDraft=draft;
+      const note=$('gps-delay-note');note.replaceChildren(element('p',draft.explanation));
+      note.append(element('p','Предварительное влияние при сохранении порядка заявок и нормативных переездов. Итог проверит оптимизатор:'));
+      for(const item of draft.affected)note.append(element('p','№ '+item.request_id+': '+time(item.planned_start)+' → '+time(item.estimated_start)+
+        (item.window_missed?' · окно клиента нарушено':item.shift_minutes?' · сдвиг '+item.shift_minutes+' мин':' · время сохранено')));
+      const cancel=element('button','Отменить предложение','secondary');cancel.type='button';cancel.onclick=clearGpsDelay;note.append(cancel);
+      note.hidden=false;
+      $('facts-form').querySelector('button[type="submit"]').textContent='Подтвердить доезд и открыть пересчёт';
+      activateTab('facts');$('fact-remaining').focus();
+    } else if (event.detail.action === 'facts') {
+      clearGpsDelay();
       activateTab('facts');
       if ([...$('fact-engineer').options].some(o => o.value === event.detail.engineerId)) $('fact-engineer').value = event.detail.engineerId;
       factRequests(); factFields(); $('fact-engineer').focus();
@@ -619,6 +646,7 @@
   });
   window.addEventListener('risk-intent', event => {
     if (!state || busy) return;
+    clearGpsDelay();
     if (event.detail?.action === 'facts') {
       activateTab('facts');
       if (event.detail.engineerId && [...$('fact-engineer').options].some(option=>option.value===event.detail.engineerId)) {
@@ -668,16 +696,36 @@
     catch(error){failure(error);}finally{busy=false;controls();}
   });
   $('execution-mode').addEventListener('change', controls);
+  $('fact-remaining').addEventListener('input',()=>{
+    if(gpsDelayDraft)$('gps-delay-note').textContent='Остаток изменён диспетчером. Предварительное сравнение скрыто: новые последствия рассчитает оптимизатор после подтверждения.';
+  });
   $('facts-form').addEventListener('submit', async event => {
     event.preventDefault(); if (busy || !state) return;
     let payload;
     try { payload = factPayload(state.version, {engineer_id: $('fact-engineer').value, time: $('fact-time').value, status: $('fact-status').value, request_id: $('fact-request').value, location_id: $('fact-location').value, remaining_minutes: $('fact-remaining').value, consumed_router: $('fact-router').value, consumed_tv_box: $('fact-tv').value}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     if($('fact-edit').value){payload.fact_id=$('fact-edit').value;payload.correction_reason=$('correction-reason').value;}
+    const delay=gpsDelayDraft;
+    if(delay) {
+      if(state.version!==delay.version || payload.engineer_id!==delay.engineer_id || payload.request_id!==delay.request_id ||
+          payload.status!=='traveling' || payload.fact_id) {
+        clearGpsDelay();$('error').textContent='Параметры подтверждения изменились. Получите оценку GPS заново.';$('error').hidden=false;return;
+      }
+      if(Date.now()>delay.expires_at_ms) {
+        clearGpsDelay();$('error').textContent='GPS-оценка устарела. Получите свежую перед подтверждением.';$('error').hidden=false;return;
+      }
+      payload.gps_point_measured_at_ms=delay.point_measured_at_ms;
+      payload.comment=delay.comment+' Подтверждённый остаток: '+payload.remaining_minutes+' мин.';
+    }
     busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Запись фактического статуса…';
-    try { renderState(await request('/api/facts', payload)); $('event-type').value='replan'; targets(); $('status').textContent = 'Статус сохранён.'; }
-    catch (error) { failure(error); }
+    let saved=false;
+    try {
+      renderState(await request(delay?'/api/gps/confirm-delay':'/api/facts', payload)); saved=true;clearGpsDelay();
+      $('event-type').value='replan';targets();$('event-time').value=time(state.time);
+      $('status').textContent=delay?'Время доезда подтверждено. Рассчитываем влияние на план.':'Статус сохранён.';
+    } catch (error) { failure(error); }
     finally { busy = false; controls(); }
+    if(saved && delay){activateTab('events');$('event-form').requestSubmit();}
   });
   $('reload').addEventListener('click', reload);
   $('load-remote').addEventListener('click', reload);

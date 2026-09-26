@@ -12,6 +12,7 @@
 <script src="scenarios.js" defer></script>
 <script src="/gps-dispatcher.js" defer></script>
 <script src="/risk-dashboard.js" defer></script>
+<script src="/time-input.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">К рабочему месту</a>
@@ -63,7 +64,7 @@
     <div class="gps-demo-controls"><div><label for="gps-demo-engineer">Инженер</label><select id="gps-demo-engineer"></select></div><div><label for="gps-demo-case">Ситуация</label><select id="gps-demo-case"><option value="stopped">Остановка по пути</option><option value="moving_away">Удаление от адреса</option><option value="near_site">Прибыл к адресу</option><option value="late">Риск не попасть в окно</option><option value="low_accuracy">Неточная координата</option><option value="stale">Устаревшая координата</option><option value="shift_unconfirmed">Смена не подтверждена</option><option value="clear">Очистить пример</option></select></div><button id="gps-demo-run" class="primary" type="button">Показать</button></div><p id="gps-demo-status" role="status"></p>
     <details id="gps-own-data"><summary>Проверить свои координаты / трек</summary>
       <p>Точки будут отмечены за выбранным выше инженером только в тестовом канале. Для проверки считаем, что он едет к выбранной заявке. Последняя точка переносится на сейчас, интервалы сохраняются.</p>
-      <div class="gps-demo-controls"><div><label for="gps-replay-task">Назначенная заявка</label><select id="gps-replay-task"></select></div><div><label for="gps-replay-time">Время на дате плана</label><input id="gps-replay-time" type="time" value="09:00"></div><button id="gps-replay-reload" type="button" class="secondary">Обновить заявки</button></div>
+      <div class="gps-demo-controls"><div><label for="gps-replay-task">Назначенная заявка</label><select id="gps-replay-task"></select></div><div><label for="gps-replay-time">Время на дате плана</label><input id="gps-replay-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" value="09:00" required></div><button id="gps-replay-reload" type="button" class="secondary">Обновить заявки</button></div>
       <p id="gps-replay-target" class="hint"></p>
       <div class="gps-demo-controls"><div><label for="gps-lat">Широта</label><input id="gps-lat" type="number" step="any" min="-90" max="90" placeholder="55.75"></div><div><label for="gps-lon">Долгота</label><input id="gps-lon" type="number" step="any" min="-180" max="180" placeholder="37.62"></div><div><label for="gps-accuracy">Точность, м</label><input id="gps-accuracy" type="number" min="0.1" step="any" value="10"></div></div>
       <div class="gps-actions"><button type="button" id="gps-own-position" class="secondary">Взять координату моего устройства</button><button type="button" id="gps-single-point" class="secondary">Подставить одну точку</button><button type="button" id="gps-track-sample" class="secondary">Пример: стоим у заявки</button></div>
@@ -72,13 +73,14 @@
       <label for="gps-track-text">Точки для проверки · до 120 строк</label><textarea id="gps-track-text" rows="5" spellcheck="false" placeholder="seconds,lat,lon,accuracy_m"></textarea>
       <p class="hint">CSV: seconds,lat,lon,accuracy_m. seconds — секунды от начала трека, по возрастанию, от 0 до 595. JSON — массив объектов с теми же полями. Десятичный разделитель — точка.</p>
       <button id="gps-replay-run" type="button" class="primary">Проверить трек</button><p id="gps-replay-status" role="status"></p>
+      <div id="gps-replay-changes" class="gps-plan-changes" hidden aria-live="polite"></div>
     </details></div>
   <div id="gps-metrics" class="gps-metrics" aria-label="Наблюдаемость сотрудников"></div>
   <section class="panel gps-exclusion-panel" aria-labelledby="gps-exclusion-title">
     <h3 id="gps-exclusion-title">Пересчитать без инженеров</h3>
     <p>Отметьте одного или нескольких сотрудников в карточках ниже. Получите варианты распределения их оставшихся заявок. Состав сохраняется; план изменится после вашего выбора и применения варианта.</p>
     <p id="gps-excluded-now" class="hint" hidden></p>
-    <div class="gps-exclusion-controls"><div><label for="gps-exclusion-time">С какого времени на дате плана</label><input id="gps-exclusion-time" type="time" step="60" required></div>
+    <div class="gps-exclusion-controls"><div><label for="gps-exclusion-time">С какого времени на дате плана</label><input id="gps-exclusion-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" required></div>
     <button id="gps-exclusion-run" class="primary" type="button" disabled>Пересчитать без выбранных (0)</button>
     <button id="gps-exclusion-clear" class="secondary" type="button">Снять выбор</button></div>
     <p id="gps-exclusion-selection" role="status">Выберите сотрудников в карточках ниже.</p>
@@ -87,7 +89,7 @@
   </section>
   <p class="hint">Проценты показывают долю инженеров в этом плане. Это не вероятность отказа или опоздания. Описание и подсказки доступны при наведении и в раскрывающемся блоке.</p>
   <div class="gps-workspace"><section class="panel"><h3>Последние надёжные координаты</h3><div id="gps-map" aria-label="Карта GPS-позиций инженеров"></div><p class="hint">Серый маркер — устаревшая точка или передача остановлена. На карте сохраняется последняя надёжная точка; время указано в карточке.</p><button id="gps-fit" class="secondary" type="button">Показать все точки</button></section><section><div id="gps-people" class="gps-people"></div></section></div>
-  <details class="panel gps-diagnostics"><summary>Состояние GPS-модуля и диагностика</summary><p id="gps-health"></p><p>Анализ выполняется отдельно от планирования. При сбое модели доступны последние точки и проверки связи; прогнозы временно отключаются.</p><pre id="gps-diagnostics"></pre><details><summary>Последние измерения выбранного инженера</summary><label for="gps-trace-engineer">Инженер</label><select id="gps-trace-engineer"></select><button id="gps-trace-load" class="secondary" type="button">Показать журнал точек</button><pre id="gps-trace"></pre></details></details>
+  <details class="panel gps-diagnostics"><summary>Состояние GPS-модуля и диагностика</summary><p id="gps-health"></p><p>Анализ выполняется отдельно от планирования. При сбое модели доступны последние точки и проверки связи; прогнозы временно отключаются.</p><pre id="gps-diagnostics"></pre><details><summary>Последние измерения выбранного инженера</summary><label for="gps-trace-engineer">Инженер</label><select id="gps-trace-engineer"></select><button id="gps-trace-load" class="secondary" type="button">Показать журнал точек</button><button id="gps-history-load" class="secondary" type="button">История устройства (500 точек)</button><button id="gps-history-next" class="secondary" type="button" hidden>Ещё 500 точек</button><pre id="gps-trace"></pre></details></details>
 </section>
 <section id="panel-plan" role="tabpanel" aria-labelledby="tab-plan">
 <div class="plan-toolbar"><div><label for="plan-version">История плана</label><select id="plan-version" disabled></select></div><p id="plan-context" class="hint">Загрузка плана…</p></div>
@@ -98,9 +100,10 @@
 <section id="completion-panel" class="panel" hidden><h2>Подтвердить выполнение · <span id="completion-count">0</span></h2><div id="completion-list"></div></section>
 <details class="mode-settings"><summary>Настройки учёта выполнения</summary><div class="mode-controls"><label for="execution-mode">Учёт выполнения</label><select id="execution-mode"><option value="simulation">Демо: по плану, если нет фактов</option><option value="manual">Ручной: только факты</option></select><button id="mode-apply" type="button" class="secondary">Применить режим</button><p class="hint">В ручном режиме инженер без статуса недоступен для новых назначений.</p></div></details><div class="workspace"><section class="panel event-panel"><h2>Обновить статус</h2>
 
+<div id="gps-delay-note" class="notice" role="status" hidden></div>
 <form id="facts-form"><fieldset id="facts-fields" disabled>
 <label for="fact-engineer">Инженер</label><select id="fact-engineer" required></select>
-<p id="engineer-fact-context" class="hint"></p><label for="fact-time">Время факта</label><input id="fact-time" type="time" step="60" required>
+<p id="engineer-fact-context" class="hint"></p><label for="fact-time">Время факта</label><input id="fact-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" required>
 <label for="fact-status">Статус</label><select id="fact-status"><option value="available">Свободен</option><option value="traveling">В пути</option><option value="working">Работает</option><option value="completion_pending" disabled>Ожидает подтверждения</option><option value="completed">Завершил заявку</option><option value="interrupted">Работа прервана</option><option value="unavailable">Недоступен</option></select>
 <label for="fact-request">Заявка</label><select id="fact-request"></select>
 <label for="fact-location">Текущее местоположение</label><select id="fact-location"></select><p id="fact-location-note" class="hint">Выберите известное место вручную.</p>
@@ -115,11 +118,11 @@
 <section class="panel event-panel"><div class="section-heading"><h2>Пересчёт плана</h2></div>
 <form id="event-form"><fieldset id="event-fields" disabled>
 <label for="event-type">Тип события</label><select id="event-type"><option value="replan">Пересчитать по фактам</option><option value="emergency">Аварийная заявка</option><option value="new_request">Новая обычная заявка</option><option value="cancel">Отмена заявки</option><option value="unavailable">Инженер недоступен</option></select>
-<label for="event-time">Время события</label><input id="event-time" type="time" required step="60">
+<label for="event-time">Время события</label><input id="event-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" required>
 <label id="target-label" for="event-target">Адрес по существующей заявке</label><select id="event-target" required></select>
 <div id="event-engineers-group" hidden><p class="field-label">Не учитывать инженеров</p><div id="event-engineers" class="engineer-checklist"></div></div>
 <div id="emergency-fields"><details id="new-address-panel"><summary>Адреса нет в списке</summary><label for="new-address">Город, улица, дом</label><input id="new-address" type="text" maxlength="300" placeholder="Москва, улица …, дом …"><button id="address-search" type="button" class="secondary">Найти точку</button><label for="address-candidates">Результаты поиска</label><select id="address-candidates"><option value="">Сначала найдите адрес</option></select><p id="address-context" class="hint"></p><iframe id="address-map" title="Проверка нового адреса на карте" hidden></iframe><button id="address-confirm" type="button" class="secondary" disabled>Использовать точку и рассчитать дороги</button></details><div class="input-pair"><div><label for="duration">Работа на объекте, мин</label><input id="duration" type="number" min="1" max="1440" value="80" required></div><div><label for="router">Роутеры, шт.</label><input id="router" type="number" min="0" value="0" required></div></div><label class="check"><input id="redirect" type="checkbox"><span>Разрешить перенаправление в пути</span></label></div>
-<div id="ordinary-fields" hidden><label for="work-kind">Вид работ</label><select id="work-kind"><option value="connection">Подключение</option><option value="local">Локальная заявка</option><option value="addon">Дозаказ</option></select><div class="input-pair"><div><label for="window-start">Окно с</label><input id="window-start" type="time" value="10:00" required></div><div><label for="window-end">Окно до</label><input id="window-end" type="time" value="12:00" required></div></div><label for="new-tv">ТВ-приставки, шт.</label><input id="new-tv" type="number" min="0" max="100" value="0"></div>
+<div id="ordinary-fields" hidden><label for="work-kind">Вид работ</label><select id="work-kind"><option value="connection">Подключение</option><option value="local">Локальная заявка</option><option value="addon">Дозаказ</option></select><div class="input-pair"><div><label for="window-start">Окно с</label><input id="window-start" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" value="10:00" required></div><div><label for="window-end">Окно до</label><input id="window-end" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" value="12:00" required></div></div><label for="new-tv">ТВ-приставки, шт.</label><input id="new-tv" type="number" min="0" max="100" value="0"></div>
 <input id="preserve" type="checkbox" checked disabled hidden><p id="event-policy" class="hint">Начатые работы сохраняются до завершения.</p>
 <button id="preview" class="primary" type="submit">Рассчитать варианты</button>
 </fieldset></form></section>

@@ -11,11 +11,12 @@ from .service import GpsService
 
 
 class GpsApi:
-    def __init__(self, session, *, config=None, model=None, enabled=True):
+    def __init__(self, session, *, config=None, model=None, enabled=True, history_path=None, routing=None):
         self.service = None
         try:
             options = {'model': model} if model else {}
-            self.service = GpsService(project_context(session), GpsConfig.load(config), enabled=enabled, **options)
+            self.service = GpsService(project_context(session), GpsConfig.load(config), enabled=enabled,
+                                      history_path=history_path, routing=routing, **options)
         except Exception:
             logging.exception('GPS initialization failed; planning stays available')
 
@@ -43,8 +44,19 @@ class GpsApi:
                 if set(params) != {'engineer_id', 'channel'}:
                     raise GpsInputError('Укажите engineer_id и channel')
                 return 200, self.service.trace(params['engineer_id'][0], params['channel'][0])
+            if method == 'GET' and path == '/api/gps/history':
+                if 'engineer_id' not in params or set(params)-{'engineer_id','before','limit'}:
+                    raise GpsInputError('Укажите engineer_id и параметры страницы истории')
+                try:
+                    limit = int(params.get('limit',['500'])[0])
+                except ValueError:
+                    raise GpsInputError('GPS: неверный limit') from None
+                return 200, self.service.history_page(params['engineer_id'][0], limit=limit,
+                                                      before=params.get('before',[None])[0])
             if params:
                 raise GpsInputError('GPS: параметры запроса не поддерживаются')
+            if method == 'POST' and path == '/api/gps/delay':
+                return 200, self.service.delay_draft(payload)
             if method == 'POST' and path == '/api/gps/telemetry':
                 return 202, self.service.ingest(payload)
             if method == 'POST' and path == '/api/gps/demo':

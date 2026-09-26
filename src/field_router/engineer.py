@@ -88,6 +88,9 @@ def engineer_state(session, engineer_id):
     return {
         'version': session.version, 'date': session.scenario.date,
         'region': session.scenario.region, 'time': session.time,
+        'plan_updates': [{'version': version, 'time': view['operations']['time'],
+                          'label': view['operations']['label']}
+                         for version, view in sorted(session.views.items())[-20:]],
         'needs_replanning': session.needs_replanning,
         'engineer': engineer.model_dump(mode='json'),
         'status': deepcopy(latest), 'tasks': tasks,

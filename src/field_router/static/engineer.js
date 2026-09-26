@@ -68,7 +68,7 @@
   function taskType(task) { return task.hd_type || task.bk_type || skills[task.skill] || 'Выездная работа'; }
   function syncStatus(ok) {
     connected = ok; $('connection').classList.toggle('offline', !ok);
-    $('connection').textContent = ok ? 'Обновлено ' + new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) : 'Нет связи · показаны последние полученные данные';
+    $('connection').textContent = ok ? 'Обновлено ' + new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit', hourCycle:'h23'}) : 'Нет связи · показаны последние полученные данные';
     controls();
   }
   function controls() {
@@ -280,6 +280,7 @@
     if (!window.L) { $('map-note').textContent = 'Не удалось загрузить карту. Адреса доступны в списке ниже.'; return; }
     if (!map) {
       map = L.map('engineer-map', {scrollWheelZoom:false});
+      map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {referrerPolicy:'strict-origin-when-cross-origin', attribution:'© OpenStreetMap', maxZoom:19}).addTo(map).on('tileerror', () => {
         $('map-note').textContent = 'Подложка карты недоступна. Точки заявок сохранены; список адресов работает без интернета.';
       });
@@ -327,7 +328,8 @@
     try {
       const result = await request('/api/engineer/facts', payload);
       action = null; dialog.close(); render(result); syncStatus(true); error('');
-      notice(payload.status === 'completed' ? 'Сообщение о выполнении отправлено. Окончательное закрытие подтвердит диспетчер.' : 'Отметка сохранена и доступна диспетчеру. Назначения изменятся после утверждения нового плана.');
+      window.dispatchEvent(new CustomEvent('engineer-action',{detail:{status:payload.status}}));
+      notice(payload.status === 'completed' ? 'Сообщение о выполнении отправлено. Окончательное закрытие подтвердит диспетчер.' : 'Отметка сохранена: у диспетчера → «Статусы инженеров» → «Журнал статусов». Назначения изменятся после утверждения нового плана.');
     } catch (failure) {
       $('action-error').textContent = failure.message; $('action-error').hidden = false;
       if (failure.status === 409) {
@@ -343,6 +345,7 @@
   $('close-dialog').addEventListener('click', () => dialog.close());
   dialog.addEventListener('cancel', event => { if (sending) event.preventDefault(); });
   dialog.addEventListener('close', () => { action = null; selectedId = null; });
+  window.addEventListener('engineer-end-shift',()=>{beginAction('unavailable'); if(action)$('action-comment').value='Смена завершена';});
   $('shift-start').addEventListener('click', () => beginAction('available'));
   $('shift-problem').addEventListener('click', () => beginAction('unavailable'));
   $('search').addEventListener('input', renderTasks);

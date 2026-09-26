@@ -44,7 +44,8 @@ def replay(service, payload):
     if not isinstance(eid,str) or eid not in context['engineers']:
         raise GpsInputError('Выберите существующего инженера')
     if type(payload['version']) is not int or payload['version']!=context['version']:
-        raise GpsInputError('План изменился. Обновите тестовые параметры.',409)
+        raise GpsInputError(f'Проверка не запущена: выбрана версия № {payload["version"]}, '
+                            f'а текущая версия — № {context["version"]}. Сравните изменения перед повтором.',409)
     engineer=deepcopy(context['engineers'][eid])
     task=next((task for task in engineer['tasks'] if task['id']==payload['request_id'] and task['point']),None)
     if task is None: raise GpsInputError('Выберите назначенную этому инженеру заявку с координатами')

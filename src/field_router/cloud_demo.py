@@ -1,5 +1,6 @@
 """Resettable single-process demo for Render's ephemeral Free service."""
 import os
+from contextlib import nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -23,17 +24,26 @@ def run(*, root=Path('.')):
     for region in ('Восток', 'Юго-восток', 'Югоцентр'):
         if not (source / (region + '.json')).is_file():
             raise ValueError('Не найден исходный демо-регион: ' + region)
-    # Every process gets a clean day. Never remove any user-supplied state path.
-    with TemporaryDirectory(prefix='field-router-demo-') as directory:
+    # A mounted persistent volume is opt-in; the public demo keeps its reset
+    # behavior. Never delete or reset an operator-supplied directory.
+    persistent = os.environ.get('FIELD_ROUTER_DATA_DIR')
+    if persistent:
+        Path(persistent).mkdir(parents=True, exist_ok=True)
+    with (nullcontext(persistent) if persistent else TemporaryDirectory(prefix='field-router-demo-')) as directory:
         state = Path(directory)
-        print('Демо: общий день для всех пользователей; перезапуск восстанавливает исходные сценарии.', flush=True)
-        scenario_server.main([
+        print('Постоянное хранилище: план, аккаунты и GPS сохраняются.' if persistent else
+              'Демо: общий день для всех пользователей; перезапуск восстанавливает исходные сценарии.', flush=True)
+        arguments = [
             str(source / 'Восток.json'), '--regions-dir', str(source),
             '--state', str(state / 'state.json'), '--accounts', str(state / 'accounts.sqlite3'),
             '--cache', str(state / 'geo-cache'), '--host', '0.0.0.0', '--port', str(port),
             '--public-origin', origin, '--network', '--solver', 'hybrid',
             '--time-limit', '3', '--morning-time-limit', '10',
-        ])
+        ]
+        routing = os.environ.get('FIELD_ROUTER_GPS_ROUTING')
+        if routing:
+            arguments += ['--gps-routing', routing]
+        scenario_server.main(arguments)
 
 
 if __name__ == '__main__':

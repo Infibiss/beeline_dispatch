@@ -65,7 +65,7 @@ def validate_public_origin(value):
 
 def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,host='127.0.0.1',
                   gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid',
-                  morning_time_limit=None,public_origin=None):
+                  morning_time_limit=None,public_origin=None,gps_routing=None):
     public_origin = validate_public_origin(public_origin)
     # Windows spawn imports this module in the model child. Keep OR-Tools and
     # rendering imports inside the server entrypoints, outside that cold path.
@@ -75,6 +75,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
     from .models import Scenario, Plan
     from .report import render_report
     from .gps.http import GpsApi
+    from .gps.eta import load_routing
+    routing_config = load_routing(gps_routing)
     from .crew import CrewService
     from .regions import RegionRegistry
     from .solvers.selection import get_solver
@@ -101,7 +103,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             if not primary:addresses.candidates = {}  # Never inherit another region's selection tokens.
         return {'holder': {'session': current}, 'path': path, 'lock': threading.Lock(),
                 'crews': CrewService(addresses), 'address_service': addresses,
-                'gps': GpsApi(current,config=gps_config,model=gps_model,enabled=not disable_gps)}
+                'gps': GpsApi(current,config=gps_config,model=gps_model,enabled=not disable_gps,
+                              history_path=Path(path).with_suffix('.gps.sqlite3'),routing=routing_config)}
     if regions is not None:
         if region_sources is not None or 'current' in regions:
             raise ValueError('Укажите один каталог регионов; current зарезервирован')
@@ -111,6 +114,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
     regions=RegionRegistry(session,state_path,context_factory,region_sources)
     from .auth_http import AuthHttp
     auth=AuthHttp(accounts, regions, _STATIC, bool(tls_context) or bool(public_origin))
+    from .gps.mobile import NativeGpsApi
+    native_gps=NativeGpsApi(accounts, regions, bool(tls_context) or bool(public_origin), public_origin=public_origin)
     scheme='https' if tls_context else 'http'
 
     class Handler(BaseHTTPRequestHandler):
@@ -156,7 +161,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             inline = " 'unsafe-inline'" if rendered else ''
             tiles = ' https://tile.openstreetmap.org' if rendered or urlsplit(self.path).path in ('/engineer','/') else ''
             self.send_header('Content-Security-Policy',f"default-src 'self'; style-src 'self'{inline}; script-src 'self'{inline}; img-src 'self' data:{tiles}; connect-src 'self'{tiles}; frame-ancestors 'self'; object-src 'none'; base-uri 'self'")
-            self.end_headers();self.wfile.write(body)
+            self.end_headers()
+            if not getattr(self,'_head_only',False):self.wfile.write(body)
 
         def trusted(self):
             hosts={f'{name}:{self.server.server_port}' for name in allowed_names}
@@ -169,14 +175,45 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             origin=self.headers.get('Origin')
             return origin is None or origin == scheme+'://'+authority
 
+        def do_HEAD(self):
+            # Only the APK exposes HEAD. Run exactly the same authentication as
+            # GET, but suppress every response body (including login redirects).
+            self._head_only=True
+            route=urlsplit(self.path).path.split('/')
+            target='/'+'/'.join(route[3:]) if len(route)>3 and route[1] in ('r','regions') else urlsplit(self.path).path
+            if target!='/engineer-app.apk':
+                self.extra_headers={'Allow':'GET, POST'}
+                return self.reply(405,{'error':'HEAD доступен только для скачивания приложения'})
+            original=self.command
+            try:
+                self.command='GET'
+                return self.do_GET()
+            finally:
+                self.command=original
+
         def do_GET(self):
             if not self.trusted():return self.reply(403,{'error':'Адрес сервера или источник запроса не разрешён'})
             if self.path == '/healthz':return self.reply(200,{'status':'ok'})
+            if native_gps.receive(self):return
             if auth.before(self):return
+            if native_gps.authenticated(self):return
             try:holder,path,lock,crews,gps,address_service=self.context()
             except UnknownRegion:return self.reply(404,{'error':'Неизвестный район'})
             except (ValueError,OSError,KeyError,TypeError):return self.reply(400,{'error':'Район недоступен: проверьте набор и отдельный файл состояния'})
             route=urlsplit(self.path)
+            if route.path=='/engineer-app.apk':
+                apk=_STATIC.parents[2]/'output'/'android'/'field-engineer-debug.apk'
+                if not apk.is_file():
+                    return self.reply(404,{'error':'Android-приложение ещё не собрано. Обратитесь к диспетчеру.'})
+                from .apk_download import apk_response
+                try:
+                    status,body,headers=apk_response(apk,
+                        None if getattr(self,'_head_only',False) else self.headers.get('Range'),
+                        self.headers.get('If-Range'))
+                except OSError:
+                    return self.reply(503,{'error':'Файл приложения временно недоступен. Повторите скачивание.'})
+                self.extra_headers=headers
+                return self.reply(status,body,'application/vnd.android.package-archive')
             if route.path=='/api/regions':
                 manifest=regions.manifest(self.region_key)
                 if self.identity and self.identity['role']=='engineer':
@@ -195,7 +232,10 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 except Exception:
                     return self.reply(503,{'error':'Показатели риска временно недоступны. Планирование продолжает работать.'})
             if route.path == '/api/gps' or route.path.startswith('/api/gps/'):
-                return self.reply(*gps.request('GET',route.path,route.query))
+                status, data = gps.request('GET',route.path,route.query)
+                if status == 200 and route.path == '/api/gps':
+                    native_gps.describe_connections(self.region_key, data)
+                return self.reply(status, data)
             if route.path in ('/api/engineers','/api/engineer','/api/revision'):
                 try:
                     query=parse_qs(route.query,keep_blank_values=True)
@@ -253,6 +293,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 with lock:self.reply(200,holder['session'].state())
                 return
             files={'/':('scenarios.html','text/html; charset=utf-8'),'/scenarios.js':('scenarios.js','text/javascript; charset=utf-8'),'/scenarios.css':('scenarios.css','text/css; charset=utf-8')}
+            files['/time-input.js']=('time-input.js','text/javascript; charset=utf-8')
             files.update({'/app-context.js':('app-context.js','text/javascript; charset=utf-8'),'/app-context.css':('app-context.css','text/css; charset=utf-8')})
             files.update({'/risk-dashboard.js':('risk-dashboard.js','text/javascript; charset=utf-8'),'/risk-dashboard.css':('risk-dashboard.css','text/css; charset=utf-8')})
             files.update({'/crew':('crew.html','text/html; charset=utf-8'),'/crew.js':('crew.js','text/javascript; charset=utf-8'),'/crew.css':('crew.css','text/css; charset=utf-8')})
@@ -261,6 +302,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                           '/engineer.css':('engineer.css','text/css; charset=utf-8')})
             files.update({f'/{name}':(name,kind) for name,kind in (
                 ('gps-engineer.js','text/javascript; charset=utf-8'),
+                ('gps-android.js','text/javascript; charset=utf-8'),
+                ('apk-download.js','text/javascript; charset=utf-8'),
                 ('gps-dispatcher.js','text/javascript; charset=utf-8'),
                 ('gps.css','text/css; charset=utf-8'))})
             if route.path.startswith('/assets/'):
@@ -273,7 +316,9 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
 
         def do_POST(self):
             if not self.trusted():return self.reply(403,{'error':'Запрос с другого сайта запрещен'})
+            if native_gps.receive(self):return
             if auth.before(self):return
+            if native_gps.authenticated(self):return
             try:holder,path,lock,crews,gps,address_service=self.context()
             except (ValueError,OSError,KeyError,TypeError):return self.reply(400,{'error':'Район недоступен: проверьте набор и отдельный файл состояния'})
             if self.headers.get('Content-Type','').split(';')[0]!='application/json':return self.reply(415,{'error':'Ожидается JSON'})
@@ -287,7 +332,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 if self.identity and self.identity['role']=='engineer' and payload.get('engineer_id')!=self.identity['engineer_id']:
                     return self.reply(403,{'error':'Можно отправлять только свои статусы и координаты'})
                 # Telemetry has its own lock; the solver may be busy for seconds.
-                if is_gps:return self.reply(*gps.request('POST',gps_route.path,gps_route.query,payload))
+                if is_gps and gps_route.path!='/api/gps/confirm-delay':return self.reply(*gps.request('POST',gps_route.path,gps_route.query,payload))
                 if self.path in ('/api/explain','/api/recommend'):
                     with lock:
                         session=holder['session']
@@ -324,11 +369,14 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         result=candidate.state()
                     elif self.path=='/api/preview':
                         result={**holder['session'].preview(payload,time_limit=time_limit,solver=solver),'llm_enabled':explainer is not None}
-                    elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts','/api/completions/confirm'):
+                    elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts','/api/completions/confirm','/api/gps/confirm-delay'):
                         # Persist the candidate state before publishing it in memory.
                         candidate=deepcopy(holder['session'])
                         if self.path=='/api/engineer/facts':result=record_engineer_fact(candidate,payload)
                         elif self.path=='/api/completions/confirm':result=confirm_completion(candidate,payload)
+                        elif self.path=='/api/gps/confirm-delay':
+                            from .gps.delay import confirm
+                            result=confirm(candidate,gps.service,payload)
                         else:result=candidate.approve(payload) if self.path=='/api/approve' else candidate.set_mode(payload) if self.path=='/api/mode' else candidate.record_fact(payload)
                         path.parent.mkdir(parents=True,exist_ok=True)
                         temporary=path.with_suffix(path.suffix+'.tmp')
@@ -370,6 +418,7 @@ def point_preview(point):
         '<style>body{margin:0;font:13px system-ui}p{padding:8px;margin:0}#map{height:240px}</style>'
         '<p>'+escape(point.label)+'</p><div id="map"></div><script src="/assets/leaflet.js"></script><script>'
         f'const p=[{point.lat},{point.lon}];const m=L.map("map").setView(p,17);'
+        'm.attributionControl.setPrefix(\'<a href="https://leafletjs.com">Leaflet</a>\');'
         'L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{referrerPolicy:"strict-origin-when-cross-origin",attribution:"© OpenStreetMap"}).addTo(m);L.marker(p).addTo(m);</script></html>')
 
 
@@ -393,6 +442,7 @@ def main(argv=None):
     parser.add_argument('--solver',choices=['ortools','alns','hybrid'],default='hybrid',help='Оптимизатор; hybrid делит бюджет между OR-Tools и ALNS')
     parser.add_argument('--gps-config',type=Path)
     parser.add_argument('--gps-model',help='Replaceable Python module:class with analyze(job)')
+    parser.add_argument('--gps-routing',type=Path,help='Явно настроенные OSRM endpoints для передачи координат и дорожного ETA')
     parser.add_argument('--disable-gps',action='store_true')
     parser.add_argument('--accounts',type=Path,help='База учётных записей; по умолчанию рядом с файлом состояния')
     parser.add_argument('--certfile',type=Path,help='TLS certificate with IP/hostname SAN')
@@ -423,7 +473,7 @@ def main(argv=None):
     server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,morning_time_limit=args.morning_time_limit,solver=args.solver,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None,host=args.host,
                          gps_config=args.gps_config,gps_model=args.gps_model,disable_gps=args.disable_gps,tls_context=tls,
                          region_sources=discover_regions(args.comparison,args.state,args.regions_dir),accounts=accounts,
-                         public_origin=args.public_origin)
+                         public_origin=args.public_origin,gps_routing=args.gps_routing)
     print('Учётные записи: '+str(accounts.path.resolve()),flush=True)
     addresses=local_ipv4_addresses() if args.host=='0.0.0.0' else [args.host]
     for address in addresses:

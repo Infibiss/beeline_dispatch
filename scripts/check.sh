@@ -30,6 +30,7 @@ with ZipFile(wheel) as archive:
                      'field_router/static/login.html', 'field_router/static/login.js', 'field_router/static/auth.css',
                      'field_router/static/accounts.html', 'field_router/static/accounts.js'})
     required.update({'field_router/gps/service.py', 'field_router/gps/models.py',
+                     'field_router/gps/storage.py', 'field_router/gps/mobile.py', 'field_router/gps/eta.py',
                      'field_router/static/engineer.html', 'field_router/static/engineer.js', 'field_router/static/engineer.css',
                      'field_router/static/gps-engineer.js', 'field_router/static/gps-dispatcher.js', 'field_router/static/gps.css'})
     missing = required - set(archive.namelist())

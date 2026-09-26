@@ -1,0 +1,15 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'ru.fieldrouter.engineer'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'ru.fieldrouter.engineer'
+        minSdk 26
+        targetSdk 35
+        versionCode 5
+        versionName '0.1.4'
+        resValue 'string', 'default_server', providers.gradleProperty('serverUrl').getOrElse('')
+    }
+    buildTypes { release { minifyEnabled false } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_11; targetCompatibility JavaVersion.VERSION_11 }
+}

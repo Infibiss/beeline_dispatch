@@ -10,7 +10,8 @@
     [switch]$Network,
     [switch]$Https,
     [switch]$DisableGps,
-    [string]$GpsModel = ''
+    [string]$GpsModel = '',
+    [string]$GpsRoutingConfig = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,6 +40,10 @@ $serverArguments = @('-B', '-m', 'field_router.scenario_server', $comparison,
 if ($Network) { $serverArguments += '--network' }
 if ($DisableGps) { $serverArguments += '--disable-gps' }
 if ($GpsModel) { $serverArguments += @('--gps-model', $GpsModel) }
+if ($GpsRoutingConfig) {
+    if (-not [IO.Path]::IsPathRooted($GpsRoutingConfig)) { $GpsRoutingConfig = Join-Path $repository $GpsRoutingConfig }
+    $serverArguments += @('--gps-routing', $GpsRoutingConfig)
+}
 $serverArguments += @('--gps-config', (Join-Path $repository 'config\gps.json'))
 if ($Https) {
     $certificate = Join-Path $repository 'output\local\https\server.crt'

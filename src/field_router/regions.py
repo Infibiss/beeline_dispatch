@@ -3,8 +3,11 @@ import json
 import hashlib
 import re
 import threading
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import uuid4
+from .availability import day_interval, shift_blocks
 
 REGIONS = {'east': 'Восток', 'south-east': 'Юго-восток', 'south-center': 'Югоцентр'}
 
@@ -62,12 +65,38 @@ def load_session(comparison, state_path):
     from .replanning import ScenarioSession
     payload = json.loads(Path(comparison).read_text(encoding='utf-8'))
     scenario = Scenario.model_validate(payload['scenario'])
+    plan = next((p for p in payload['plans'] if p['solver'] == 'ortools'), payload['plans'][0])
     if Path(state_path).exists():
-        session = ScenarioSession.restore(json.loads(Path(state_path).read_text(encoding='utf-8')))
+        old_bytes = Path(state_path).read_bytes()
+        session = ScenarioSession.restore(json.loads(old_bytes.decode('utf-8')))
         if session.scenario.region != scenario.region:
             raise ValueError('Файл состояния принадлежит другому региону')
+        if session.scenario.date != scenario.date:
+            if date.fromisoformat(scenario.date) < date.fromisoformat(session.scenario.date):
+                raise ValueError('Сравнение относится к более раннему дню, чем сохранённое состояние')
+            archive=Path(state_path).with_name(Path(state_path).stem+'-'+session.scenario.date+Path(state_path).suffix)
+            if archive.exists() and archive.read_bytes()!=old_bytes:
+                raise ValueError('Архив предыдущего дня уже существует; проверьте файлы перед сменой дня: '+str(archive))
+            fresh=ScenarioSession(scenario,Plan.model_validate(plan),geography=payload.get('geography'))
+            fresh.unavailability=[{**item, 'location_id': None}
+                if item['start_date'] < scenario.date else dict(item)
+                for item in session.unavailability
+                if not item.get('revoked') and day_interval(item,scenario.date) is not None]
+            fresh.pending_report_ids=[item['id'] for item in fresh.unavailability
+                if item['engineer_id'] in fresh.initial_engineers and shift_blocks(
+                    [item],item['engineer_id'],scenario.date,
+                    fresh.initial_engineers[item['engineer_id']].shift)]
+            fresh.needs_replanning=bool(fresh.pending_report_ids)
+            fresh._refresh_fact_inventory()
+            fresh._save_view('Новый день; перенесены периоды недоступности' if fresh.unavailability else 'Новый день')
+            # Archive the exact old bytes before atomically replacing the day.
+            # A failed replacement leaves the old current state in place.
+            if not archive.exists():archive.write_bytes(old_bytes)
+            temporary=Path(state_path).with_suffix(Path(state_path).suffix+'.rollover-'+uuid4().hex+'.tmp')
+            temporary.write_text(json.dumps(fresh.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
+            temporary.replace(state_path)
+            return fresh
         return session
-    plan = next((p for p in payload['plans'] if p['solver'] == 'ortools'), payload['plans'][0])
     return ScenarioSession(scenario, Plan.model_validate(plan), geography=payload.get('geography'))
 
 
@@ -140,10 +169,10 @@ class RegionRegistry:
                 state_path = Path(spec['state'])
                 if 'session' in spec:
                     session = spec['session']
-                elif state_path.exists():
-                    session = ScenarioSession.restore(json.loads(state_path.read_text(encoding='utf-8')))
-                else:
+                elif 'comparison' in spec:
                     session = load_session(spec['comparison'], state_path)
+                else:
+                    session = ScenarioSession.restore(json.loads(state_path.read_text(encoding='utf-8')))
                 if session.scenario.region != spec['label']:
                     raise ValueError('Файл состояния принадлежит другому району')
                 self.contexts[key] = self._context(session, state_path, False)

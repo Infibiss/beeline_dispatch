@@ -19,3 +19,4 @@ dialog{border:0;border-radius:22px;width:min(600px,calc(100% - 24px));padding:24
 @media(prefers-reduced-motion:no-preference){button,a{transition:background .15s,border-color .15s}}
 
 .app-install-download{display:inline-flex;align-items:center;justify-content:center;max-width:100%;text-align:center;text-decoration:none;overflow-wrap:anywhere}.app-install-download[aria-disabled="true"]{opacity:.6;cursor:wait}
+.pill.pending_replan{background:#fff2d9;color:#8b570c}.unavailability-entry{padding:12px 0;border-top:1px solid var(--line);font-size:13px}.unavailability-entry strong{display:block}.unavailability-entry p{white-space:pre-wrap;overflow-wrap:anywhere}.unavailability-entry small{display:block;color:var(--muted)}#unavailability-list{margin-top:16px}#unavailability-submit{margin-top:14px;width:100%}

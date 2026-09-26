@@ -8,7 +8,7 @@ const appUrl=path=>window.FieldRouter?window.FieldRouter.url(path):regionURL(pat
 const uniqueId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
 const labelTransport={public:'Общественный транспорт',car:'Авто',walk:'Пешком',bicycle:'Велосипед'};
 const labelSkill={local:'Ремонт',connection:'Подключение',emergency:'Аварии'};
-const labelField={name:'Имя',transport:'Транспорт',vehicle_id:'Автомобиль',shift:'Смена',skills:'Навыки',start_location:'Старт',start_candidate_id:'Другой адрес',stock_mode:'Выдача',router:'Роутеры, шт.',tv_box:'ТВ-приставки, шт.'};
+const labelField={name:'Имя',transport:'Транспорт',vehicle_id:'Автомобиль',shift:'Смена',off_duty:'График дня',skills:'Навыки',start_location:'Старт',start_candidate_id:'Другой адрес',stock_mode:'Выдача',router:'Роутеры, шт.',tv_box:'ТВ-приставки, шт.'};
 function node(tag,text){const n=document.createElement(tag);if(text!=null)n.textContent=text;return n;}
 function canEdit(){return !busy&&state?.editable;}
 function reset(){draft=null;$('preview').hidden=true;$('plan-link').removeAttribute('href');controls();}
@@ -25,6 +25,7 @@ if(value==null||value==='')return '—';
 if(key==='skills')return value.map(x=>labelSkill[x]||x).join(', ');
 if(key==='shift')return clock(value.start)+'–'+clock(value.end);
 if(key==='transport')return labelTransport[value]||value;
+if(key==='off_duty')return value?'Выходной':'Работает';
 if(key==='stock_mode')return value==='plan'?'Под план + резерв':'Фиксированный запас';
 if(key==='start_location')return state.locations.find(x=>x.id===value)?.label||value;
 if(key==='start_candidate_id')return 'Выбранный адрес';
@@ -64,6 +65,7 @@ const saved=state.engineers.some(person=>person.id===e.id);
 const membership=node('p',state.region+' · '+(saved?'В системе · заявок в текущем плане: '+(state.assignments?.[e.id]||0):'Новая бригада · ещё не сохранена'));membership.className='crew-membership';card.append(membership,grid);
 field(grid,'Имя','name',e.name).maxLength=100;field(grid,'Транспорт','transport',e.transport,'text',Object.entries(labelTransport));
 field(grid,'Начало смены','start',clock(e.shift.start),'time');field(grid,'Конец смены','end',clock(e.shift.end),'time');
+field(grid,'График дня','off_duty',e.off_duty?'yes':'no','text',[['no','Работает'],['yes','Выходной']]);
 const starts=state.locations.map(x=>[x.id,x.label]);const start=field(grid,'Старт дня','start_location',e.start_location,'text',starts);
 const policy=field(grid,'Выдача','stock_mode',e.stock_mode,'text',[['plan','Под план + резерв'],['fixed','Фиксированный запас']]);
 const router=field(grid,'Роутеры','router',e.router,'number'),tv=field(grid,'ТВ-приставки','tv_box',e.tv_box,'number');
@@ -77,7 +79,7 @@ details.append(search,results,hint);card.append(details);const remove=node('butt
 if(saved){const mobile=node('a','Открыть приложение инженера ↗');mobile.className='crew-mobile-link';mobile.href=appUrl('/engineer?engineer_id='+encodeURIComponent(e.id));mobile.target='_blank';mobile.rel='noopener';card.append(mobile);}
 $('rows').append(card);
 }
-function collect(){return [...$('rows').children].map(card=>{const get=k=>card.querySelector('[data-key="'+k+'"]').value;const transport=get('transport');return {id:card.dataset.id,name:get('name').trim(),transport,vehicle_id:transport==='car'?(card.dataset.vehicleId||null):null,shift:{start:minutes(get('start')),end:minutes(get('end'))},skills:[...card.querySelectorAll('[data-skill]:checked')].map(x=>x.value),start_location:get('start_location'),start_candidate_id:card.dataset.candidate||null,stock_mode:get('stock_mode'),router:Number(get('router')),tv_box:Number(get('tv_box'))};});}
+function collect(){return [...$('rows').children].map(card=>{const get=k=>card.querySelector('[data-key="'+k+'"]').value;const transport=get('transport');return {id:card.dataset.id,name:get('name').trim(),transport,vehicle_id:transport==='car'?(card.dataset.vehicleId||null):null,shift:{start:minutes(get('start')),end:minutes(get('end'))},off_duty:get('off_duty')==='yes',skills:[...card.querySelectorAll('[data-skill]:checked')].map(x=>x.value),start_location:get('start_location'),start_candidate_id:card.dataset.candidate||null,stock_mode:get('stock_mode'),router:Number(get('router')),tv_box:Number(get('tv_box'))};});}
 $('rows').addEventListener('input',markDirty);$('rows').addEventListener('change',markDirty);
 $('preset-select').onchange=()=>{if(canEdit())describePreset();};
 $('recommend').onclick=()=>{if(!canEdit())return;const preset=selectedPreset();if(!preset)return;$('rows').replaceChildren();preset.engineers.forEach(row);markDirty();status('Форма заполнена: «'+preset.label+'». Рассчитайте и сравните план перед применением.');};

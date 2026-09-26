@@ -17,15 +17,20 @@ CONTROL_COUNTS={'Восток':12,'Юго-восток':12,'Югоцентр':11
 
 def current_rows(session):
     saved=session.scenario.metadata.get('crew_inputs')
-    if saved is not None:return deepcopy(saved)
+    if saved is not None:
+        rows=deepcopy(saved)
+        for row in rows:
+            worker=session.initial_engineers.get(row['id'])
+            row['off_duty']=worker.off_duty if worker is not None else row.get('off_duty',False)
+        return rows
     return [dict(id=e.id,name=e.name,shift=e.shift.model_dump(),skills=e.skills,transport=e.transport,
-        vehicle_id=e.vehicle_id,start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
+        off_duty=e.off_duty,vehicle_id=e.vehicle_id,start_location=e.start_location,stock_mode='fixed',router=e.stock.router,tv_box=e.stock.tv_box)
         for e in session.initial_engineers.values()]
 
 
 def _engineer(session,row,**changes):
     return Engineer(id=row['id'],name=row['name'],region=session.scenario.region,
-        shift=row['shift'],skills=row['skills'],transport=row['transport'],
+        shift=row['shift'],off_duty=row.get('off_duty',False),skills=row['skills'],transport=row['transport'],
         vehicle_id=row.get('vehicle_id'),
         start_location=row['start_location'],stock=Equipment(router=row['router'],tv_box=row['tv_box'])
         if row['stock_mode']=='fixed' else None).model_copy(update=changes)
@@ -59,7 +64,8 @@ def home_starts(session,rows):
     result=deepcopy(rows);travel=session._travel(session.scenario)
     jobs_by_city={city:sorted([r for r in session.scenario.requests if r.locality==city],key=lambda r:r.id)
                   for city in ('Кашира','Домодедово','Ступино')}
-    available={e['id']:e for e in result if e['start_location']=='office' and not e.get('start_candidate_id')}
+    available={e['id']:e for e in result if e['start_location']=='office' and not e.get('start_candidate_id')
+               and not e.get('off_duty',False)}
     max_moves=max(0,len(available)-1)
     for city,jobs in sorted(jobs_by_city.items(),key=lambda x:(-sum(r.duration_minutes for r in x[1]),x[0])):
         if not jobs or not available or max_moves<=0:continue
@@ -120,7 +126,7 @@ def skill_gaps(session,rows):
 
 def roster_changes(before,after):
     old={r['id']:r for r in before};new={r['id']:r for r in after};changes=[]
-    fields=('name','shift','skills','transport','vehicle_id','start_location','start_candidate_id','stock_mode','router','tv_box')
+    fields=('name','shift','off_duty','skills','transport','vehicle_id','start_location','start_candidate_id','stock_mode','router','tv_box')
     for eid in sorted(old.keys()|new.keys()):
         a,b=old.get(eid),new.get(eid)
         diff={'crew':{'before':a,'after':b}} if a is None or b is None else {
@@ -182,6 +188,7 @@ class CrewInput(Model):
     id: str = Field(min_length=1,max_length=100,pattern=r'^[\w:-]+$')
     name: str = Field(min_length=1,max_length=100)
     shift: TimeWindow
+    off_duty: bool = Field(default=False, strict=True)
     skills: list[Skill] = Field(min_length=1,max_length=3)
     transport: Transport
     vehicle_id: str | None = None
@@ -257,7 +264,7 @@ class CrewService:
                     points[start]=points[source];address=catalog.get(source,source)
             stock=Equipment(router=row.router,tv_box=row.tv_box) if row.stock_mode=='fixed' else None
             engineers.append(Engineer(id=row.id,name=row.name.strip(),region=session.scenario.region,shift=row.shift,
-                skills=row.skills,transport=row.transport,vehicle_id=row.vehicle_id,
+                off_duty=row.off_duty,skills=row.skills,transport=row.transport,vehicle_id=row.vehicle_id,
                 start_location=start,start_address=address,stock=stock))
             inputs.append({**row.model_dump(mode='json'),'start_location':start,'start_candidate_id':None})
         active_starts={e.start_location for e in engineers}

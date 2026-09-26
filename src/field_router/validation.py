@@ -18,6 +18,8 @@ def validate_plan(scenario, travel, plan) -> list[str]:
         engineer = engineers[route.engineer_id]
         if not route.visits:
             errors.append(f"empty route: {engineer.id}")
+        if engineer.off_duty:
+            errors.append(f"off-duty engineer: {engineer.id}")
         now, location = engineer.shift.start, engineer.start_location
         distance = minutes = service = routers = boxes = 0
         for visit in route.visits:
@@ -31,6 +33,8 @@ def validate_plan(scenario, travel, plan) -> list[str]:
                 errors.append(prefix+"region")
             if request.skill not in engineer.skills:
                 errors.append(prefix+"skill")
+            if engineer.id in request.excluded_engineer_ids:
+                errors.append(prefix+"engineer declined this request")
             if request.required_transport and request.required_transport != engineer.transport:
                 errors.append(prefix+"transport")
             leg_time = travel.minutes(location,request.id,engineer.transport)

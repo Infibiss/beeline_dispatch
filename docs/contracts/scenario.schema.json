@@ -36,6 +36,11 @@
         "shift": {
           "$ref": "#/$defs/TimeWindow"
         },
+        "off_duty": {
+          "default": false,
+          "title": "Off Duty",
+          "type": "boolean"
+        },
         "skills": {
           "items": {
             "$ref": "#/$defs/Skill"
@@ -198,6 +203,14 @@
         },
         "equipment": {
           "$ref": "#/$defs/Equipment"
+        },
+        "excluded_engineer_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Excluded Engineer Ids",
+          "type": "array"
         },
         "source_line": {
           "anyOf": [

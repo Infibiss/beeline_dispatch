@@ -369,10 +369,21 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         result=candidate.state()
                     elif self.path=='/api/preview':
                         result={**holder['session'].preview(payload,time_limit=time_limit,solver=solver),'llm_enabled':explainer is not None}
-                    elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts','/api/completions/confirm','/api/gps/confirm-delay'):
+                    elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts',
+                                      '/api/engineer/unavailability','/api/engineer/decline',
+                                      '/api/engineer/revoke-report',
+                                      '/api/completions/confirm','/api/gps/confirm-delay'):
                         # Persist the candidate state before publishing it in memory.
                         candidate=deepcopy(holder['session'])
                         if self.path=='/api/engineer/facts':result=record_engineer_fact(candidate,payload)
+                        elif self.path=='/api/engineer/unavailability':
+                            candidate.report_unavailability(payload)
+                            result=engineer_state(candidate,payload['engineer_id'])
+                        elif self.path=='/api/engineer/decline':
+                            candidate.decline_assignment(payload)
+                            result=engineer_state(candidate,payload['engineer_id'])
+                        elif self.path=='/api/engineer/revoke-report':
+                            result=candidate.revoke_engineer_report(payload)
                         elif self.path=='/api/completions/confirm':result=confirm_completion(candidate,payload)
                         elif self.path=='/api/gps/confirm-delay':
                             from .gps.delay import confirm

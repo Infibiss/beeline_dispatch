@@ -116,7 +116,9 @@ class AuthHttp:
                                '/app-context.js','/app-context.css','/time-input.js','/api/gps/mobile','/engineer-app.apk'}
                 if handler.command=='GET' and route not in allowed_get and not route.startswith('/assets/'):
                     raise AuthError('Раздел доступен только диспетчеру', 403)
-                if handler.command=='POST' and route not in {'/api/gps/telemetry','/api/engineer/facts','/api/gps/mobile'}:
+                if handler.command=='POST' and route not in {'/api/gps/telemetry','/api/engineer/facts',
+                                                               '/api/engineer/unavailability','/api/engineer/decline',
+                                                               '/api/gps/mobile'}:
                     raise AuthError('Действие доступно только диспетчеру', 403)
                 if route=='/api/engineer' and parse_qs(raw.query).get('engineer_id') != [identity['engineer_id']]:
                     raise AuthError('Доступны только ваши задания', 403)

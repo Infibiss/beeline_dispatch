@@ -44,6 +44,19 @@
     }
     else if (input.type !== 'replan') throw new Error('Неизвестный тип события.');
     const payload = {version, event, allow_redirect: input.type === 'emergency' && !!input.redirect, preserve_in_progress: true};
+    if (input.type === 'emergency' && input.offDutyEngineerId) {
+      const reason = (input.offDutyReason || '').trim();
+      if (input.offDutyConfirmed !== true || reason.length < 3 || reason.length > 1000) throw new Error('Подтвердите согласие сотрудника и укажите причину эскалации.');
+      Object.assign(payload, {call_off_duty_engineer_ids:[input.offDutyEngineerId], call_off_duty_confirmed:true, call_off_duty_reason:reason});
+      const startText = (input.offDutyWindowStart || '').trim(), endText = (input.offDutyWindowEnd || '').trim();
+      if (!!startText !== !!endText) throw new Error('Укажите оба часа выхода сотрудника с выходного.');
+      if (startText) {
+        const start = minute(startText), end = minute(endText);
+        if (start < event.time || end <= start) throw new Error('Окно выхода должно начинаться не раньше аварии и заканчиваться после начала.');
+        payload.call_off_duty_window_start = start;
+        payload.call_off_duty_window_end = end;
+      }
+    }
     if (input.type === 'replan' && Array.isArray(input.localScopeEngineerIds) && input.localScopeEngineerIds.length) {
       payload.local_scope_engineer_ids = [...new Set(input.localScopeEngineerIds)];
     }
@@ -157,16 +170,90 @@
     $('ordinary-fields').hidden = !ordinary;
     for (const id of ['work-kind','window-start','window-end','new-tv']) $(id).disabled = !ordinary;
     $('redirect').closest('label').hidden = !emergency; $('redirect').disabled = !emergency;
-    $('event-policy').textContent = ordinary ? 'Добавим в свободный интервал без переноса прежних назначений. Если места нет, заявка останется без назначения.' : emergency ? 'Начатая работа завершается. Ориентир реакции на аварию — до 2 часов с поступления; превышение покажем в результате.' : 'Начатые работы сохраняются до завершения.';
+    const offDuty = state.engineers.filter(item => item.off_duty === true);
+    const previousOffDuty = $('call-off-duty-engineer').value;
+    const noCall = element('option', 'Никого не привлекать'); noCall.value = '';
+    $('call-off-duty-engineer').replaceChildren(noCall, ...offDuty.map(item => {
+      const option = element('option', item.name + ' · ' + item.id); option.value = item.id; return option;
+    }));
+    if (offDuty.some(item => item.id === previousOffDuty)) $('call-off-duty-engineer').value = previousOffDuty;
+    $('call-off-duty-panel').hidden = !emergency || !offDuty.length;
+    $('call-off-duty-engineer').disabled = !emergency || !offDuty.length;
+    offDutyFields();
+    $('event-policy').textContent = ordinary ? 'Добавим в свободный интервал без переноса прежних назначений. Если места нет, заявка останется без назначения.' : emergency ? 'Начатая работа завершается. Ориентир реакции на аварию — до 2 часов с поступления; превышение покажем в результате. Выходные сотрудники привлекаются только при отдельной подтверждённой эскалации.' : 'Начатые работы сохраняются до завершения.';
     $('target-label').textContent = engineer ? 'Недоступный инженер' : newJob ? 'Адрес новой заявки' : 'Отменяемая заявка';
     $('event-target').replaceChildren(...(engineer ? state.engineers : newJob ? (state.locations || []).map(item => ({id:item.id,address:item.label})) : state.requests).map(item => {
       const option = element('option', engineer ? item.name + ' · ' + item.id : newJob ? item.address : requestName(item.id) + ' · ' + item.address);
       option.value = item.id; return option;
     }));
   }
+  function offDutyFields() {
+    const selected = $('event-type').value === 'emergency' && !!$('call-off-duty-engineer').value;
+    $('call-off-duty-confirmation').hidden = !selected;
+    $('call-off-duty-confirmed').disabled = !selected;
+    $('call-off-duty-confirmed').required = selected;
+    $('call-off-duty-reason').disabled = !selected;
+    $('call-off-duty-reason').required = selected;
+    for (const id of ['call-off-duty-window-start','call-off-duty-window-end']) $(id).disabled = !selected;
+    const engineer = (state?.engineers || []).find(item => item.id === $('call-off-duty-engineer').value);
+    $('call-off-duty-window-hint').textContent = engineer ?
+      'Исходный график: ' + time(engineer.shift_start) + '–' + time(engineer.shift_end) + '. Для выхода в другое время укажите обе границы.' : '';
+  }
+  function renderReplanningPool() {
+    const pool = Array.isArray(state?.replanning_pool) ? state.replanning_pool : [];
+    const entries = pool.map(item => {
+      const row = element('div', null, 'notice');
+      row.append(element('strong', requestName(item.request_id) + ' · ' + (item.address || 'Адрес не указан')));
+      if (item.engineer_id) row.append(element('p', 'Сообщил: ' + engineerName(item.engineer_id)));
+      if (item.reason) row.append(element('p', 'Причина: ' + item.reason));
+      if (item.start_date && item.end_date) row.append(element('p', 'Недоступен: ' + item.start_date + ' ' + item.start_time + ' — ' + item.end_date + ' ' + item.end_time));
+      if (item.comment) row.append(element('p', 'Комментарий: ' + item.comment));
+      return row;
+    });
+    $('replanning-pool').replaceChildren(...(entries.length ? entries : [element('p', 'Сейчас нет заявок, ожидающих перепланирования.', 'hint')]));
+    const reports = [...(state.unavailability || []).filter(item => !item.revoked).map(item => ({...item, report_type:'unavailability'})),
+      ...(state.declined_assignments || []).filter(item => !item.revoked).map(item => ({...item, report_type:'decline'}))];
+    $('engineer-reports').replaceChildren(...(reports.length ? reports.map(report => {
+      const card = element('div', null, 'notice');
+      const title = report.report_type === 'decline' ? 'Отказ от выезда · ' + requestName(report.request_id) : 'Период недоступности · ' + (report.reason_label || report.reason);
+      card.append(element('strong', engineerName(report.engineer_id) + ' · ' + title));
+      if (report.start_date) card.append(element('p', report.start_date + ' ' + report.start_time + ' — ' + report.end_date + ' ' + report.end_time));
+      if (report.comment) card.append(element('p', report.comment));
+      const reason = element('input'); reason.type = 'text'; reason.minLength = 3; reason.maxLength = 1000;
+      reason.placeholder = 'Причина исправления'; reason.setAttribute('aria-label', 'Причина исправления сообщения');
+      card.append(reason);
+      let location = null;
+      const started = report.report_type === 'unavailability' && report.start_date <= state.date &&
+        (report.start_date < state.date || minute(report.start_time) <= state.time);
+      if (started) {
+        location = element('select'); location.setAttribute('aria-label', 'Подтверждённая точка возвращения');
+        const blank = element('option', 'Выберите текущую точку'); blank.value = '';
+        location.append(blank, ...(state.locations || []).map(point => {
+          const option = element('option', point.label); option.value = point.id; return option;
+        }));
+        card.append(location);
+      }
+      const revoke = element('button', 'Отозвать сообщение', 'secondary'); revoke.type = 'button';
+      revoke.addEventListener('click', async () => {
+        if (busy || !state) return;
+        if (reason.value.trim().length < 3) { $('error').textContent = 'Укажите причину исправления.'; $('error').hidden = false; return; }
+        if (location && !location.value) { $('error').textContent = 'Укажите подтверждённую текущую точку инженера.'; $('error').hidden = false; return; }
+        busy = true; controls(); $('error').hidden = true;
+        try {
+          const payload = {version:state.version, report_id:report.id, reason:reason.value.trim()};
+          if (location) payload.location_id = location.value;
+          renderState(await request('/api/engineer/revoke-report', payload));
+          $('status').textContent = 'Сообщение исправлено. Рассчитайте и утвердите новый план.';
+        } catch (error) { failure(error); }
+        finally { busy = false; controls(); }
+      });
+      card.append(revoke); return card;
+    }) : [element('p', 'Активных сообщений нет.', 'hint')]));
+  }
   function renderState(data) {
     if (!data || data.version == null || !Array.isArray(data.requests) || !Array.isArray(data.engineers)) throw new Error('Сервер вернул неполное состояние.');
     state = data;
+    renderReplanningPool();
     $('remote-update').hidden = true;
     $('region').textContent = data.region || '—'; $('status').classList.toggle('attention', !!data.needs_replanning); $('version').textContent = data.version;
     $('clock').textContent = time(data.time); $('event-time').value = time(data.time); $('event-time').min = time(data.time);
@@ -567,6 +654,11 @@
   $('event-form').addEventListener('input', () => { localScopeEngineerIds=[]; const hadBatch = !!batch; resetCandidates('Параметры изменены. Рассчитайте варианты.'); if (hadBatch) $('status').textContent = 'Параметры изменены — предыдущий расчёт сброшен.'; });
   function defaultDuration() { $('duration').value = $('event-type').value === 'new_request' ? ({connection:70,local:30,addon:20}[$('work-kind').value]) : 80; }
   $('event-type').addEventListener('change', () => { targets(); defaultDuration(); });
+  $('call-off-duty-engineer').addEventListener('change', () => {
+    $('call-off-duty-confirmed').checked = false; $('call-off-duty-reason').value = '';
+    $('call-off-duty-window-start').value = ''; $('call-off-duty-window-end').value = '';
+    offDutyFields();
+  });
   $('work-kind').addEventListener('change', defaultDuration);
   $('event-form').addEventListener('submit', async event => {
     event.preventDefault(); if (busy || !state) return;
@@ -574,6 +666,8 @@
     try { payload = eventPayload(state.version, {id: uniqueEventId(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value,
       engineerIds:[...$('event-engineers').querySelectorAll('input:checked:not(:disabled)')].map(input=>input.value),
       duration: $('duration').value, router: $('router').value, tvBox:$('new-tv').value, workKind:$('work-kind').value, windowStart:$('window-start').value, windowEnd:$('window-end').value, redirect: $('redirect').checked, preserve: true,
+      offDutyEngineerId:$('call-off-duty-engineer').value, offDutyConfirmed:$('call-off-duty-confirmed').checked, offDutyReason:$('call-off-duty-reason').value,
+      offDutyWindowStart:$('call-off-duty-window-start').value, offDutyWindowEnd:$('call-off-duty-window-end').value,
       localScopeEngineerIds}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Расчёт может занять несколько секунд…';

@@ -26,9 +26,10 @@ def _instance(scenario, travel, profile, reference, focus_request_id=None):
     tasks = [Task(idx=i,id=r.id,lat=0,lon=0,a=min(w.start for w in r.windows),b=max(w.end for w in r.windows),
         service=r.duration_minutes,skill=r.skill.value,transport=_MODES.get(r.required_transport),
         priority={'normal':1,'high':2,'urgent':3}[r.priority],windows=tuple((w.start,w.end) for w in r.windows),
-        equipment=r.equipment.model_dump()) for i,r in enumerate(scenario.requests)]
+        equipment=r.equipment.model_dump(),excluded_engineer_ids=frozenset(r.excluded_engineer_ids))
+        for i,r in enumerate(scenario.requests)]
     engineers = [Engineer(idx=i,id=e.id,name=e.name,lat=0,lon=0,shift_start=e.shift.start,shift_end=e.shift.end,
-        skills=frozenset(s.value for s in e.skills),mode=_MODES[e.transport],start_label=e.start_location,
+        skills=frozenset(s.value for s in e.skills),mode=_MODES[e.transport],off_duty=e.off_duty,start_label=e.start_location,
         stock=e.stock.model_dump() if e.stock is not None else None) for i,e in enumerate(scenario.engineers)]
     prior = reference_visits(scenario,reference)
     targets = response_targets(scenario,focus_request_id)

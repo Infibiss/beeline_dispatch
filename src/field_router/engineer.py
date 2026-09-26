@@ -4,6 +4,7 @@ HTTP authorization binds employees to their region and ID. Dispatchers retain
 the preview picker. This projection never assigns jobs or approves a plan.
 """
 from copy import deepcopy
+from .availability import shift_blocks
 
 
 def engineer_index(session):
@@ -19,8 +20,23 @@ def engineer_state(session, engineer_id):
     if engineer_id not in session.initial_engineers:
         raise ValueError('Неизвестный инженер')
     engineer = session.initial_engineers[engineer_id]
+    current = next((item for item in session.scenario.engineers if item.id == engineer_id), None)
+    if current is not None and current.off_duty != engineer.off_duty:
+        engineer = engineer.model_copy(update={'off_duty': current.off_duty,
+                                              'shift': session._availability_shift(engineer_id)})
     facts = [f for f in session.fact_log if f['engineer_id'] == engineer_id]
     latest = session.statuses.get(engineer_id)
+    periods = [period for period in session.unavailability if period['engineer_id'] == engineer_id]
+    blocks = shift_blocks(periods, engineer_id, session.scenario.date,
+                          session._availability_shift(engineer_id))
+    active_absence = next((period for (start, end), period in blocks
+                           if start <= session.time < end), None)
+    unknown_ends = [end for (start, end), period in blocks
+                    if end <= session.time and not period.get('location_id')]
+    return_confirmation_required = bool(unknown_ends) and not any(
+        fact['status'] == 'available' and fact['time'] >= max(unknown_ends) and
+        fact.get('location_id') for fact in facts)
+    pending_reassignment_ids = set(session.pending_reassignment_ids(engineer_id))
     visits = {}
     for route in session.frozen:
         if route['engineer_id'] == engineer_id:
@@ -49,6 +65,8 @@ def engineer_state(session, engineer_id):
             status = latest['status']
         elif history and history[-1]['status'] == 'interrupted':
             status = 'interrupted'
+        if key in pending_reassignment_ids and status == 'planned':
+            status = 'pending_replan'
         point = session.geo_locations.get(key)
         spent = {device: sum(f['consumed'][device] for f in session.fact_log
                             if f.get('request_id') == key) for device in ('router', 'tv_box')}
@@ -94,6 +112,12 @@ def engineer_state(session, engineer_id):
         'needs_replanning': session.needs_replanning,
         'engineer': engineer.model_dump(mode='json'),
         'status': deepcopy(latest), 'tasks': tasks,
+        'unavailability': deepcopy(periods),
+        'active_absence': deepcopy(active_absence),
+        'return_confirmation_required': return_confirmation_required,
+        'declined_assignments': deepcopy([item for item in session.declined_assignments
+                                          if item['engineer_id'] == engineer_id]),
+        'pending_reassignment_ids': sorted(pending_reassignment_ids),
         'facts': deepcopy(facts), 'inventory': deepcopy(inventory),
         'locations': locations, 'route_shape': deepcopy(shape),
         'distance_m': route.distance_m if route else 0,
@@ -119,6 +143,8 @@ def record_engineer_fact(session, payload):
     old = session.statuses.get(eid, {})
     key = payload.get('request_id')
     if kind in ('traveling', 'working', 'completed', 'interrupted'):
+        if key in session.pending_reassignment_ids(eid):
+            raise ValueError('Заявка передана на перепланирование; обновите задания')
         # A fresh mobile action cannot act on another engineer's assignment or
         # a job removed since the last plan; historical corrections are dispatch-only.
         owned = {r['id'] for r in session.fact_requests() if r['engineer_id'] == eid}

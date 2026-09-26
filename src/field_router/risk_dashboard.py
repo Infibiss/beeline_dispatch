@@ -9,6 +9,7 @@ from .fleet_risk import fleet_snapshot
 from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
                           application_risk_seed)
 from .service_observations import confirmed_service_observations
+from .availability import shift_blocks
 
 SCHEMA_VERSION = '1.0'
 WINDOW_BUFFER_MINUTES = 15
@@ -36,9 +37,15 @@ class DashboardSessionSnapshot:
     execution_mode: str
     needs_replanning: bool
     excluded_engineer_ids: frozenset[str]
+    unavailability: tuple[dict[str, Any], ...]
+    activated_off_duty_windows: dict[str, Any]
+    pending_reassignment_request_ids: frozenset[str]
 
     def excluded_engineers(self):
         return set(self.excluded_engineer_ids)
+
+    def pending_reassignment_ids(self):
+        return sorted(self.pending_reassignment_request_ids)
 
     def mode(self):
         return 'manual' if self.execution_mode == 'manual' else 'mixed' if self.statuses else 'simulation'
@@ -60,6 +67,9 @@ def capture_dashboard_session(session):
         execution_mode=session.execution_mode,
         needs_replanning=session.needs_replanning,
         excluded_engineer_ids=frozenset(session.excluded_engineers()),
+        unavailability=tuple(deepcopy(session.unavailability)),
+        activated_off_duty_windows=dict(session.activated_off_duty_windows),
+        pending_reassignment_request_ids=frozenset(session.pending_reassignment_ids()),
     )
 
 
@@ -167,11 +177,33 @@ def _forecast(session, context, fleet):
 def dashboard(session, gps_snapshot=None):
     now = session.time
     excluded = session.excluded_engineers()
-    eligible = {key: e for key, e in session.initial_engineers.items()
-                if key not in excluded and e.shift.end > now
-                and session.statuses.get(key, {}).get('status') != 'unavailable'
-                and (session.execution_mode != 'manual' or key in session.statuses)}
+    current = {e.id: e for e in session.scenario.engineers}
+    dispatchable = {row['engineer_id'] for row in session.inventory if row['dispatchable']}
+    eligible = {}
+    for key, initial in session.initial_engineers.items():
+        worker = current.get(key)
+        if (key in excluded or worker is None or worker.off_duty or key not in dispatchable or
+                worker.shift.end <= now or session.statuses.get(key, {}).get('status') == 'unavailable' or
+                (session.execution_mode == 'manual' and key not in session.statuses)):
+            continue
+        effective_shift = session.activated_off_duty_windows.get(key, initial.shift)
+        intervals = shift_blocks(session.unavailability, key, session.scenario.date, effective_shift)
+        if any(start <= now < end for (start, end), _ in intervals):
+            continue
+        unknown_ends = [end for (start, end), period in intervals
+                        if end <= now and not period.get('location_id')]
+        if unknown_ends and not any(
+                fact.get('engineer_id') == key and fact.get('status') == 'available' and
+                fact.get('time', -1) >= max(unknown_ends) and fact.get('location_id')
+                for fact in session.fact_log):
+            continue
+        next_start = min((start for (start, end), _ in intervals if start > now),
+                         default=worker.shift.end)
+        end = min(worker.shift.end, next_start)
+        if end > max(now, worker.shift.start):
+            eligible[key] = worker.model_copy(update={'shift': worker.shift.model_copy(update={'end': end})})
     completed = {f['request_id'] for f in session.fact_log if f['status'] in ('completed', 'completion_pending')}
+    pending = set(session.pending_reassignment_ids())
     visits = {}
     for route in session.frozen:
         for visit in route['visits']:
@@ -180,7 +212,7 @@ def dashboard(session, gps_snapshot=None):
         for visit in route.visits:
             visits[(route.engineer_id, visit.request_id)] = visit.model_dump()
     visits = {(eid, rid): v for (eid, rid), v in visits.items()
-              if eid in eligible and v['end'] > now and rid not in completed}
+              if eid in eligible and v['end'] > now and rid not in completed and rid not in pending}
     capacity = sum(e.shift.end - max(now, e.shift.start) for e in eligible.values())
     occupied = 0
     for eid, engineer in eligible.items():
@@ -225,7 +257,7 @@ def dashboard(session, gps_snapshot=None):
     fleet = fleet_snapshot(session.scenario)
     return {'schema_version': SCHEMA_VERSION, 'context': context,
             'summary': {'engineers': len(eligible), 'roster': len(session.initial_engineers),
-                        'unassigned': len(session.plan.unassigned)},
+                        'unassigned': len({u.request_id for u in session.plan.unassigned} | pending)},
             'indicators': [
                 {'id': 'capacity', 'title': 'Загрузка бригад', 'value': ratio(occupied, capacity),
                  'caption': 'оставшегося времени смен занято',

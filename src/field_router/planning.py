@@ -5,7 +5,8 @@ from .models import Equipment, Metrics, Plan, Route, Unassigned, Visit
 
 
 def compatible(request, engineer):
-    return (request.region == engineer.region and request.skill in engineer.skills
+    return (not engineer.off_duty and request.region == engineer.region and request.skill in engineer.skills
+            and engineer.id not in request.excluded_engineer_ids
             and (request.required_transport is None or request.required_transport == engineer.transport))
 
 
@@ -76,13 +77,19 @@ def explain_unassigned(request, scenario, travel, *, baseline=False):
     mode = [e for e in skilled if request.required_transport is None or e.transport==request.required_transport]
     stocked = [e for e in mode if e.stock is None or (
         e.stock.router>=request.equipment.router and e.stock.tv_box>=request.equipment.tv_box)]
+    working = [e for e in stocked if not e.off_duty]
+    willing = [e for e in working if e.id not in request.excluded_engineer_ids]
     if not skilled:
         code, reason = "NO_SKILL", "Нет исполнителя с требуемым навыком в этом участке."
     elif not mode:
         code, reason = "NO_TRANSPORT", "Среди инженеров с нужным навыком нет требуемого транспорта."
     elif not stocked:
         code, reason = "NO_EQUIPMENT", "У подходящих инженеров недостаточно устройств для этой заявки."
-    elif not any(build_route(e,[request],travel) is not None or _optimistically_reachable(request,e,scenario,travel) for e in stocked):
+    elif not working:
+        code, reason = "OFF_DUTY", "Подходящие инженеры не работают в этот день."
+    elif not willing:
+        code, reason = "ENGINEER_DECLINED", "Подходящие инженеры отказались от этой заявки."
+    elif not any(build_route(e,[request],travel) is not None or _optimistically_reachable(request,e,scenario,travel) for e in willing):
         code, reason = "NO_TIME_WINDOW", "При текущих стартах и сменах не успеть в окно даже с оптимистичной оценкой дороги."
     elif baseline:
         code, reason = "NO_APPEND_SLOT", "Нет допустимого добавления в конец текущих маршрутов. Baseline не меняет порядок уже назначенных работ."

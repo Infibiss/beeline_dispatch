@@ -24,6 +24,17 @@ def test_event_input_preserves_redirect_choice_but_never_interrupts_work():
     assert result == {'version': 4, 'event': {'id': 'evt-1', 'type': 'emergency', 'time': 635, 'anchor_id': 'R-1', 'duration_minutes': 80, 'router': 0}, 'allow_redirect': True, 'preserve_in_progress': True}
 
 
+def test_off_duty_call_requires_explicit_consent_for_emergency_only():
+    emergency = client("console.log(JSON.stringify(core.eventPayload(4,{id:'evt',type:'emergency',time:'10:35',target:'R-1',duration:'80',router:'0',offDutyEngineerId:'E-2',offDutyConfirmed:true,offDutyReason:'Крупная авария'})))")
+    assert emergency['call_off_duty_engineer_ids'] == ['E-2']
+    assert emergency['call_off_duty_confirmed'] is True
+    assert emergency['call_off_duty_reason'] == 'Крупная авария'
+    rejected = client("try { core.eventPayload(4,{id:'evt',type:'emergency',time:'10:35',target:'R-1',duration:'80',router:'0',offDutyEngineerId:'E-2',offDutyConfirmed:false,offDutyReason:'Крупная авария'}); console.log('false'); } catch { console.log('true'); }")
+    ordinary = client("console.log(JSON.stringify(core.eventPayload(4,{id:'ordinary',type:'new_request',time:'10:35',target:'R-1',duration:'80',router:'0',workKind:'local',windowStart:'11:00',windowEnd:'12:00',offDutyEngineerId:'E-2',offDutyConfirmed:true,offDutyReason:'Крупная авария'})))")
+    assert rejected is True
+    assert 'call_off_duty_engineer_ids' not in ordinary
+
+
 def test_event_time_rejects_invalid_values_before_request():
     result = client("console.log(JSON.stringify(['25:00','08:60','', '8:00'].map(time=>{try{core.eventPayload(1,{id:'x',type:'cancel',time,target:'r'});return false}catch{return true}})))")
     assert result == [True, True, True, True]

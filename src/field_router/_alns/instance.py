@@ -27,6 +27,7 @@ class Task:
     address: str = ''
     windows: tuple[tuple[int, int], ...] | None = None
     equipment: dict[str, int] = field(default_factory=dict)
+    excluded_engineer_ids: frozenset[str] = field(default_factory=frozenset)
 
     @property
     def service_windows(self):
@@ -44,6 +45,7 @@ class Engineer:
     shift_end: int
     skills: frozenset
     mode: str
+    off_duty: bool = False
     start_label: str = 'Office'
     stock: dict[str, int] | None = None
 
@@ -162,6 +164,7 @@ class Instance:
         return self
 
     def compatible(self, e: Engineer, t: Task) -> bool:
-        return (t.skill in e.skills and (t.transport is None or t.transport == e.mode)
+        return (not e.off_duty and e.id not in t.excluded_engineer_ids
+                and t.skill in e.skills and (t.transport is None or t.transport == e.mode)
                 and (e.stock is None or all(t.equipment.get(k, 0) <= e.stock.get(k, 0)
                                            for k in ('router', 'tv_box'))))

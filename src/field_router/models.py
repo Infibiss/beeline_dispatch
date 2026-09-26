@@ -117,8 +117,17 @@ class Request(Model):
     # Emergency > connection > repair/additional order.
     priority: Priority = "normal"
     equipment: Equipment = Field(default_factory=Equipment)
+    excluded_engineer_ids: list[str] = Field(default_factory=list, max_length=100)
     source_line: int | None = None
     provenance: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def valid_excluded_engineers(self):
+        if any(not engineer_id.strip() for engineer_id in self.excluded_engineer_ids):
+            raise ValueError("Excluded engineer IDs must be nonempty")
+        if len(set(self.excluded_engineer_ids)) != len(self.excluded_engineer_ids):
+            raise ValueError("Duplicate excluded engineer ID")
+        return self
 
 
 class Engineer(Model):
@@ -128,6 +137,7 @@ class Engineer(Model):
     start_location: str = "office"
     start_address: str | None = None
     shift: TimeWindow
+    off_duty: bool = Field(default=False, strict=True)
     skills: list[Skill] = Field(min_length=1, max_length=3)
     transport: Transport
     vehicle_id: str | None = None

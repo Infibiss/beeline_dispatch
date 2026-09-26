@@ -92,6 +92,31 @@ def test_dashboard_snapshot_is_coherent_and_isolated_from_later_mutations(make_s
     assert before['forecast']['plan_version']==before['context']['plan_version']
 
 
+def test_returned_engineer_remains_in_capacity_after_followup_status(make_scenario):
+    scenario, plan = demo(make_scenario)
+    session = ScenarioSession(scenario, plan)
+    session.report_unavailability({
+        'version': session.version, 'engineer_id': 'e1',
+        'start_date': scenario.date, 'start_time': '10:00',
+        'end_date': scenario.date, 'end_time': '10:30',
+        'reason': 'personal', 'comment': 'Приём по личному вопросу',
+        'location_id': None,
+    })
+    session.time = 700
+    session.fact_log.extend([
+        {'engineer_id': 'e1', 'status': 'available', 'time': 630,
+         'location_id': 'office', 'consumed': {'router': 0, 'tv_box': 0}},
+        {'engineer_id': 'e1', 'status': 'traveling', 'time': 690,
+         'location_id': 'office', 'consumed': {'router': 0, 'tv_box': 0}},
+    ])
+    session.statuses['e1'] = {'status': 'traveling', 'time': 690,
+                              'location_id': 'office'}
+
+    result = dashboard(capture_dashboard_session(session))
+    assert result['summary']['engineers'] == 2
+    assert indicators(result)['capacity']['facts']['capacity_minutes'] == 760
+
+
 def test_window_endpoint_and_later_separate_window_are_not_extra_buffer(make_scenario):
     scenario,plan=demo(make_scenario)
     session=ScenarioSession(scenario,plan)

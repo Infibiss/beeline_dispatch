@@ -15,7 +15,8 @@
       {kind:'wait',start:visit.arrival,end:visit.start},{kind:'work',start:visit.start,end:visit.end}]
       .filter(part => Number.isFinite(part.start) && Number.isFinite(part.end) && part.end > part.start);
   }
-  function buildRecords(scenario, plan) {
+  function buildRecords(scenario, plan, operations = {}) {
+    const pending = new Set(operations?.assignment_summary?.pending_request_ids || []);
     const engineers = new Map((scenario.engineers || []).map(e => [e.id,e]));
     const visits = new Map();
     (plan.routes || []).forEach((route,routeIndex) => (route.visits || []).forEach((visit,stopIndex) => {
@@ -23,12 +24,12 @@
     }));
     const unassigned = new Map((plan.unassigned || []).map(item => [item.request_id,item]));
     return (scenario.requests || []).map(request => ({request,...(visits.get(request.id) || {}),
-      unassigned:unassigned.get(request.id)}));
+      unassigned:unassigned.get(request.id),pendingReassignment:pending.has(request.id)}));
   }
   function filterRecords(records, engineer, query) {
     const needle = String(query || '').trim().toLocaleLowerCase('ru');
     return records.filter(record => {
-      if (engineer === '__unassigned__' && record.visit) return false;
+      if (engineer === '__unassigned__' && record.visit && !record.pendingReassignment) return false;
       if (engineer && engineer !== '__unassigned__' && record.route?.engineer_id !== engineer) return false;
       const haystack = [record.request.id,record.request.address,record.request.locality,record.engineer?.name]
         .filter(Boolean).join(' ').toLocaleLowerCase('ru');
@@ -56,9 +57,10 @@
   function priorityLabel(priority) {
     return {urgent:'Авария · максимальный приоритет',high:'Подключение · после аварий'}[priority] || 'Обычный';
   }
-  function prioritySummary(scenario, plan) {
+  function prioritySummary(scenario, plan, operations = {}) {
     const top=(scenario.requests || []).filter(request=>['urgent','high'].includes(request.priority));
     const assigned=new Set((plan.routes || []).flatMap(route=>(route.visits || []).map(visit=>visit.request_id)));
+    for(const key of operations?.assignment_summary?.pending_request_ids || [])assigned.delete(key);
     return {served:top.filter(request=>assigned.has(request.id)).length,total:top.length};
   }
   if (typeof module !== 'undefined' && module.exports) {
@@ -79,7 +81,7 @@
   const number = value => Number.isFinite(value) ? value : 0;
   const km = value => (number(value) / 1000).toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
   const windows = request => (request.windows || []).map(w => time(w.start)+'–'+time(w.end)).join(', ') || 'Не указаны';
-  const color = record => record.route ? COLORS[record.routeIndex % COLORS.length] : '#ac7b38';
+  const color = record => record.route && !record.pendingReassignment ? COLORS[record.routeIndex % COLORS.length] : '#ac7b38';
   let payload;
   try { payload = JSON.parse($('dispatcher-data').textContent); }
   catch (_) { $('notice').textContent = 'Не удалось прочитать данные отчёта. Сформируйте файл повторно.'; return; }
@@ -114,7 +116,7 @@
   (scenario.engineers || []).forEach(engineer => {
     const option=node('option',engineer.name || engineer.id); option.value=engineer.id; $('engineer-select').append(option);
   });
-  const unassignedOption=node('option','Без назначения'); unassignedOption.value='__unassigned__'; $('engineer-select').append(unassignedOption);
+  const unassignedOption=node('option','Требуют назначения'); unassignedOption.value='__unassigned__'; $('engineer-select').append(unassignedOption);
 
   if (usingLeaflet) {
     map = window.L.map('map',{scrollWheelZoom:false}).setView([55.75,37.62],10);
@@ -131,12 +133,14 @@
   function stat(value,label,warn) { const item=node('div',null,'metric'+(warn?' warn':'')); item.append(node('strong',value),node('span',label)); return item; }
   function renderMetrics() {
     const m=plan.metrics || {};
-    $('metrics').replaceChildren(stat(m.assigned ?? 0,'Заявок назначено'),stat(m.unassigned ?? records.filter(r=>!r.visit).length,'Без назначения',number(m.unassigned)>0),
+    const coverage=payload.operations?.assignment_summary;
+    const attention=coverage?.requires_assignment ?? m.unassigned ?? records.filter(r=>!r.visit).length;
+    $('metrics').replaceChildren(stat(coverage?.assigned ?? m.assigned ?? 0,coverage?'С действующим назначением':'Заявок назначено'),stat(attention,'Требуют назначения',attention>0),
       stat(m.engineers_used ?? 0,'Инженеров на линии'),stat(km(m.distance_m),'Километров по модели'),
       stat(number(m.travel_minutes)+' мин','Время в пути'),stat(number(plan.elapsed_seconds).toFixed(2)+' с','Расчёт плана'));
     $('plan-status').textContent = STATUS[plan.status] || plan.status || 'Расчёт не выполнен';
     if (['ortools','alns','hybrid'].includes(plan.solver)) $('plan-status').textContent += ' · Оптимальность не гарантируется';
-    const top=prioritySummary(scenario,plan);
+    const top=prioritySummary(scenario,plan,payload.operations);
     $('plan-status').textContent += ' · Аварии и подключения: '+top.served+' / '+top.total+'. Приоритет: авария → подключение → ремонт / дозаказ.';
   }
   function renderList() {
@@ -148,10 +152,10 @@
       const button=node('button',null,'request-item'); button.type='button'; button.dataset.requestId=request.id;
       button.style.setProperty('--route-color',color(record)); button.setAttribute('aria-pressed',String(selected===request.id));
       const row=node('span',null,'row'); row.append(node('span',requestName(request.id),'request-id'),
-        node('span',record.visit?time(record.visit.start):'Не назначена','request-state'+(record.visit?'':' unassigned')));
+        node('span',record.pendingReassignment?'Нужен новый инженер':record.visit?time(record.visit.start):'Не назначена','request-state'+(record.visit && !record.pendingReassignment?'':' unassigned')));
       button.append(row,node('strong',request.address || 'Адрес не указан'),
         node('small',windows(request)+' · '+number(request.duration_minutes)+' мин'),
-        node('small',record.engineer?.name || (record.visit?record.route.engineer_id:'Нет инженера')));
+        node('small',(record.pendingReassignment?'Ранее: ':'')+(record.engineer?.name || (record.visit?record.route.engineer_id:'Нет инженера'))));
       button.addEventListener('click',()=>select(request.id,true)); container.append(button);
     });
   }
@@ -164,12 +168,13 @@
     if (!record) { empty(container,'Выберите заявку в списке, на карте или в расписании.'); return; }
     const request=record.request, visit=record.visit;
     container.append(node('div',requestName(request.id),'card-id'),node('h3',request.address || 'Адрес не указан','card-address'),
-      node('div',visit?'Назначена · '+(record.engineer?.name || record.route.engineer_id):'Без назначения','card-state'+(visit?'':' unassigned')));
+      node('div',record.pendingReassignment?'Требует переназначения':visit?'Назначена · '+(record.engineer?.name || record.route.engineer_id):'Без назначения','card-state'+(visit && !record.pendingReassignment?'':' unassigned')));
+    if(record.pendingReassignment)container.append(node('p','Прежний исполнитель недоступен или отказался от выезда. Ниже сохранено старое расписание для сравнения; назначение больше не считается действующим.','notice'));
     const list=node('dl',null,'facts'), technical=node('dl',null,'facts');
     fact(list,'Окно клиента',windows(request));
     fact(list,'Продолжительность / тип работ',number(request.duration_minutes)+' мин · '+(SKILL[request.skill] || request.skill || '—'));
     if (visit) {
-      fact(list,'Прибытие → начало → окончание',time(visit.arrival)+' → '+time(visit.start)+' → '+time(visit.end));
+      fact(list,record.pendingReassignment?'Ранее: прибытие → начало → окончание':'Прибытие → начало → окончание',time(visit.arrival)+' → '+time(visit.start)+' → '+time(visit.end));
       fact(list,'Предыдущий переезд / ожидание',number(visit.travel_minutes)+' мин · '+km(visit.distance_m)+' км / '+Math.max(0,visit.start-visit.arrival)+' мин');
       fact(list,'Инженер / транспорт',(record.engineer?.name || record.route.engineer_id)+' · '+(TRANSPORT[record.engineer?.transport] || record.engineer?.transport || '—'));
       if (record.engineer?.transport === 'public') {
@@ -228,11 +233,11 @@
       label.append(node('small',(TRANSPORT[engineer?.transport] || engineer?.transport || '—')+' · '+km(route.distance_m)+' км'));
       const track=node('div',null,'track');
       filtered.filter(r=>r.route===route).forEach(record=>timelineSegments(record.visit).forEach(segment=>{
-        const button=node('button',segment.kind==='work'?requestName(record.request.id):'','segment '+segment.kind);
+        const button=node('button',segment.kind==='work'?requestName(record.request.id):'','segment '+segment.kind+(record.pendingReassignment?' pending-reassignment':''));
         button.type='button';button.dataset.requestId=record.request.id;
         button.style.left=((segment.start-start)/span*100)+'%';button.style.width=((segment.end-segment.start)/span*100)+'%';
         button.style.setProperty('--route-color',color(record));
-        const description=KINDS[segment.kind]+' · '+requestName(record.request.id)+' · '+time(segment.start)+'–'+time(segment.end)+' · '+record.request.address;
+        const description=(record.pendingReassignment?'Старое назначение — нужен новый инженер · ':'')+KINDS[segment.kind]+' · '+requestName(record.request.id)+' · '+time(segment.start)+'–'+time(segment.end)+' · '+record.request.address;
         button.title=description;button.setAttribute('aria-label',description);button.setAttribute('aria-pressed',String(record.request.id===selected));
         button.addEventListener('click',()=>select(record.request.id,true));track.append(button);
       }));
@@ -381,7 +386,7 @@
     if(listItem)listItem.scrollIntoView({block:'nearest',inline:'nearest'});
   }
   function refresh(resetPlan) {
-    if(resetPlan){plan=plans[Number($('plan-select').value)] || {routes:[],unassigned:[],metrics:{}};records=buildRecords(scenario,plan);renderMetrics();renderEquipment();renderProvenance();}
+    if(resetPlan){plan=plans[Number($('plan-select').value)] || {routes:[],unassigned:[],metrics:{}};records=buildRecords(scenario,plan,payload.operations);renderMetrics();renderEquipment();renderProvenance();}
     filtered=filterRecords(records,$('engineer-select').value,$('request-search').value);
     if(!filtered.some(record=>record.request.id===selected))selected=filtered[0]?.request.id || null;
     $('filter-summary').textContent='Показано '+filtered.length+' из '+records.length+' заявок';

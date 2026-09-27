@@ -27,7 +27,7 @@ def test_private_fields_never_sent_and_response_cached():
     e=Explainer(send=send)
     b=batch();before=deepcopy(b)
     assert e.explain(b,'sla')['source']=='yandexgpt'
-    assert 'назначено 5' in e.explain(b,'sla')['text']
+    assert 'назначено' in e.explain(b,'sla')['text'] and '5' in e.explain(b,'sla')['text']
     assert len(calls)==1 and b==before
 
 @pytest.mark.parametrize('response',[{}, {'output':[{'content':[{'type':'output_text','text':''}]}]}])
@@ -191,3 +191,84 @@ def test_llm_cannot_override_lower_risk_verified_recommendation():
  response={'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"cost","points":["coverage","risk"]}'}]}]}
  result=Explainer(send=lambda _:response).recommend(b)
  assert result['source']=='rule' and result['candidate_id']=='stable'
+
+
+def test_plain_retry_llm_uses_same_no_loss_policy_as_plan_recommendation():
+ from field_router.llm import Explainer, eligible_candidates
+ b=batch();b['recommendation_policy']='preserve_approved'
+ sla=b['candidates'][0];sla['emergency']=None
+ sla['facts'].update(previous_approved_lost=2,time_shift_minutes=0)
+ add_risk(sla,p_sla=.1)
+ stable=deepcopy(sla);stable['id']='stable'
+ stable['facts'].update(previous_approved_lost=0,reassigned=0)
+ add_risk(stable,p_sla=.2)
+ b['candidates'].append(stable)
+ assert [item['id'] for item in eligible_candidates(b)]==['stable']
+ def send(body):
+  context=json.loads(body['input'].splitlines()[-1])
+  assert context['eligible_candidates']==['stable']
+  return {'output':[{'content':[{'type':'output_text','text':'{"candidate_id":"sla","points":["coverage","risk"]}'}]}]}
+ result=Explainer(send=send).recommend(b)
+ assert result['source']=='rule' and result['candidate_id']=='stable'
+ assert 'Новых событий нет' in result['text']
+
+
+def test_selected_candidate_explanation_is_detailed_but_does_not_claim_preview_applied():
+ from field_router.llm import Explainer
+ b=batch();add_risk(b['candidates'][0])
+ response={'output':[{'content':[{'type':'output_text','text':'{"points":["coverage","risk"]}'}]}]}
+ result=Explainer(send=lambda _:response).explain(b,'sla')
+ assert result['source']=='yandexgpt'
+ assert 'Вариант' in result['text'] and 'P(SLA)' in result['text']
+ assert 'Почему этот вариант:' in result['text']
+ assert 'Что проверить диспетчеру:' in result['text']
+ assert 'не откалиброваны' in result['text']
+ assert 'Применён вариант' not in result['text']
+
+
+def test_known_but_inapplicable_model_point_is_ignored_without_losing_valid_explanation():
+ from field_router.llm import Explainer
+ b=batch()
+ b['candidates'][0]['emergency']={}
+ response={'output':[{'content':[{'type':'output_text',
+     'text':'{"points":["coverage","reaction","changes"]}'}]}]}
+ result=Explainer(send=lambda _:response).explain(b,'sla')
+ assert result['source']=='yandexgpt'
+ assert 'назначено' in result['text']
+ assert 'От поступления аварии' not in result['text']
+
+
+def test_grouped_autopilot_does_not_claim_a_new_emergency_was_unassigned():
+ from field_router.llm import Explainer, verified_points
+ b=batch()
+ b['event']={'type':'replan'}
+ b['candidates'][0]['emergency']={'assigned':False}
+ assert 'reaction' not in verified_points(b)
+ response={'output':[{'content':[{'type':'output_text',
+     'text':'{"points":["coverage","reaction","changes"]}'}]}]}
+ result=Explainer(send=lambda _:response).explain(b,'sla')
+ assert result['source']=='yandexgpt'
+ assert 'Новая авария не назначена' not in result['text']
+
+
+def test_per_visit_detail_uses_only_verified_quantiles_and_risk():
+ from field_router.llm import decision_detail
+ candidate={'risk':{'status':'ready','routes':[{'visits':[{
+     'request_id':'request:x','service_duration':{'p50_minutes':30,'p80_minutes':45,'p90_minutes':60},
+     'p_sla_breach':.125,'p_late_start':.2}]}]}}
+ text=decision_detail({'request_id':'request:x','explanation':'Назначено инженеру.'},candidate)
+ assert 'Назначено инженеру.' in text
+ assert 'P50 — 30, P80 — 45, P90 — 60' in text
+ assert '12.5%' in text and '20%' in text and 'не откалиброваны' in text
+ candidate['risk']['routes'][0]['visits'][0]['p_sla_breach']=float('nan')
+ assert 'риск нарушения' not in decision_detail({'request_id':'request:x','explanation':'Назначено.'},candidate)
+
+
+def test_provider_failure_notice_is_specific_and_never_exposes_exception_body():
+ from urllib.error import URLError
+ from field_router.llm import Explainer
+ e=Explainer(send=lambda _: (_ for _ in ()).throw(URLError('PRIVATE SECRET')))
+ result=e.explain(batch(),'sla')
+ assert result['source']=='template'
+ assert 'соединения' in result['notice']
+ assert 'PRIVATE' not in json.dumps(result)

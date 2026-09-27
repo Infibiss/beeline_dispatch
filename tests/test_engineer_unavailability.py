@@ -71,6 +71,22 @@ def test_absence_puts_existing_visits_in_pool_until_dispatcher_approves(make_sce
     assert restored.pending_reassignment_ids() == []
 
 
+def test_unplaced_visits_keep_previous_owner_and_attention_after_approval(make_scenario):
+    session = session_with_route(make_scenario)
+    report(session, end_time='18:00')
+    report(session, engineer_id='e2', end_time='18:00')
+    batch = preview_replan(session)
+    session.approve({'version': session.version, 'batch_id': batch['id'], 'candidate_id': 'stable'})
+    rows = {row['request_id']: row for row in session.replanning_pool()}
+    assert set(rows) == {'a', 'b'}
+    assert all(row['status'] == 'unassigned' and row['previous_engineer_id'] == 'e1'
+               for row in rows.values())
+    assert all(row['windows'] and row['duration_minutes'] > 0 for row in rows.values())
+    assert all(row['code'] for row in rows.values())
+    assert not session.needs_replanning
+    assert set(session.dispatch_notifications[-1]['unassigned_request_ids']) == {'a', 'b'}
+
+
 def test_declined_visit_is_not_cancelled_or_returned_to_same_engineer(make_scenario):
     session = session_with_route(make_scenario)
     session.decline_assignment({'version': 1, 'engineer_id': 'e1', 'request_id': 'b',

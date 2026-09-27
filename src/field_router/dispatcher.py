@@ -43,6 +43,10 @@ def _operation_context(payload: dict) -> tuple[str, str]:
     context += '</strong><p>' + safe(mode_label) + '. Местоположение без GPS.</p>'
     if operations.get('needs_replanning'):
         context += '<p role="status"><strong>Факты изменились; показан последний утверждённый план, требуется пересчёт.</strong></p>'
+    summary=operations.get('assignment_summary') or {}
+    if summary.get('awaiting_replan'):
+        context += ('<p>Прежний исполнитель недоступен у '+safe(summary['awaiting_replan'])+
+                    ' заявок. Они требуют переназначения и не включены в число действующих назначений. Старые маршруты показаны для сравнения.</p>')
     context += '</section>'
     rows = []
     for route in (operations.get('frozen') or []) + (operations.get('history') or []):

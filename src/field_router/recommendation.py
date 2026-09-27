@@ -31,5 +31,17 @@ def eligible_candidates(batch):
     """LLM explains the server rule; it cannot substitute another trade-off."""
     candidates=[c for c in batch['candidates'] if not c.get('duplicate_of')]
     if not candidates:raise ValueError('Нет вариантов для рекомендации')
+    if batch.get('recommendation_policy')=='preserve_approved':
+        # A retry with no new facts must not exchange promised customers just
+        # to improve a secondary metric. Keep this policy common to the solver
+        # recommendation and optional LLM wording.
+        def retry_rank(candidate):
+            facts=candidate['facts']
+            return (facts.get('previous_approved_lost',facts.get('lost_assignments',0)),
+                    facts.get('unassigned',0),
+                    facts.get('avoidable_reassigned',facts.get('reassigned',0)),
+                    facts.get('time_shift_minutes',0),recommendation_rank(candidate))
+        best=min(retry_rank(candidate) for candidate in candidates)
+        return [candidate for candidate in candidates if retry_rank(candidate)==best]
     best=min(recommendation_rank(c) for c in candidates)
     return [c for c in candidates if recommendation_rank(c)==best]

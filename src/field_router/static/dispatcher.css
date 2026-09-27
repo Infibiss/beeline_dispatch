@@ -17,6 +17,7 @@
 /* Constrain grid children and long addresses instead of clipping the viewport. */
 .toolbar>div,.heading>div,.bottom-grid>*{min-width:0}.workspace>*{max-width:100%}
 .card-address,.request-item strong{overflow-wrap:anywhere}.scroll,#schedule{max-width:100%;overscroll-behavior-x:contain}
+.segment.pending-reassignment{border:1px dashed #956619;background-image:repeating-linear-gradient(135deg,transparent,transparent 5px,#fff5 5px,#fff5 9px)}
 @media(max-width:720px){
   main{padding:16px 12px}.embedded main{padding:0}
   input,select{font-size:16px;min-height:46px}.toolbar{gap:10px}.toolbar>div{min-width:0;flex-basis:100%}

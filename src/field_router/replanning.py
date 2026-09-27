@@ -7,7 +7,7 @@ from typing import Literal
 from uuid import uuid4
 
 from pydantic import Field, model_validator
-from .models import Model, Scenario, Plan, Request, Point, Equipment, TimeWindow, Skill, Visit, Route
+from .models import Model, Scenario, Plan, Request, Point, Equipment, TimeWindow, Skill, Visit, Route, Metrics
 from .travel import synthetic_travel
 from .geo_models import GeographyBundle
 from .geography import attach_geography
@@ -132,6 +132,47 @@ def facts_for(scenario,plan,diff):
         'time_shift_minutes':sum(abs(d['after_start']-d['before_start']) for d in diff if d['before_start'] is not None and d['after_start'] is not None)}
 
 
+def preserved_approved_seed(scenario, travel, reference):
+    """Feasible fallback retaining every still-feasible published visit and start.
+
+    A changed availability/fact can invalidate an old visit. In that case the
+    visit is left for the solver; no unavailable or off-duty worker is silently
+    returned to service. New intake and previously unassigned work remain in
+    the residual scenario as explicit unassigned jobs until search finds a slot.
+    """
+    from .ordinary_insertion import _fixed_route
+    from .planning import explain_unassigned
+
+    jobs={request.id:request for request in scenario.requests}
+    engineers={engineer.id:engineer for engineer in scenario.engineers}
+    start_times={key:start for key,(_,start) in _assignments(reference).items()}
+    routes=[];assigned=set()
+    for old_route in reference.routes:
+        engineer=engineers.get(old_route.engineer_id)
+        if engineer is None or engineer.off_duty:
+            continue
+        kept=[];fixed=None
+        for visit in old_route.visits:
+            key=visit.request_id
+            if key not in jobs or key in assigned:
+                continue
+            trial=_fixed_route(engineer,kept+[key],jobs,start_times,travel)
+            if trial is not None:
+                kept.append(key);fixed=trial;assigned.add(key)
+        if fixed is not None:
+            routes.append(fixed)
+    unassigned=[explain_unassigned(request,scenario,travel)
+                for request in scenario.requests if request.id not in assigned]
+    result=Plan(solver='approved_seed',status='feasible',scenario_id=scenario.id,
+        routes=routes,unassigned=unassigned,
+        metrics=Metrics(assigned=len(assigned),unassigned=len(unassigned),
+            engineers_used=len(routes),distance_m=sum(route.distance_m for route in routes),
+            travel_minutes=sum(route.travel_minutes for route in routes),
+            service_minutes=sum(route.service_minutes for route in routes)),
+        diagnostics={'policy':'preserve_feasible_approved_visits_and_starts'})
+    return require_valid(scenario,travel,result)
+
+
 def explanation(facts):
     return (f"В оставшейся части дня назначено {facts['assigned']} заявок, без назначения — {facts['unassigned']}. "
             f"Аварии: {facts['emergency_assigned']} из {facts['emergency_total']}; подключения: {facts['connection_assigned']} из {facts['connection_total']}. "
@@ -172,6 +213,11 @@ class ScenarioSession:
         self.declined_assignments=[]
         self.pending_report_ids=[]
         self.activated_off_duty_windows={}
+        self.planning_settings={'mode':'manual','every_n_requests':1,'every_n_minutes':None}
+        self.incoming_requests=[]
+        self.dispatch_notifications=[]
+        self.decision_log=[]
+        self.autopilot_last_failure_at=None
         self.execution_mode='simulation'
         self.needs_replanning=False
         self.views={}
@@ -194,7 +240,8 @@ class ScenarioSession:
     def _save_view(self,label):
         payload={'scenario':self.scenario.model_dump(mode='json'),'plans':[self.plan.model_dump(mode='json')],
             'operations':{'version':self.version,'time':self.time,'label':label,'frozen':deepcopy(self.frozen),
-                'needs_replanning':self.needs_replanning,'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values()))},
+                'needs_replanning':self.needs_replanning,'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values())),
+                'assignment_summary':self.assignment_summary()},
             'validation':{'valid':not self.needs_replanning,'violations':[]}}
         if self.geography:
             # A historical workbench needs only the journeys shown in this plan.
@@ -225,6 +272,10 @@ class ScenarioSession:
         payload=deepcopy(self.views[chosen])
         payload['request_labels']=self.request_labels()
         payload['operations']['historical']=chosen!=self.version
+        if chosen==self.version:
+            # Old saved views predate operational assignment counters. Derive
+            # the current view from facts; never rewrite historical snapshots.
+            payload['operations']['assignment_summary']=self.assignment_summary()
         return payload
 
     def record_fact(self,payload):
@@ -284,6 +335,13 @@ class ScenarioSession:
         if block and block[0]<shift.end and shift.start<block[1]:
             self.needs_replanning=True
             self.pending_report_ids.append(period['id'])
+            affected=self.pending_reassignment_ids(engineer_id)
+            if affected:
+                self.dispatch_notifications.append({'id':uuid4().hex,'kind':'replan_required',
+                    'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+                    'title':f'Инженер недоступен: визитов для пересчёта {len(affected)}',
+                    'text':'Проверьте заявки, требующие внимания, и подтвердите новый план после расчёта.',
+                    'request_ids':affected})
         self.batches.clear()
         self.history.append({'version':self.version,'event':{'id':period['id'],'type':'unavailability_report',
             'time':self.time,'engineer_id':engineer_id,'start_date':period['start_date'],
@@ -327,6 +385,11 @@ class ScenarioSession:
             'exclusion_added':eid not in self.catalog[key].excluded_engineer_ids}
         self.declined_assignments.append(report);self.pending_report_ids.append(report['id'])
         self.time=now;self.version+=1;self.needs_replanning=True;self.batches.clear()
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'replan_required',
+            'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+            'title':'Инженер отказался от выезда: нужен пересчёт',
+            'text':'Заявка сохранена и ожидает переназначения диспетчером.',
+            'request_ids':[key]})
         self.history.append({'version':self.version,'event':{'id':report['id'],'type':'declined_assignment',
             'time':now,'engineer_id':eid,'request_id':key}})
         self._refresh_fact_inventory();self._save_view('Выезд передан в пул перепланирования')
@@ -354,13 +417,35 @@ class ScenarioSession:
                     result.add(key)
         return sorted(result)
 
+    def assignment_summary(self):
+        """Current residual assignments, excluding reported invalid promises.
+
+        Keep the approved routes intact for comparison and replanning. A visit
+        on an unavailable engineer is not counted as an effective assignment.
+        New JSON arrivals are separate until they enter a calculated plan.
+        """
+        active={request.id for request in self.scenario.requests}
+        planned={visit.request_id for route in self.plan.routes for visit in route.visits} & active
+        pending=set(self.pending_reassignment_ids()) & active
+        missing=active-planned
+        attention=missing|pending
+        return {'total':len(active),'assigned':len(active-attention),
+                'requires_assignment':len(attention),'awaiting_replan':len(pending),
+                'unassigned':len(missing), 'pending_request_ids':sorted(pending)}
+
     def replanning_pool(self):
         pending=set(self.pending_reassignment_ids())
         owners={v.request_id:r.engineer_id for r in self.plan.routes for v in r.visits}
         owners.update({v['request_id']:r['engineer_id'] for r in self.frozen for v in r['visits']})
+        previous_owners={}
+        for view in self.views.values():
+            for route in view['plans'][0]['routes']:
+                previous_owners.update({visit['request_id']:route['engineer_id'] for visit in route['visits']})
+            for route in view['operations'].get('frozen',[]):
+                previous_owners.update({visit['request_id']:route['engineer_id'] for visit in route['visits']})
         visits={v.request_id:v.model_dump() for r in self.plan.routes for v in r.visits}
         visits.update({v['request_id']:v for r in self.frozen for v in r['visits']})
-        unassigned={u.request_id:u.reason for u in self.plan.unassigned}
+        unassigned={u.request_id:u for u in self.plan.unassigned}
         pending_reports=set(self.pending_report_ids)
         declines={(item['engineer_id'],item['request_id']):item for item in self.declined_assignments
                   if item['id'] in pending_reports and not item.get('revoked')}
@@ -382,9 +467,13 @@ class ScenarioSession:
                  'start_time':period['start_time'],'end_date':period['end_date'],
                  'end_time':period['end_time']} if period and key in pending else
                 {'report_type':'fact' if key in pending else None,
-                 'reason':unassigned.get(key,'Инженер сообщил недоступность через статус')})
+                 'reason':unassigned[key].reason if key in unassigned else 'Инженер сообщил недоступность через статус'})
             rows.append({'request_id':key,'address':self.catalog[key].address,
                 'engineer_id':eid,'status':'awaiting_replan' if key in pending else 'unassigned',
+                'previous_engineer_id':previous_owners.get(key) if eid is None else None,
+                'code':unassigned[key].code if key in unassigned else None,
+                'windows':[window.model_dump() for window in self.catalog[key].windows],
+                'duration_minutes':self.catalog[key].duration_minutes,
                 **detail})
         return rows
 
@@ -486,6 +575,99 @@ class ScenarioSession:
     def mode(self):
         return 'manual' if self.execution_mode=='manual' else 'mixed' if self.statuses else 'simulation'
 
+    def receive_requests(self,payload):
+        """Accept a bounded, idempotent JSON batch without changing the plan."""
+        from .intake import normalize
+        if not isinstance(payload,dict) or set(payload)-{'requests','request'}:
+            raise ValueError('Ожидается JSON с полем requests')
+        rows=payload.get('requests',payload.get('request'))
+        if isinstance(rows,dict):rows=[rows]
+        if not isinstance(rows,list) or not 1<=len(rows)<=100:
+            raise ValueError('Передайте от 1 до 100 заявок')
+        candidate=deepcopy(self)
+        existing={item['id']:item for item in candidate.incoming_requests}
+        known={r.provenance.get('event') for r in candidate.catalog.values()}
+        added=[];seen=set()
+        for raw in rows:
+            if isinstance(raw,dict) and raw.get('id') in existing and 'time' not in raw:
+                raw={**raw,'time':existing[raw['id']]['event']['time']}
+            item=normalize(candidate,raw,allow_past=isinstance(raw,dict) and raw.get('id') in existing)
+            key=item['id']
+            if key in seen:raise ValueError('Повтор ID внутри пакета: '+key)
+            seen.add(key)
+            if key in existing:
+                old=existing[key]
+                if old['event']!=item['event'] or old['address']!=item['address']:
+                    raise ValueError('Повтор ID с другими полями: '+key)
+                continue
+            if key in known or 'request:'+key in candidate.catalog or 'emergency:'+key in candidate.catalog:
+                raise ValueError('Заявка с таким ID уже есть в плане: '+key)
+            candidate.incoming_requests.append(item);existing[key]=item;added.append(item)
+        if added:
+            candidate.time=max(candidate.time,*(item['event']['time'] for item in added))
+            candidate.version+=1;candidate.needs_replanning=True;candidate.batches.clear()
+            candidate.dispatch_notifications.append({'id':uuid4().hex,'kind':'incoming',
+                'time':datetime.now(timezone.utc).isoformat(),'version':candidate.version,
+                'title':f'Поступило заявок: {len(added)}',
+                'text':'Новые заявки ожидают распределения.', 'request_ids':[item['id'] for item in added]})
+            candidate._save_view(f'Поступило заявок: {len(added)}')
+        self.__dict__.update(candidate.__dict__)
+        return {'added':len(added),'duplicates':len(rows)-len(added),'state':self.state()}
+
+    def set_planning_settings(self,payload):
+        if not isinstance(payload,dict) or set(payload)-{'version','mode','every_n_requests','every_n_minutes'}:
+            raise ValueError('Некорректные настройки режима')
+        if type(payload.get('version')) is not int or payload['version']!=self.version:
+            raise ValueError('Устаревшая версия плана')
+        mode=payload.get('mode')
+        if mode not in ('manual','autopilot'):
+            raise ValueError('Выберите ручной режим или автопилот')
+        count=payload.get('every_n_requests')
+        minutes=payload.get('every_n_minutes')
+        if count is not None and (type(count) is not int or not 1<=count<=100):
+            raise ValueError('Порог по заявкам должен быть от 1 до 100')
+        if minutes is not None and (type(minutes) is not int or not 1<=minutes<=240):
+            raise ValueError('Интервал должен быть от 1 до 240 минут')
+        if mode=='autopilot' and count is None and minutes is None:
+            raise ValueError('Для автопилота укажите хотя бы один порог')
+        self.planning_settings={'mode':mode,'every_n_requests':count,'every_n_minutes':minutes}
+        self.autopilot_last_failure_at=None
+        self.version+=1;self.batches.clear()
+        self.history.append({'version':self.version,'event':{'id':'planning-mode:'+str(self.version),
+            'type':'planning_mode','time':self.time},'settings':deepcopy(self.planning_settings)})
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'planning_mode',
+            'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+            'title':'Автопилот включён' if mode=='autopilot' else 'Включён ручной режим',
+            'text':(f'Порог: {count} новых заявок' if count is not None else '')+
+                   ((' или ' if count is not None else '')+f'{minutes} минут ожидания' if minutes is not None else '')
+                   if mode=='autopilot' else 'Новые заявки ожидают решения диспетчера.'})
+        self._save_view('Режим планирования: '+('автопилот' if mode=='autopilot' else 'ручной'))
+        return self.state()
+
+    def autopilot_due(self,now=None):
+        if self.planning_settings['mode']!='autopilot':return False
+        pending=[item for item in self.incoming_requests if item['status']=='new']
+        if not pending:return False
+        now=now or datetime.now(timezone.utc)
+        if self.autopilot_last_failure_at and (
+                now-datetime.fromisoformat(self.autopilot_last_failure_at)).total_seconds()<60:
+            return False
+        count=self.planning_settings.get('every_n_requests')
+        if count is not None and len(pending)>=count:return True
+        minutes=self.planning_settings.get('every_n_minutes')
+        if minutes is None:return False
+        oldest=min(datetime.fromisoformat(item['received_at']) for item in pending)
+        return (now-oldest).total_seconds()>=minutes*60
+
+    def record_autopilot_failure(self,message):
+        self.autopilot_last_failure_at=datetime.now(timezone.utc).isoformat()
+        self.version+=1;self.batches.clear()
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'auto_error',
+            'time':self.autopilot_last_failure_at,'version':self.version,
+            'title':'Автопилот не применил новый план',
+            'text':message,'request_ids':[item['id'] for item in self.incoming_requests if item['status']=='new']})
+        self._save_view('Автопилот: требуется внимание диспетчера')
+
     def set_mode(self,payload):
         if payload.get('version')!=self.version:raise ValueError('Устаревшая версия')
         if payload.get('mode') not in ('manual','simulation'):raise ValueError('Неизвестный режим')
@@ -502,6 +684,9 @@ class ScenarioSession:
             if key.startswith('request:') and kind in WORK_KINDS:
                 counts[kind]+=1
                 labels[key]=f'{WORK_KINDS[kind][0]} №{counts[kind]}'
+        for item in self.incoming_requests:
+            event=item['event'];key=('emergency:' if event['type']=='emergency' else 'request:')+item['id']
+            labels.setdefault(key,('Аварийная заявка ' if event['type']=='emergency' else 'Заявка ')+item['id'])
         return labels
 
     def fact_requests(self):
@@ -520,10 +705,19 @@ class ScenarioSession:
         return [{'id':key,'address':self.catalog[key].address,'engineer_id':eid} for key,eid in sorted(owners) if key in self.catalog]
 
     def state(self):
+        last_applied=next((row for row in reversed(self.history) if row.get('candidate_id')),None)
         return {'pending_completions':pending_completions(self),'historical_requests':self.historical_requests(),'fact_journal':deepcopy(self.fact_log),'fact_audit':deepcopy(self.fact_audit),'execution_mode':self.execution_mode,'version':self.version,'time':self.time,'region':self.scenario.region,'date':self.scenario.date,'approximate_locations':sum(p.quality=='approximate' for p in self.geography.locations.values()) if self.geography else 0,'simulation':not bool(self.statuses),'geography_mode':'road' if self.geography else 'synthetic',
             'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values())),'needs_replanning':self.needs_replanning,
+            'last_applied':({'version':last_applied['version'],'automatic':last_applied.get('automatic'),
+                'incoming_count':len(last_applied.get('incoming_ids',[])),
+                'changed_count':len(last_applied.get('changed_request_ids',[]))} if last_applied else None),
             'unavailability':deepcopy(self.unavailability),'declined_assignments':deepcopy(self.declined_assignments),
             'replanning_pool':self.replanning_pool(),
+            'assignment_summary':self.assignment_summary(),
+            'planning_settings':deepcopy(self.planning_settings),
+            'incoming_requests':deepcopy(self.incoming_requests),
+            'dispatch_notifications':deepcopy(self.dispatch_notifications[-100:]),
+            'decision_log':deepcopy(self.decision_log[-300:]),
             'excluded_engineer_ids':sorted(self.excluded_engineers()),
             'locations':[{'id':k,'label':self.catalog[k].address if k in self.catalog else ('Офис' if k=='office' else (self.geo_locations[k].original_address or self.geo_locations[k].label) if k in self.geo_locations else k)} for k in (self.geo_locations if self.geography else self.scenario.points) if not k.startswith(('start:','position:','resume:','closed:','observed:')) and (not k.startswith(('emergency:','request:')) or k in self.catalog)],
             'versions':[{'version':v,'time':p['operations']['time'],'label':p['operations']['label']} for v,p in self.views.items()],
@@ -720,13 +914,14 @@ class ScenarioSession:
             if any(v<0 for v in stock.values()):raise ValueError('Отрицательный остаток оборудования')
             if e.id in unavailable:continue
             block=current_blocks.get(e.id)
+            engineer_blocks=blocks.get(e.id,[])
             shift_end=e.shift.end
-            unknown_ends=[end for (start,end),item in blocks[e.id]
+            unknown_ends=[end for (start,end),item in engineer_blocks
                           if start<=now and not item.get('location_id')]
             confirmed_return=(not unknown_ends or any(f['engineer_id']==e.id and
                 f['status']=='available' and f['time']>=max(unknown_ends) and
                 bool(f.get('location_id')) for f in self.fact_log))
-            if any(end<=now for (start,end),_ in blocks[e.id]):
+            if any(end<=now for (start,end),_ in engineer_blocks):
                 shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
             if block is not None:
                 start,end,item=block
@@ -740,13 +935,13 @@ class ScenarioSession:
                     if item.get('location_id'):
                         location=item['location_id']
                     shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
-                    following=next(((a,b) for (a,b),_ in blocks[e.id] if a>=end),None)
+                    following=next(((a,b) for (a,b),_ in engineer_blocks if a>=end),None)
                     if following:shift_end=min(shift_end,following[0])
-            elif blocks[e.id] and now>=blocks[e.id][-1][0][1]:
+            elif engineer_blocks and now>=engineer_blocks[-1][0][1]:
                 shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
             if (block is not None and block[0]<=now and not block[2].get('location_id') and not confirmed_return) or (
                     block is None and any(end<=now and not item.get('location_id') for
-                    (start,end),item in blocks[e.id]) and not confirmed_return):
+                    (start,end),item in engineer_blocks) and not confirmed_return):
                 # A future leave was reported without a start/resume location.
                 # Returning to the route requires an explicit available fact;
                 # never invent a drive from a stale position.
@@ -759,28 +954,34 @@ class ScenarioSession:
         if event.type=='cancel' and event.request_id in locked:
             raise ValueError('Нельзя отменить завершенную или закрепленную текущую заявку')
         remaining=[r for r in s.requests if r.id not in locked and not (event.type=='cancel' and r.id==event.request_id)]
-        if event.type in ('emergency','new_request'):
-            if event.anchor_id=='office':source_address=s.office_address
-            elif event.anchor_id in self.catalog:source_address=self.catalog[event.anchor_id].address
-            else:source_address=self.geo_locations[event.anchor_id].original_address or self.geo_locations[event.anchor_id].label
-            key=('emergency:' if event.type=='emergency' else 'request:')+event.id
+        arrivals=([(event,None)] if event.type in ('emergency','new_request') else [])+[
+            (Event.model_validate(item['event']),item) for item in self.incoming_requests
+            if item['status']=='new']
+        for arrival,incoming in arrivals:
+            if arrival.anchor_id=='office':source_address=s.office_address
+            elif incoming is not None:source_address=incoming['address']
+            elif arrival.anchor_id in self.catalog:source_address=self.catalog[arrival.anchor_id].address
+            else:source_address=self.geo_locations[arrival.anchor_id].original_address or self.geo_locations[arrival.anchor_id].label
+            key=('emergency:' if arrival.type=='emergency' else 'request:')+arrival.id
             if key in self.catalog:raise ValueError('ID новой заявки уже существует')
-            points[key]=points[event.anchor_id]
-            self._alias_location(key,event.anchor_id)
-            if event.type=='emergency':
+            if key in points:raise ValueError('ID заявки пересекается с дорожной точкой')
+            points[key]=points[arrival.anchor_id]
+            self._alias_location(key,arrival.anchor_id)
+            if arrival.type=='emergency':
                 kind,skill,priority='Глобальная проблема',Skill.EMERGENCY,'urgent'
-                windows=[TimeWindow(start=now,end=1440)]
+                windows=[TimeWindow(start=arrival.time,end=1440)]
             else:
-                kind,skill,priority=WORK_KINDS[event.work_kind]
-                windows=[TimeWindow(start=event.window_start,end=event.window_end)]
+                kind,skill,priority=WORK_KINDS[arrival.work_kind]
+                windows=[TimeWindow(start=arrival.window_start,end=arrival.window_end)]
             remaining.append(Request(id=key,region=s.region,date=s.date,address=source_address,
-                locality=self.catalog[event.anchor_id].locality if event.anchor_id in self.catalog else '',
-                bk_type=kind,hd_type='Новая аварийная заявка' if event.type=='emergency' else 'Новая обычная заявка',windows=windows,
-                duration_minutes=event.duration_minutes,skill=skill,priority=priority,
-                equipment=Equipment(router=event.router,tv_box=event.tv_box),
-                provenance={'event':event.id,'received_at':str(now),
-                    **({'work_kind':event.work_kind} if event.type=='new_request' else {}),
-                    'coordinates':('Дорожная точка: ' if self.geography else 'Условная точка: ')+event.anchor_id}))
+                locality=self.catalog[arrival.anchor_id].locality if arrival.anchor_id in self.catalog else '',
+                bk_type=kind,hd_type='Новая аварийная заявка' if arrival.type=='emergency' else 'Новая обычная заявка',windows=windows,
+                duration_minutes=arrival.duration_minutes,skill=skill,priority=priority,
+                equipment=Equipment(router=arrival.router,tv_box=arrival.tv_box),
+                provenance={'event':arrival.id,'received_at':str(arrival.time),
+                    **({'work_kind':arrival.work_kind} if arrival.type=='new_request' else {}),
+                    'coordinates':('Дорожная точка: ' if self.geography else 'Условная точка: ')+arrival.anchor_id,
+                    **({'source':'json_intake'} if incoming is not None else {})}))
         if not engineers:
             # Preserve a zero-capacity retired slot so the solver-neutral Scenario
             # remains valid. Its shift cannot fit any positive-duration request.
@@ -843,6 +1044,9 @@ class ScenarioSession:
             raise ValueError('Список инженеров поддерживается только для события недоступности')
         for key in ('allow_redirect','preserve_in_progress'):
             if type(payload.get(key,False)) is not bool:raise ValueError('Ожидается явный переключатель '+key)
+        protect_approved=payload.get('protect_approved_assignments',False)
+        if type(protect_approved) is not bool:
+            raise ValueError('Некорректный режим сохранения утверждённых назначений')
         local_scope=payload.get('local_scope_engineer_ids',[])
         if (not isinstance(local_scope,list) or len(local_scope)>5 or
                 any(not isinstance(eid,str) or not eid for eid in local_scope) or len(set(local_scope))!=len(local_scope)):
@@ -923,8 +1127,37 @@ class ScenarioSession:
         else:
             backend=get_solver(solver)
             pool=[backend.solve(s,travel,time_limit_seconds=time_limit,profile=p,reference=reference,focus_request_id=focus) for p in ('sla','stable','cost')]
+        protected=set()
+        if event.type=='replan':
+            # All residual jobs, including previously unassigned requests and
+            # the whole new intake batch, are considered by the solvers above.
+            # Their coverage-first objective can nevertheless evict a visit
+            # already published to a customer. Offer a validated reference
+            # seed also for a manual retry: Stable should be truly stable, and
+            # the dispatcher can still explicitly choose an SLA/Cost trade-off.
+            seed=preserved_approved_seed(s,travel,reference)
+            if seed is not None:
+                pool.append(seed)
+                protected=set(_assignments(seed)) & set(prior)
+        def lost_promises(plan):
+            return len(protected-set(_assignments(plan)))
+        if protect_approved and event.type=='replan' and protected:
+            # Autopilot may trade promises only for a genuinely new emergency,
+            # not merely because an old emergency remains on the day plan.
+            if pool:
+                emergencies={('emergency:'+item['id']) for item in self.incoming_requests
+                    if item['status']=='new' and item['event']['type']=='emergency'}
+                if emergencies:
+                    most=max(len(emergencies & set(_assignments(plan))) for plan in pool)
+                    pool=[plan for plan in pool if len(emergencies & set(_assignments(plan)))==most]
+                fewest=min(lost_promises(plan) for plan in pool)
+                pool=[plan for plan in pool if lost_promises(plan)==fewest]
         for profile in ('sla','stable','cost'):
-            plan=min(pool,key=lambda candidate:objective_key(candidate,s,profile=profile,reference=reference,focus_request_id=focus))
+            profile_pool=pool
+            if profile=='stable' and protected:
+                fewest=min(lost_promises(plan) for plan in pool)
+                profile_pool=[plan for plan in pool if lost_promises(plan)==fewest]
+            plan=min(profile_pool,key=lambda candidate:objective_key(candidate,s,profile=profile,reference=reference,focus_request_id=focus))
             require_valid(s,travel,plan)
             diff_ids={r.id for r in s.requests}
             if event.type=='cancel':diff_ids.add(event.request_id)
@@ -935,7 +1168,8 @@ class ScenarioSession:
             facts.update(avoidable_reassigned=sum(old[0] in available and assignments[key][0]!=old[0]
                          for key,old in prior.items() if key in assignments),
                          priority_start_sum=sum(assignments[key][1] for key in targets if key in assignments),
-                         response_target_count=len(targets),response_unassigned=len(targets-set(assignments)))
+                         response_target_count=len(targets),response_unassigned=len(targets-set(assignments)),
+                         previous_approved_lost=lost_promises(plan))
             facts['outside_scope_changes']=sum(
                 old[0] not in local_scope and assignments.get(key)!=old
                 for key,old in prior.items()) if local_scope else 0
@@ -982,6 +1216,8 @@ class ScenarioSession:
                 'llm':{'status':'not_connected','facts_only':True,'instruction':'Объясни компромиссы только по facts и diff. Не придумывай SLA, деньги, причины невозможности или оптимальность. Решение принимает диспетчер.'}})
         group_candidates(candidates)
         batch={'request_labels':labels,'observation_warnings':[f"{self.initial_engineers[eid].name}: последний ручной факт в {f['time']//60:02}:{f['time']%60:02}; последующее выполнение не подтверждено." for eid,f in self.statuses.items() if f['time']<event.time],'id':uuid4().hex,'version':self.version,'event':event.model_dump(),'candidates':candidates,'frozen':frozen,'inventory':inventory,
+            'protect_approved_assignments':protect_approved,
+            'incoming_ids':[item['id'] for item in self.incoming_requests if item['status']=='new'],
             'local_scope':{'engineer_ids':list(local_scope),'mode':'minimal_disruption_priority','hard_isolation':False} if local_scope else None,
             'off_duty_escalation':{'engineer_ids':list(activation_ids),'reason':escalation_reason.strip(),
                 'confirmed':True,'window_start':activation_window.start if activation_window else None,
@@ -990,6 +1226,12 @@ class ScenarioSession:
                 'loss_unit':'условные единицы','iterations':risk_engine.config.iterations,
                 'seed_fingerprint':risk_seed,'duration_evidence':duration_evidence.metadata()},
             'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам. Риски оценены Монте-Карло по априорным распределениям'+(f" и {duration_evidence.observation_count} подтверждённым длительностям" if duration_evidence.observation_count else '')+'; калибровка вероятностей на независимой истории исходов пока не подтверждена, потери — условные единицы.'}
+        plain_retry=(event.type=='replan' and not batch['incoming_ids'] and
+                     not self.pending_report_ids and not self.needs_replanning and event.time==self.time)
+        # A plain retry is an audit of the unchanged day. The shared selector
+        # applies its no-loss policy for both UI and LLM recommendations;
+        # explicit SLA/Cost alternatives remain available to the dispatcher.
+        batch['recommendation_policy']='preserve_approved' if plain_retry else 'risk_aware'
         batch['recommended_candidate_id']=eligible_candidates(batch)[0]['id']
         batch['response_focus_request_id']=focus
         if event.type=='new_request':
@@ -1008,7 +1250,7 @@ class ScenarioSession:
                 'off_duty_escalation':deepcopy(batch['off_duty_escalation'])}}
         return batch
 
-    def approve(self,payload):
+    def approve(self,payload,*,automatic=False):
         if payload.get('version')!=self.version:raise ValueError('Устаревшая версия плана')
         stored=self.batches.get(payload.get('batch_id'))
         if stored is None:raise ValueError('Предложение не найдено; пересчитайте')
@@ -1018,6 +1260,12 @@ class ScenarioSession:
         if candidate is None:raise ValueError('Неизвестный вариант')
         plan=Plan.model_validate(candidate['plan'])
         require_valid(stored['scenario'],self._travel(stored['scenario']),plan)
+        previous_assignments={visit.request_id:(route.engineer_id,visit.start)
+            for route in self.plan.routes for visit in route.visits}
+        previous_unassigned={row.request_id for row in self.plan.unassigned}
+        before_assigned_count=self.plan.metrics.assigned
+        before_unassigned_count=self.plan.metrics.unassigned
+        before_assignment_summary=self.assignment_summary()
         escalation=stored['policy'].get('off_duty_escalation') or {}
         requested=set(escalation.get('engineer_ids',[]))
         used={r.engineer_id for r in plan.routes if r.visits} & requested
@@ -1046,7 +1294,96 @@ class ScenarioSession:
         if policy.get('off_duty_escalation'):
             policy['off_duty_escalation']['activated_ids']=sorted(used)
             policy['off_duty_escalation']['not_required_ids']=sorted(requested-used)
-        self.history.append({'event':batch['event'],'candidate_id':candidate['id'],'version':self.version,'policy':policy})
+        self.history.append({'event':batch['event'],'candidate_id':candidate['id'],'version':self.version,
+            'policy':policy,'automatic':automatic,'incoming_ids':list(batch.get('incoming_ids',[]))})
+        cancelled_request_ids=([batch['event']['request_id']]
+            if batch['event']['type']=='cancel' else [])
+        if cancelled_request_ids:
+            from .intake import cancellation_entry
+            key=cancelled_request_ids[0]
+            for item in self.incoming_requests:
+                item_key=('emergency:' if item['event']['type']=='emergency' else 'request:')+item['id']
+                if item_key==key:
+                    item['status']='cancelled'
+                    item['applied_version']=self.version
+            self.decision_log.append(cancellation_entry(self,candidate,key,
+                previous_assignments.get(key),automatic))
+        if batch.get('incoming_ids'):
+            from .intake import decision_entry
+            assigned={visit.request_id for route in plan.routes for visit in route.visits}
+            for item in self.incoming_requests:
+                if item['id'] not in batch['incoming_ids'] or item['status']!='new':continue
+                key=('emergency:' if item['event']['type']=='emergency' else 'request:')+item['id']
+                item['status']='assigned' if key in assigned else 'unassigned'
+                item['applied_version']=self.version
+                self.decision_log.append(decision_entry(self,candidate,item,automatic))
+        # A later dispatcher replan may recover a previously unassigned JSON
+        # request, or move an assigned one without changing its status. Keep
+        # the inbox's applied_version aligned with the actual current plan.
+        current_assignments={visit.request_id:(route.engineer_id,visit.start)
+            for route in plan.routes for visit in route.visits}
+        assigned=set(current_assignments)
+        unassigned_ids={item.request_id for item in plan.unassigned}
+        for item in self.incoming_requests:
+            if item['status']=='new':continue
+            key=('emergency:' if item['event']['type']=='emergency' else 'request:')+item['id']
+            current_status='assigned' if key in assigned else 'unassigned' if key in unassigned_ids else None
+            if current_status and (item['status']!=current_status or
+                    previous_assignments.get(key)!=current_assignments.get(key)):
+                item['status']=current_status
+                item['applied_version']=self.version
+        from .intake import reassignment_entry
+        incoming_keys={('emergency:' if item['event']['type']=='emergency' else 'request:')+item['id']
+            for item in self.incoming_requests if item['id'] in batch.get('incoming_ids',[])}
+        changed=list(cancelled_request_ids)
+        for key in sorted(set(previous_assignments)|previous_unassigned|set(current_assignments)|unassigned_ids):
+            if key in incoming_keys or key not in current_assignments and key not in unassigned_ids:
+                continue
+            before=previous_assignments.get(key)
+            after=current_assignments.get(key)
+            if before==after and (before is not None or key in previous_unassigned):
+                continue
+            changed.append(key)
+            self.decision_log.append(reassignment_entry(self,candidate,key,before,automatic))
+        self.history[-1]['changed_request_ids']=changed
+        unresolved=[item.request_id for item in plan.unassigned]
+        lost_request_ids=sorted(set(previous_assignments) & unassigned_ids)
+        recovered_request_ids=sorted(previous_unassigned & set(current_assignments))
+        active_previous_unassigned=previous_unassigned-set(cancelled_request_ids)
+        backlog_remaining_request_ids=sorted(active_previous_unassigned & unassigned_ids)
+        self.history[-1]['lost_request_ids']=lost_request_ids
+        self.history[-1]['recovered_request_ids']=recovered_request_ids
+        title=(('Автопилот применил план' if automatic else 'Диспетчер применил план')+
+               f' №{self.version} · новых {len(batch.get("incoming_ids",[]))} · изменено назначений {len(changed)}')
+        if unresolved:title+=f' · без исполнителя {len(unresolved)}'
+        if cancelled_request_ids:
+            detail='Отменённая заявка исключена из активного плана и не входит в список без исполнителя. '
+        elif lost_request_ids:
+            detail=f'Ранее назначенных заявок теперь без исполнителя: {len(lost_request_ids)}. '
+        elif recovered_request_ids:
+            detail=f'Восстановлены назначения: {len(recovered_request_ids)}. '
+        else:
+            detail='Ранее назначенные заявки не потеряли исполнителя. '
+        if active_previous_unassigned:
+            detail+=(f'Повторно проверено заявок без исполнителя: {len(active_previous_unassigned)}; '
+                     f'назначено из них: {len(recovered_request_ids)}. ')
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'auto_applied' if automatic else 'manual_applied',
+            'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+            'title':title,
+            'text':detail+('После расчёта часть заявок всё ещё без исполнителя. Откройте «Заявки, требующие внимания».'
+                    if unresolved else 'Все заявки остатка дня распределены.'),
+            'plan_explanation':candidate.get('explanation',''),
+            'request_ids':list(batch.get('incoming_ids',[])), 'changed_request_ids':changed,
+            'cancelled_request_ids':cancelled_request_ids,
+            'unassigned_request_ids':unresolved,
+            'unassigned_details':deepcopy(candidate['unassigned_details']),
+            'lost_request_ids':lost_request_ids,'recovered_request_ids':recovered_request_ids,
+            'backlog_attempted_request_ids':sorted(active_previous_unassigned),
+            'backlog_remaining_request_ids':backlog_remaining_request_ids,
+            'before_assigned_count':before_assigned_count,'after_assigned_count':plan.metrics.assigned,
+            'before_effective_assigned_count':before_assignment_summary['assigned'],
+            'before_requires_assignment_count':before_assignment_summary['requires_assignment'],
+            'before_unassigned_count':before_unassigned_count,'after_unassigned_count':plan.metrics.unassigned})
         self.batches.clear()
         self.pending_report_ids.clear()
         self.needs_replanning=False
@@ -1055,6 +1392,9 @@ class ScenarioSession:
 
     def dump(self):
         return {'execution_mode':self.execution_mode,'fact_audit':self.fact_audit,'initial_engineers':{k:v.model_dump(mode='json') for k,v in self.initial_engineers.items()},'geography':self.geography.model_dump(mode='json') if self.geography else None,'aliases':self.aliases,'geo_locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},'statuses':self.statuses,'fact_log':self.fact_log,'needs_replanning':self.needs_replanning,'views':self.views,'scenario':self.scenario.model_dump(mode='json'),'plan':self.plan.model_dump(mode='json'),
+            'planning_settings':self.planning_settings,'incoming_requests':self.incoming_requests,
+            'dispatch_notifications':self.dispatch_notifications,'decision_log':self.decision_log,
+            'autopilot_last_failure_at':self.autopilot_last_failure_at,
             'unavailability':self.unavailability,'declined_assignments':self.declined_assignments,
             'pending_report_ids':self.pending_report_ids,
             'activated_off_duty_windows':{eid:window.model_dump(mode='json') for eid,window in self.activated_off_duty_windows.items()},
@@ -1084,6 +1424,11 @@ class ScenarioSession:
         obj.pending_report_ids=payload.get('pending_report_ids',[])
         obj.activated_off_duty_windows={eid:TimeWindow.model_validate(window) for eid,window in
             payload.get('activated_off_duty_windows',{}).items()}
+        obj.planning_settings=payload.get('planning_settings',{'mode':'manual','every_n_requests':1,'every_n_minutes':None})
+        obj.incoming_requests=payload.get('incoming_requests',[])
+        obj.dispatch_notifications=payload.get('dispatch_notifications',[])
+        obj.decision_log=payload.get('decision_log',[])
+        obj.autopilot_last_failure_at=payload.get('autopilot_last_failure_at')
         obj.execution_mode=payload.get('execution_mode','simulation');obj.fact_audit=payload.get('fact_audit',[])
         from .fact_journal import migrate
         migrate(obj)

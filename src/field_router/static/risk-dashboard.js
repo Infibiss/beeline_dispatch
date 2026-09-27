@@ -94,7 +94,7 @@
 
   const $ = id => document.getElementById(id);
   if (!$('panel-risk')) return;
-  let snapshot = null, active = false, demo = false, version = null, sequence = 0, controller = null, planningBusy = false;
+  let snapshot = null, active = false, demo = false, version = null, demoRunId = null, sequence = 0, controller = null, planningBusy = false;
   const text = (tag, value, cls) => { const el = document.createElement(tag); if (value != null) el.textContent = value; if (cls) el.className = cls; return el; };
   const percent = value => value == null ? '—' : new Intl.NumberFormat('ru-RU', {maximumFractionDigits:1}).format(value) + '%';
   const number = value => isFiniteNumber(value) ? new Intl.NumberFormat('ru-RU', {maximumFractionDigits:2}).format(value) : '—';
@@ -427,8 +427,21 @@
     document.querySelectorAll('.risk-preview').forEach(button => {button.disabled = planningBusy || button.dataset.stale === 'true';});
   });
   window.addEventListener('planning-state', event => {
-    const changed = version !== event.detail.version; version = event.detail.version;
-    if (changed) {demo = false; if (active) load();}
+    const runChanged = demoRunId !== (event.detail.demoRunId || null);
+    const changed = version !== event.detail.version || runChanged;
+    version = event.detail.version; demoRunId = event.detail.demoRunId || null;
+    if (changed) {
+      // A reset can reuse version 1; invalidate outstanding responses as well
+      // as the snapshot so a previous run cannot reappear on another tab.
+      sequence++; controller?.abort(); snapshot = null; demo = false;
+      $('risk-indicators').replaceChildren(); $('risk-forecasts').replaceChildren(); clearForecastDetails();
+      $('risk-demo').disabled = true; $('risk-refresh').disabled = false;
+      $('risk-demo').setAttribute('aria-pressed', 'false');
+      $('risk-demo').textContent = 'Показать пример Risk Engine';
+      $('risk-demo-notice').hidden = true; $('risk-stale').hidden = true; $('risk-error').hidden = true;
+      $('risk-context').textContent = 'Показатели появятся при открытии вкладки.';
+      if (active) load();
+    }
   });
   window.addEventListener('focus', () => {if (active) load();});
 })();

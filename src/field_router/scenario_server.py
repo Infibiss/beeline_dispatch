@@ -1,16 +1,20 @@
 """Shared dispatcher/engineer demo; loopback by default, explicit LAN binding."""
 import argparse
+from datetime import datetime, timezone
 from html import escape
 from copy import deepcopy, copy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import hmac
 import ipaddress
+import os
 import re
 from pathlib import Path
 import socket
 import ssl
 import threading
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, urlencode
+from uuid import uuid4
 from .regions import load_session, UnknownRegion
 
 
@@ -65,7 +69,8 @@ def validate_public_origin(value):
 
 def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,host='127.0.0.1',
                   gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid',
-                  morning_time_limit=None,public_origin=None,gps_routing=None):
+                  morning_time_limit=None,public_origin=None,gps_routing=None,intake_token=None,demo_stream_requests=None,
+                  demo_reset_session=None):
     public_origin = validate_public_origin(public_origin)
     # Windows spawn imports this module in the model child. Keep OR-Tools and
     # rendering imports inside the server entrypoints, outside that cold path.
@@ -112,11 +117,133 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         **{key:{'label':other.scenario.region,'state':other_path,'session':other}
                            for key,(other,other_path) in regions.items()}}
     regions=RegionRegistry(session,state_path,context_factory,region_sources)
+    demo_baseline=deepcopy(demo_reset_session) if demo_reset_session is not None else None
+    if demo_baseline is not None:
+        if demo_baseline.scenario.region != session.scenario.region:
+            regions.close()
+            raise ValueError('Исходное состояние демо принадлежит другому району')
+        context=regions.contexts[regions.default_key]
+        saved_run_id=None
+        if context['path'].exists():
+            saved_run_id=json.loads(context['path'].read_text(encoding='utf-8')).get('demo_run_id')
+        context['demo_run_id']=(saved_run_id if isinstance(saved_run_id,str) and
+            re.fullmatch(r'[a-f0-9]{32}',saved_run_id) else uuid4().hex)
+
+    def demo_fields(region_key):
+        primary=region_key==regions.default_key
+        return {'demo_stream_enabled':primary and demo_stream_requests is not None,
+                'demo_reset_enabled':primary and demo_baseline is not None,
+                'demo_run_id':regions.contexts[region_key].get('demo_run_id')}
+
+    def check_demo_run(region_key,payload,*,required=False):
+        current=regions.contexts[region_key].get('demo_run_id')
+        if current is not None and (required or 'demo_run_id' in payload):
+            if payload.get('demo_run_id')!=current:
+                raise ValueError('Сценарий уже перезапущен; загрузите текущую версию')
     from .auth_http import AuthHttp
     auth=AuthHttp(accounts, regions, _STATIC, bool(tls_context) or bool(public_origin))
     from .gps.mobile import NativeGpsApi
     native_gps=NativeGpsApi(accounts, regions, bool(tls_context) or bool(public_origin), public_origin=public_origin)
     scheme='https' if tls_context else 'http'
+    intake_token = intake_token if intake_token is not None else os.environ.get('FIELD_ROUTER_INTAKE_TOKEN')
+
+    def persist(region_key, context, candidate, *, demo_run_id=None):
+        path=context['path']
+        path.parent.mkdir(parents=True,exist_ok=True)
+        temporary=path.with_suffix(path.suffix+'.tmp')
+        saved=candidate.dump()
+        run_id=demo_run_id if demo_run_id is not None else context.get('demo_run_id')
+        if run_id is not None:saved['demo_run_id']=run_id
+        temporary.write_text(json.dumps(saved,ensure_ascii=False,indent=2),encoding='utf-8')
+        temporary.replace(path)
+        regions.publish_session(region_key,candidate)
+        if run_id is not None:context['demo_run_id']=run_id
+        context['gps'].update(candidate)
+
+    stop_autopilot=threading.Event()
+    wake_autopilot=threading.Event()
+
+    def enrich_decisions(region_key,context,batch,chosen_id,version,automatic,demo_run_id=None):
+        """Attach optional LLM wording after the verified decision is durable."""
+        if explainer is None:return
+        with context['lock']:
+            if context.get('demo_run_id')!=demo_run_id:return
+        try:
+            # The solver has already chosen and applied this candidate. A fresh
+            # recommendation can pick another equally eligible plan, which used
+            # to discard otherwise valid model output for the applied plan.
+            explanation=explainer.explain(batch,chosen_id)
+        except Exception:
+            explanation={'source':'template','notice':'YandexGPT не ответила; проверенное объяснение сохранено.'}
+        model_ready=explanation.get('source')=='yandexgpt'
+        candidate=next((item for item in batch['candidates'] if item['id']==chosen_id),None)
+        if candidate is None:return
+        from .llm import decision_detail
+        with context['lock']:
+            # A reset can reuse version and candidate IDs while this provider
+            # call is in flight. Its wording belongs only to the original run.
+            if context.get('demo_run_id')!=demo_run_id:return
+            current=context['holder']['session']
+            log=deepcopy(current)
+            changed=False
+            affected=[]
+            for entry in log.decision_log:
+                if entry['version']==version and entry['candidate_id']==chosen_id:
+                    entry['llm_status']='ready' if model_ready else 'unavailable'
+                    entry['llm_notice']=(
+                        'YandexGPT выбрала акценты для сравнения планов; факты каждого назначения и риски проверены расчётом.'
+                        if model_ready else explanation.get('notice','YandexGPT недоступна; проверенное объяснение сохранено.'))
+                    if model_ready:
+                        entry['plan_explanation']=explanation['text']
+                        entry['llm_explanation']=decision_detail(entry,candidate)
+                    affected.append(entry['id'])
+                    changed=True
+            for notice in log.dispatch_notifications:
+                if notice.get('version')==version and notice.get('kind') in ('auto_applied','manual_applied'):
+                    notice['llm_status']='ready' if model_ready else 'unavailable'
+                    notice['llm_notice']=(
+                        'Пояснение YandexGPT готово; назначения и риски проверены алгоритмом.'
+                        if model_ready else explanation.get('notice','YandexGPT недоступна; проверенное объяснение сохранено.'))
+                    if model_ready:notice['plan_explanation']=explanation['text']
+                    changed=True
+            if changed:
+                if model_ready:
+                    log.dispatch_notifications.append({'id':uuid4().hex,'kind':'explanation_ready',
+                        'time':datetime.now(timezone.utc).isoformat(),'version':version,
+                        'title':f'Готово пояснение к плану №{version}',
+                        'text':'YandexGPT выделила важные компромиссы. Индивидуальные факты назначений и риски доступны в журнале решений.',
+                        'request_ids':affected})
+                try:persist(region_key,context,log)
+                except OSError:pass
+
+    def autopilot_loop():
+        from .intake import apply_autopilot
+        while not stop_autopilot.is_set():
+            wake_autopilot.wait(2)
+            wake_autopilot.clear()
+            if stop_autopilot.is_set():break
+            with regions.lock: active=list(regions.contexts.items())
+            for region_key, context in active:
+                batch_choice=None
+                with context['lock']:
+                    current=context['holder']['session']
+                    if not current.autopilot_due():continue
+                    candidate=deepcopy(current)
+                    try:
+                        batch_choice=apply_autopilot(candidate,time_limit=time_limit,solver=solver)
+                    except Exception:
+                        candidate=deepcopy(current)
+                        candidate.record_autopilot_failure('Не удалось построить допустимый план. Заявки остались в очереди; проверьте их вручную.')
+                    try:persist(region_key,context,candidate)
+                    except OSError:continue
+                    demo_run_id=context.get('demo_run_id')
+                if batch_choice and not stop_autopilot.is_set():
+                    batch, chosen_id=batch_choice
+                    # The provider can take tens of seconds; keep ingestion and
+                    # later autopilot batches responsive while it is answering.
+                    threading.Thread(target=enrich_decisions,
+                        args=(region_key,context,batch,chosen_id,candidate.version,True,demo_run_id),
+                        daemon=True).start()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -248,6 +375,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         else:
                             if query:raise ValueError('Неизвестные параметры запроса')
                             result=engineer_index(session) if route.path=='/api/engineers' else {'version':session.version}
+                            if route.path=='/api/revision':result.update(demo_fields(self.region_key))
                             if route.path=='/api/engineers' and self.identity and self.identity['role']=='engineer':
                                 result['engineers']=[e for e in result['engineers'] if e['id']==self.identity['engineer_id']]
                     return self.reply(200,result)
@@ -263,8 +391,12 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 except (ValueError,KeyError,TypeError):return self.reply(400,{'error':'Точка устарела, повторите поиск'})
             if route.path in ('/dispatcher','/report','/report.html'):
                 try:
-                    version=_version(route.query)
+                    query=parse_qs(route.query,keep_blank_values=True)
+                    run_ids=query.pop('demo_run_id',None)
+                    if run_ids is not None and len(run_ids)!=1:raise ValueError('Укажите один запуск демо')
+                    version=_version(urlencode(query,doseq=True))
                     with lock:
+                        if run_ids is not None:check_demo_run(self.region_key,{'demo_run_id':run_ids[0]})
                         session=holder['session']
                         payload=session.workbench(version)
                         selected_version=version if version is not None else session.version
@@ -274,7 +406,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         document=render_report(Scenario.model_validate(payload['scenario']),[Plan.model_validate(p) for p in payload['plans']])
                     return self.reply(200,document.encode('utf-8'),'text/html; charset=utf-8',rendered=True)
                 except (ValueError,KeyError,TypeError) as exc:
-                    return self.reply(400,{'error':str(exc)})
+                    return self.reply(409 if 'перезапущен' in str(exc) else 400,{'error':str(exc)})
             if self.path=='/api/crew':
                 with lock:self.reply(200,crews.settings(holder['session']))
                 return
@@ -290,7 +422,24 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     return self.reply(200,document.encode(),'text/html; charset=utf-8',rendered=True)
                 except (ValueError,KeyError,TypeError) as exc:return self.reply(400,{'error':str(exc)})
             if self.path=='/api/state':
-                with lock:self.reply(200,holder['session'].state())
+                with lock:self.reply(200,{**holder['session'].state(),**demo_fields(self.region_key)})
+                return
+            if route.path=='/api/demo-stream/requests' and demo_fields(self.region_key)['demo_stream_enabled']:
+                with lock:return self.reply(200,{'requests':demo_stream_requests,**demo_fields(self.region_key)})
+            if route.path=='/api/inbox':
+                if route.query:return self.reply(400,{'error':'Неизвестные параметры запроса'})
+                with lock:
+                    current=holder['session']
+                    last_applied=next((row for row in reversed(current.history) if row.get('candidate_id')),None)
+                    self.reply(200,{'version':current.version,**demo_fields(self.region_key),'planning_settings':current.planning_settings,
+                        'incoming_requests':current.incoming_requests[-200:],
+                        'dispatch_notifications':current.dispatch_notifications[-100:],
+                        'decision_log':current.decision_log[-300:],
+                        'last_applied':({'version':last_applied['version'],
+                            'automatic':last_applied.get('automatic'),
+                            'incoming_count':len(last_applied.get('incoming_ids',[])),
+                            'changed_count':len(last_applied.get('changed_request_ids',[]))}
+                            if last_applied else None)})
                 return
             files={'/':('scenarios.html','text/html; charset=utf-8'),'/scenarios.js':('scenarios.js','text/javascript; charset=utf-8'),'/scenarios.css':('scenarios.css','text/css; charset=utf-8')}
             files['/time-input.js']=('time-input.js','text/javascript; charset=utf-8')
@@ -317,7 +466,12 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
         def do_POST(self):
             if not self.trusted():return self.reply(403,{'error':'Запрос с другого сайта запрещен'})
             if native_gps.receive(self):return
-            if auth.before(self):return
+            raw=urlsplit(self.path).path
+            is_intake=raw=='/api/inbox/requests' or re.fullmatch(r'/(?:r|regions)/[a-zA-Z0-9_-]+/api/inbox/requests',raw)
+            machine_request=bool(is_intake and intake_token and
+                hmac.compare_digest(self.headers.get('X-Intake-Token',''),intake_token))
+            if not machine_request and auth.before(self):return
+            if machine_request:self.identity=None
             if native_gps.authenticated(self):return
             try:holder,path,lock,crews,gps,address_service=self.context()
             except (ValueError,OSError,KeyError,TypeError):return self.reply(400,{'error':'Район недоступен: проверьте набор и отдельный файл состояния'})
@@ -329,12 +483,20 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 if not 0<length<=(8192 if is_gps and gps_route.path!='/api/gps/replay' else 65536):raise ValueError('Недопустимый размер запроса')
                 payload=json.loads(self.rfile.read(length))
                 if not isinstance(payload,dict):raise ValueError('Ожидается объект запроса')
+                demo_payload=payload
+                payload={key:value for key,value in payload.items() if key!='demo_run_id'}
+                # Read the immutable generation token without the planner lock:
+                # telemetry must remain responsive during a long solve. All
+                # plan mutations repeat this check under their commit lock.
+                check_demo_run(self.region_key,demo_payload,
+                    required=self.path in ('/api/demo-stream/reset','/api/inbox/requests'))
                 if self.identity and self.identity['role']=='engineer' and payload.get('engineer_id')!=self.identity['engineer_id']:
                     return self.reply(403,{'error':'Можно отправлять только свои статусы и координаты'})
                 # Telemetry has its own lock; the solver may be busy for seconds.
                 if is_gps and gps_route.path!='/api/gps/confirm-delay':return self.reply(*gps.request('POST',gps_route.path,gps_route.query,payload))
                 if self.path in ('/api/explain','/api/recommend'):
                     with lock:
+                        check_demo_run(self.region_key,demo_payload)
                         session=holder['session']
                         if payload.get('version')!=session.version:raise ValueError('Устаревшая версия плана')
                         stored=session.batches.get(payload.get('batch_id'))
@@ -344,37 +506,67 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     if explainer is None:raise ValueError('LLM не настроена')
                     result=explainer.recommend(batch) if self.path=='/api/recommend' else explainer.explain(batch,payload.get('candidate_id'))
                     return self.reply(200,result)
+                manual_explanation=None
                 with lock:
-                    if self.path=='/api/address/search':
+                    check_demo_run(self.region_key,demo_payload,
+                        required=self.path in ('/api/demo-stream/reset','/api/inbox/requests'))
+                    if self.path=='/api/demo-stream/reset':
+                        if not demo_fields(self.region_key)['demo_reset_enabled']:
+                            return self.reply(404,{'error':'Перезапуск доступен только в учебной песочнице'})
+                        # The dispatcher deliberately replaces the whole run.
+                        # Autopilot may have advanced it since the last poll;
+                        # its generation, rather than that poll's version,
+                        # identifies the run the reset button is acting on.
+                        requested_version=payload.get('version')
+                        if type(requested_version) is not int or not 1<=requested_version<=holder['session'].version:
+                            raise ValueError('Некорректная версия плана для перезапуска')
+                        context=regions.contexts[self.region_key]
+                        candidate=deepcopy(demo_baseline)
+                        # Archive before committing; a failed archive or atomic
+                        # replacement leaves the current run fully active.
+                        archive_dir=path.parent/(path.stem+'-archives')
+                        archive_dir.mkdir(parents=True,exist_ok=True)
+                        archive=archive_dir/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'-'+context['demo_run_id']+'.json')
+                        if path.exists():archive.write_bytes(path.read_bytes())
+                        else:archive.write_text(json.dumps({**holder['session'].dump(),
+                            'demo_run_id':context['demo_run_id']},ensure_ascii=False,indent=2),encoding='utf-8')
+                        persist(self.region_key,context,candidate,demo_run_id=uuid4().hex)
+                        crews.draft=None
+                        if address_service is not None:address_service.candidates={}
+                        result={**candidate.state(),**demo_fields(self.region_key)}
+                    elif self.path=='/api/address/search':
                         if address_service is None:raise ValueError('Поиск адресов выключен; запустите сервер с --network')
                         result=address_service.search(holder['session'],payload)
                     elif self.path=='/api/address/confirm':
                         if address_service is None:raise ValueError('Поиск адресов выключен')
                         candidate=deepcopy(holder['session'])
                         result=address_service.confirm(candidate,payload)
-                        path.parent.mkdir(parents=True,exist_ok=True)
-                        temporary=path.with_suffix(path.suffix+'.tmp')
-                        temporary.write_text(json.dumps(candidate.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
-                        temporary.replace(path);regions.publish_session(self.region_key,candidate)
-                        gps.update(candidate)
+                        persist(self.region_key,regions.contexts[self.region_key],candidate)
                     elif self.path=='/api/crew/preview':
                         result=crews.preview(holder['session'],payload,time_limit=morning_time_limit,solver=solver)
                     elif self.path=='/api/crew/apply':
                         candidate=crews.selected(holder['session'],payload)
-                        path.parent.mkdir(parents=True,exist_ok=True)
-                        temporary=path.with_suffix(path.suffix+'.tmp')
-                        temporary.write_text(json.dumps(candidate.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
-                        temporary.replace(path);regions.publish_session(self.region_key,candidate);crews.draft=None
-                        gps.update(candidate)
+                        persist(self.region_key,regions.contexts[self.region_key],candidate)
+                        crews.draft=None
                         result=candidate.state()
                     elif self.path=='/api/preview':
                         result={**holder['session'].preview(payload,time_limit=time_limit,solver=solver),'llm_enabled':explainer is not None}
+                    elif self.path in ('/api/inbox/requests','/api/inbox/settings'):
+                        candidate=deepcopy(holder['session'])
+                        result=(candidate.receive_requests(payload) if self.path=='/api/inbox/requests'
+                                else candidate.set_planning_settings(payload))
+                        persist(self.region_key,regions.contexts[self.region_key],candidate)
+                        wake_autopilot.set()
                     elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts',
                                       '/api/engineer/unavailability','/api/engineer/decline',
                                       '/api/engineer/revoke-report',
                                       '/api/completions/confirm','/api/gps/confirm-delay'):
                         # Persist the candidate state before publishing it in memory.
                         candidate=deepcopy(holder['session'])
+                        if self.path=='/api/approve' and explainer is not None:
+                            stored=candidate.batches.get(payload.get('batch_id'))
+                            if stored is not None:
+                                manual_explanation=(deepcopy(stored['batch']),payload.get('candidate_id'))
                         if self.path=='/api/engineer/facts':result=record_engineer_fact(candidate,payload)
                         elif self.path=='/api/engineer/unavailability':
                             candidate.report_unavailability(payload)
@@ -389,13 +581,24 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                             from .gps.delay import confirm
                             result=confirm(candidate,gps.service,payload)
                         else:result=candidate.approve(payload) if self.path=='/api/approve' else candidate.set_mode(payload) if self.path=='/api/mode' else candidate.record_fact(payload)
-                        path.parent.mkdir(parents=True,exist_ok=True)
-                        temporary=path.with_suffix(path.suffix+'.tmp')
-                        temporary.write_text(json.dumps(candidate.dump(),ensure_ascii=False,indent=2),encoding='utf-8')
-                        temporary.replace(path)
-                        regions.publish_session(self.region_key,candidate)
-                        gps.update(candidate)
+                        persist(self.region_key,regions.contexts[self.region_key],candidate)
                     else:return self.reply(404,{'error':'Не найдено'})
+                    demo_run_id=regions.contexts[self.region_key].get('demo_run_id')
+                    if isinstance(result,dict):
+                        # Keep mobile/preview/address response contracts intact.
+                        # Only dispatcher state and intake envelopes carry the
+                        # simulation controls also exposed by GET /api/state.
+                        if self.path in ('/api/demo-stream/reset','/api/inbox/requests','/api/inbox/settings',
+                                         '/api/crew/apply','/api/approve','/api/facts','/api/mode',
+                                         '/api/engineer/revoke-report','/api/completions/confirm',
+                                         '/api/gps/confirm-delay'):
+                            result.update(demo_fields(self.region_key))
+                        if isinstance(result.get('state'),dict):result['state'].update(demo_fields(self.region_key))
+                if manual_explanation:
+                    explanation_batch,chosen_id=manual_explanation
+                    threading.Thread(target=enrich_decisions,
+                        args=(self.region_key,regions.contexts[self.region_key],explanation_batch,
+                              chosen_id,candidate.version,False,demo_run_id),daemon=True).start()
                 self.reply(200,result)
             except (ValueError,KeyError,TypeError) as exc:
                 self.reply(409 if 'верси' in str(exc) else 400,{'error':str(exc)})
@@ -412,12 +615,16 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             return connection, address
 
         def server_close(self):
+            stop_autopilot.set();wake_autopilot.set()
+            autopilot_thread.join(timeout=30)
             super().server_close()
             regions.close()
 
     try:
         server=Server((host,port),Handler)
         server.gps=regions.contexts[regions.default_key]['gps']
+        autopilot_thread=threading.Thread(target=autopilot_loop,name='field-router-autopilot',daemon=True)
+        autopilot_thread.start()
         return server
     except Exception:
         regions.close()

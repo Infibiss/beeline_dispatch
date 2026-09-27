@@ -98,6 +98,9 @@
   const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
   const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
   let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false, localScopeEngineerIds = [];
+  let inboxSnapshot = null, lastSeenNotificationId = null, notificationsInitialized = false;
+  let streamDemoEnabled=false, streamRows=null, streamTimer=null, streamRunning=false;
+  let demoEpoch=0, streamGeneration=0, demoResetting=false, streamLoading=false;
   const strategyNames = {sla:'Быстрее к аварии', stable:'Меньше изменений', cost:'Меньше дороги'};
   function strategyName(c) { return strategyNames[c.id] || c.label; }
   function requestName(id) { return ((batch && batch.request_labels) || (state && state.request_labels) || {})[id] || id || '—'; }
@@ -108,7 +111,35 @@
     if (className) node.className = className;
     return node;
   }
+  function planningDraft() {
+    const mode=$('planning-mode').value;
+    if(mode==='manual'){
+      const saved=inboxSnapshot?.planning_settings || {every_n_requests:1,every_n_minutes:null};
+      return {mode,every_n_requests:saved.every_n_requests,every_n_minutes:saved.every_n_minutes};
+    }
+    const count=$('auto-count').value.trim(), minutes=$('auto-minutes').value.trim();
+    return {mode,every_n_requests:count===''?null:Number(count),
+      every_n_minutes:minutes===''?null:Number(minutes)};
+  }
+  function updatePlanningDraft() {
+    const draft=planningDraft(), saved=inboxSnapshot?.planning_settings || {mode:'manual',every_n_requests:1,every_n_minutes:null};
+    const changed=draft.mode!==saved.mode || draft.every_n_requests!==saved.every_n_requests ||
+      draft.every_n_minutes!==saved.every_n_minutes;
+    $('autopilot-thresholds').hidden=draft.mode!=='autopilot';
+    const validCount=draft.every_n_requests===null || Number.isInteger(draft.every_n_requests) && draft.every_n_requests>=1 && draft.every_n_requests<=100;
+    const validMinutes=draft.every_n_minutes===null || Number.isInteger(draft.every_n_minutes) && draft.every_n_minutes>=1 && draft.every_n_minutes<=240;
+    const valid=validCount && validMinutes && (draft.mode!=='autopilot' || draft.every_n_requests!==null || draft.every_n_minutes!==null);
+    $('planning-mode-feedback').textContent=!valid ? 'Укажите допустимый порог: 1–100 заявок или 1–240 минут.' :
+      changed ? (draft.mode==='autopilot'
+        ? 'Изменения не сохранены. После сохранения автопилот может сразу обработать уже ожидающие новые заявки.'
+        : 'Изменения не сохранены. После сохранения автопилот будет выключен.') :
+      draft.mode==='autopilot' ? 'Обрабатывает новые заявки при достижении порога; уже обработанные заявки без исполнителя автоматически не исчезнут.' :
+      'Новые заявки ждут ручного расчёта и подтверждения плана.';
+    $('planning-save').disabled=busy || demoResetting || !state || !changed || !valid;
+    return valid;
+  }
   function controls() {
+    if(demoResetting)busy=true;
     window.dispatchEvent(new CustomEvent('planning-busy',{detail:{busy}}));
     $('event-fields').disabled = busy || !state;
     $('facts-fields').disabled = busy || !state;
@@ -116,16 +147,21 @@
     $('address-search').disabled = busy || !state || state.geography_mode !== 'road';
     $('address-confirm').disabled = busy || !state || !$('address-candidates').value;
     $('reload').disabled = busy; $('execution-mode').disabled = busy || !state; $('mode-apply').disabled = busy || !state || $('execution-mode').value === (state.execution_mode || 'simulation');
+    for (const id of ['planning-mode','auto-count','auto-minutes','intake-json','intake-file','intake-submit']) $(id).disabled=busy || !state;
+    updatePlanningDraft();
+    $('replan-primary').disabled=busy || !state || !state.needs_replanning &&
+      !(state.incoming_requests || []).some(item=>item.status==='new') && !(state.replanning_pool || []).length;
     $('approve').disabled = busy || !state || !batch || !selected || batch.version !== state.version;
     $('ai-recommend').disabled = busy || !batch || recommendationPending;
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
     document.querySelectorAll('#completion-list button').forEach(button => { button.disabled = busy || !state; });
+    if(streamDemoEnabled)streamProgress();
   }
   function resetCandidates(message) {
     $('excluded-summary').hidden=true;
-    batch = null; selected = null; recommendation = null; recommendationPending = false; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('observation-warnings').textContent = ''; $('variants-note').textContent = ''; $('replan-needed').hidden = !state?.needs_replanning; $('diff-title').closest('section').hidden = true;
+    batch = null; selected = null; recommendation = null; recommendationPending = false; $('ai-panel').hidden=true; $('comparison-tools').hidden = true; $('comparison-metrics').hidden = true; $('preview-coverage').hidden=true; $('observation-warnings').textContent = ''; $('variants-note').textContent = ''; $('replan-needed').hidden = true; $('diff-title').closest('section').hidden = true;
     $('candidates').dataset.count = '0';
-    $('candidates').replaceChildren(element('div', message || 'Задайте событие и рассчитайте варианты.', 'empty'));
+    $('candidates').replaceChildren(element('div', message || 'Нажмите «Рассчитать варианты», чтобы увидеть предложение для текущей очереди.', 'empty'));
     $('diff-title').textContent = 'Изменения выбранного варианта';
     const row = element('tr'), cell = element('td', 'Выберите вариант для просмотра изменений.', 'muted');
     cell.colSpan = 3; row.append(cell); $('diff-body').replaceChildren(row);
@@ -135,6 +171,7 @@
     controls();
   }
   function failure(error) {
+    if(error.staleDemoRun)return;
     if (error.httpStatus === 400 && state) { resetCandidates('Исправьте введённые данные и повторите расчёт.'); $('error').textContent = error.message; $('error').hidden = false; $('status').textContent = 'Изменения не сохранены.'; controls(); return; }
     state = null;
     $('plan-context').textContent = 'Состояние не подтверждено сервером. Показанный план может быть устаревшим; обновите состояние.';
@@ -145,11 +182,107 @@
     controls();
   }
   async function request(path, payload) {
-    const response = await appFetch(appUrl(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'});
+    const epoch=demoEpoch;
+    if(payload && state?.demo_run_id)payload={demo_run_id:state.demo_run_id,...payload};
+    const response = await appFetch(appUrl(path), payload ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)} : {cache: 'no-store'})
+      .catch(error=>{if(epoch!==demoEpoch)error.staleDemoRun=true;throw error;});
     let data;
-    try { data = await response.json(); } catch { throw new Error('Сервер не подтвердил операцию. Нажмите «Обновить», чтобы проверить состояние.'); }
+    try { data = await response.json(); } catch { const error=new Error('Сервер не подтвердил операцию. Нажмите «Обновить», чтобы проверить состояние.');if(epoch!==demoEpoch)error.staleDemoRun=true;throw error; }
+    if(epoch!==demoEpoch){const error=new Error('Симуляция уже перезапущена.');error.staleDemoRun=true;throw error;}
     if (!response.ok) { const error = new Error((response.status === 409 ? 'Версия изменилась. ' : '') + (data.error || 'Ошибка сервера.')); error.httpStatus = response.status; throw error; }
     return data;
+  }
+  function streamProgress() {
+    $('stream-demo-reset').hidden=!state?.demo_reset_enabled;
+    $('stream-demo-reset').disabled=demoResetting;
+    $('stream-demo-reset').textContent=demoResetting?'Возвращаемся к началу…':'Начать заново';
+    if(!streamRows)return;
+    const arrived=new Set((inboxSnapshot?.incoming_requests || []).map(item=>item.id));
+    const count=streamRows.filter(row=>arrived.has(row.id)).length;
+    $('stream-demo-status').textContent=streamRunning
+      ? `Поступило ${count} из ${streamRows.length}. Следующая заявка через 10 секунд; распределение зависит от сохранённого режима.`
+      : count===streamRows.length ? `Поток завершён: поступило ${count} из ${streamRows.length}. «Начать заново» вернёт исходный план и очистит историю.`
+        : `Поступило ${count} из ${streamRows.length}. ${count?'Поток на паузе.':'Выберите режим и запустите поток.'}`;
+    $('stream-demo-start').disabled=demoResetting || streamRunning || count===streamRows.length;
+    $('stream-demo-start').hidden=count===streamRows.length;
+    $('stream-demo-start').textContent=count?'Продолжить поток':'Запустить поток';
+    $('stream-demo-pause').disabled=demoResetting || !streamRunning;
+    $('stream-demo-pause').hidden=!streamRunning;
+  }
+  function stopStream() {
+    streamRunning=false;streamGeneration++;
+    if(streamTimer)clearTimeout(streamTimer);
+    streamTimer=null;
+  }
+  function clearDemoWorkspace() {
+    stopStream();streamRows=null;streamLoading=false;
+    inboxSnapshot=null;lastSeenNotificationId=null;notificationsInitialized=false;
+    localScopeEngineerIds=[];clearGpsDelay();resetCandidates();
+    $('decision-search').value='';$('decision-filter').value='all';
+    for(const id of ['event-form','facts-form'])$(id).reset?.();
+    for(const id of ['intake-json','intake-file','new-address','call-off-duty-reason'])if($(id))$(id).value='';
+    addressCandidates=[];populateSelect('address-candidates',[],item=>item.label,'Сначала найдите адрес');
+    $('address-context').textContent='';$('address-map').hidden=true;$('address-map').src='about:blank';
+    $('intake-feedback').textContent='';$('error').hidden=true;$('remote-update').hidden=true;
+    document.querySelectorAll('#panel-events details').forEach(item=>{item.open=false;});
+  }
+  function loadStreamRows() {
+    if(streamRows || streamLoading)return;
+    streamLoading=true;
+    const epoch=demoEpoch, runId=state?.demo_run_id;
+    request('/api/demo-stream/requests').then(result=>{
+      if(epoch!==demoEpoch || runId!==state?.demo_run_id)return;
+      if(result.demo_run_id && result.demo_run_id!==runId){reload();return;}
+      streamRows=result.requests;streamProgress();
+    }).catch(error=>{if(!error.staleDemoRun)$('stream-demo-status').textContent='Не удалось загрузить заявки: '+error.message;})
+      .finally(()=>{if(epoch===demoEpoch)streamLoading=false;});
+  }
+  async function restartDemo() {
+    if(demoResetting || !state?.demo_reset_enabled)return;
+    const previous={version:state.version,demo_run_id:state.demo_run_id};
+    stopStream();demoEpoch++;demoResetting=true;busy=true;controls();
+    $('stream-demo-status').textContent='Восстанавливаем исходный день и очищаем историю…';
+    try {
+      const fresh=await request('/api/demo-stream/reset',previous);
+      clearDemoWorkspace();renderState(fresh);
+      $('status').textContent='Новая симуляция: исходный день восстановлен, история очищена. Выберите режим и запустите поток.';
+    } catch(error) {
+      if(!error.staleDemoRun){$('error').textContent=error.message;$('error').hidden=false;$('stream-demo-status').textContent='Перезапуск не подтверждён. Обновите состояние и повторите.';}
+    } finally {demoResetting=false;busy=false;controls();}
+  }
+  async function streamNext() {
+    if(!streamRunning)return;
+    const generation=streamGeneration, epoch=demoEpoch;
+    const active=()=>streamRunning && generation===streamGeneration && epoch===demoEpoch;
+    try {
+      const live=await request('/api/state');
+      if(!active())return;
+      if(live.demo_run_id && live.demo_run_id!==state?.demo_run_id){stopStream();await reload();return;}
+      const arrived=new Set((live.incoming_requests || []).map(item=>item.id));
+      const row=streamRows.find(item=>!arrived.has(item.id));
+      if(!row){streamRunning=false;streamProgress();return;}
+      const copy={...row,time:Math.max(minute(row.time),live.time)};
+      await request('/api/inbox/requests',{request:copy,demo_run_id:live.demo_run_id});
+      if(!active())return;
+      const latest=await request('/api/state');
+      if(!active())return;
+      if(!busy && !batch)renderLiveState(latest);
+      else {
+        if(latest.version===state?.version)renderInbox(latest,true);
+        $('remote-update-text').textContent=`Поступила заявка ${row.id}. Загрузите изменения перед расчётом.`;
+        $('remote-update').hidden=false;
+      }
+      if(!active())return;
+      if(streamRows.every(item=>(latest.incoming_requests || []).some(incoming=>incoming.id===item.id)))
+        streamRunning=false;
+      streamProgress();
+      if(streamRunning)streamTimer=setTimeout(streamNext,10000);
+    } catch(error) {
+      if(!active() || error.staleDemoRun)return;
+      streamRunning=false;streamTimer=null;
+      $('stream-demo-status').textContent='Поток остановлен: '+error.message+' Повторите после проверки состояния.';
+      $('stream-demo-start').disabled=false;$('stream-demo-pause').disabled=true;
+    }
   }
   function targets() {
     if (!state) return;
@@ -201,18 +334,46 @@
   }
   function renderReplanningPool() {
     const pool = Array.isArray(state?.replanning_pool) ? state.replanning_pool : [];
-    const entries = pool.map(item => {
-      const row = element('div', null, 'notice');
+    const waiting = pool.filter(item => item.status === 'awaiting_replan');
+    const unresolved = pool.filter(item => item.status === 'unassigned');
+    $('replanning-pool-summary').textContent = `Требуют назначения · ${waiting.length+unresolved.length}`;
+    $('replanning-pool-summary').classList.toggle('attention', waiting.length+unresolved.length>0);
+    const card = item => {
+      const row = element('article', null, 'pool-card');
       row.append(element('strong', requestName(item.request_id) + ' · ' + (item.address || 'Адрес не указан')));
-      if (item.engineer_id) row.append(element('p', 'Сообщил: ' + engineerName(item.engineer_id)));
-      if (item.reason) row.append(element('p', 'Причина: ' + item.reason));
+      const context=[];
+      if (item.engineer_id) context.push('Сообщил: ' + engineerName(item.engineer_id));
+      else if (item.previous_engineer_id) context.push('Ранее: ' + engineerName(item.previous_engineer_id));
+      if (item.windows?.length) context.push('Окно: ' + item.windows.map(window=>time(window.start)+'–'+time(window.end)).join(' или '));
+      if (item.duration_minutes) context.push('Работа: '+item.duration_minutes+' мин');
+      if(context.length)row.append(element('p',context.join(' · '),'hint'));
+      if (item.reason) {
+        if(item.status==='awaiting_replan')row.append(element('p',item.reason,'pool-reason'));
+        else {const why=element('details');why.append(element('summary','Почему пока без исполнителя'),element('p',item.reason));row.append(why);}
+      }
       if (item.start_date && item.end_date) row.append(element('p', 'Недоступен: ' + item.start_date + ' ' + item.start_time + ' — ' + item.end_date + ' ' + item.end_time));
       if (item.comment) row.append(element('p', 'Комментарий: ' + item.comment));
       return row;
-    });
-    $('replanning-pool').replaceChildren(...(entries.length ? entries : [element('p', 'Сейчас нет заявок, ожидающих перепланирования.', 'hint')]));
+    };
+    const sections = [];
+    if (waiting.length) {
+      sections.push(element('h3', `Нужно заменить исполнителя · ${waiting.length}`));
+      sections.push(element('p', 'Прежний инженер недоступен или отказался от выезда. Старое назначение сохранено для сравнения, но больше не считается действующим.', 'hint'));
+      sections.push(...waiting.map(card));
+    }
+    if (unresolved.length) {
+      sections.push(element('h3', `Без исполнителя после расчёта · ${unresolved.length}`));
+      if(state.last_applied)sections.push(element('p',
+        `Список по применённому плану №${state.last_applied.version}. Назначенные и отменённые заявки здесь больше не показываются.`, 'hint'));
+      sections.push(element('p', unresolved.every(item=>item.code==='SEARCH_UNASSIGNED')
+        ? 'Все эти заявки не вошли в найденный план за лимит поиска. Это не доказательство невозможности; при тех же ресурсах и окнах повторный расчёт может вернуть тот же результат.'
+        : 'Это остаток утверждённого плана, а не очередь уже назначенных задач. Проверьте ограничения, доступных инженеров и временные окна.', 'hint'));
+      sections.push(...unresolved.map(card));
+    }
+    $('replanning-pool').replaceChildren(...(sections.length ? sections : [element('p', 'Нет заявок, требующих внимания.', 'hint')]));
     const reports = [...(state.unavailability || []).filter(item => !item.revoked).map(item => ({...item, report_type:'unavailability'})),
       ...(state.declined_assignments || []).filter(item => !item.revoked).map(item => ({...item, report_type:'decline'}))];
+    $('engineer-reports-title').textContent = `Сообщения инженеров · ${reports.length}`;
     $('engineer-reports').replaceChildren(...(reports.length ? reports.map(report => {
       const card = element('div', null, 'notice');
       const title = report.report_type === 'decline' ? 'Отказ от выезда · ' + requestName(report.request_id) : 'Период недоступности · ' + (report.reason_label || report.reason);
@@ -250,15 +411,282 @@
       card.append(revoke); return card;
     }) : [element('p', 'Активных сообщений нет.', 'hint')]));
   }
+  function openReplanningPool() {
+    activateTab('events');
+    const attention=(state?.replanning_pool || []).length>0;
+    const target=attention ? $('replanning-pool-section') : $('incoming-section');
+    target.open=true;target.scrollIntoView({block:'start'});target.querySelector('summary').focus();
+  }
+  function renderApplicationVisual(data) {
+    const applied=data.last_applied, panel=$('application-visual');
+    panel.hidden=!applied;
+    if(!applied)return;
+    const event=[...(data.dispatch_notifications || [])].reverse().find(item=>
+      item.version===applied.version && ['auto_applied','manual_applied'].includes(item.kind));
+    const rows=(data.decision_log || []).filter(item=>item.version===applied.version);
+    const newIds=new Set(event?.request_ids || []);
+    const isAuto=applied.automatic===true;
+    $('application-visual-title').textContent=isAuto?'Автопилот обновил план':'Что изменилось после применения';
+    $('application-visual-version').textContent=`План №${applied.version}`;
+    const stale=data.version!==state?.version;
+    $('application-visual-context').textContent=stale
+      ? 'План уже применён на сервере. Нажмите «Загрузить изменения», чтобы увидеть его на карте и в плане дня.'
+      : `${isAuto?'Применён автоматически':'Утверждён диспетчером'} · время плана ${time(state.time)}. Ниже только изменения этого применения, без полной ленты событий.`;
+    const retried=event?.backlog_attempted_request_ids?.length;
+    if(retried) $('application-visual-context').textContent+=
+      ` Ранее оставшихся без исполнителя перепроверено ${retried}; назначено ${event.recovered_request_ids?.length || 0}.`;
+    if(event?.lost_request_ids?.length) $('application-visual-context').textContent+=
+      ` Внимание: ${event.lost_request_ids.length} ранее назначенных заявок теперь без исполнителя.`;
+    if(rows.some(item=>!Object.prototype.hasOwnProperty.call(item,'previous_engineer_id')))
+      $('application-visual-context').textContent+=' Для этого старого применения сведения «до» сохранены не полностью.';
+    const metrics=[];
+    const addMetric=(label,value,attention=false)=>{
+      const card=element('div',null,attention?'application-metric attention':'application-metric');
+      card.append(element('span',label),element('strong',value));metrics.push(card);
+    };
+    addMetric('Новых обработано',String(applied.incoming_count ?? newIds.size));
+    addMetric('Изменений в плане',String(applied.changed_count ?? event?.changed_request_ids?.length ?? 0));
+    if(event?.cancelled_request_ids?.length)addMetric('Отменено',String(event.cancelled_request_ids.length));
+    const assignedBefore=event?.before_effective_assigned_count ?? event?.before_assigned_count,assignedAfter=event?.after_assigned_count;
+    if(assignedBefore != null && assignedAfter != null)
+      addMetric('Назначено',`${assignedBefore} → ${assignedAfter}`);
+    const before=event?.before_requires_assignment_count ?? event?.before_unassigned_count,after=event?.after_unassigned_count;
+    const unresolved=after ?? event?.unassigned_request_ids?.length ?? (data.version===state?.version ? state.plan?.unassigned?.length : null);
+    addMetric('Требуют назначения',before != null && unresolved != null ? `${before} → ${unresolved}` : String(unresolved ?? '—'),unresolved>0);
+    $('application-visual-metrics').replaceChildren(...metrics);
+    const llm=event?.llm_status==='ready' && event.plan_explanation ? event :
+      rows.find(item=>item.plan_explanation && (item.llm_status==='ready' || item.llm_notice?.startsWith('YandexGPT')));
+    const ordinary=event?.plan_explanation ? event : rows.find(item=>item.plan_explanation);
+    const explanation=llm || ordinary;
+    const explainer=$('application-visual-explanation');
+    explainer.replaceChildren();
+    if(explanation){
+      explainer.append(element('strong',llm?'YandexGPT расставила акценты · проверенные показатели':'Почему выбран этот вариант · проверенные показатели'),
+        element('p',explanation.plan_explanation));
+      if(!llm)explainer.append(element('small',event?.llm_status==='unavailable' ?
+        event.llm_notice || 'YandexGPT сейчас недоступна; решение и показатели проверены алгоритмом.' :
+        'Пояснение YandexGPT для этого применения пока не сохранено; решение и показатели проверены алгоритмом.','hint'));
+    }else explainer.append(element('p',event?.llm_status==='unavailable' ?
+      event.llm_notice || 'YandexGPT сейчас недоступна; назначения видны в плане дня.' :
+      'Подробное пояснение для этого применения пока не сохранено; назначения уже видны в плане дня.','hint'));
+    const ordered=[...rows].sort((a,b)=>Number(newIds.has(b.id))-Number(newIds.has(a.id)) ||
+      Number(a.status==='assigned')-Number(b.status==='assigned'));
+    const changeCard=item=>{
+      const isNew=newIds.has(item.id);
+      const cancelled=item.status==='cancelled' || item.change_type==='cancelled';
+      const beforeName=item.previous_engineer_id ? `${engineerName(item.previous_engineer_id)} · ${time(item.previous_start)}` :
+        isNew ? 'Новая заявка' : item.previous_engineer_id===null ? 'Без назначения' : 'До применения: нет данных';
+      const afterName=cancelled?'Удалена из плана':item.engineer_id ? `${engineerName(item.engineer_id)} · ${time(item.start)}` : 'Без исполнителя';
+      const label=cancelled?'Отменена':item.change_type==='lost_assignment'?'Потеря назначения':
+        item.change_type==='recovered'?'Снова назначена':
+        item.status==='unassigned'?'Требует внимания':isNew?'Новая заявка':
+        item.previous_engineer_id===item.engineer_id?'Сдвиг времени':'Переназначение';
+      const card=element('details',null,!cancelled && item.status==='unassigned'?'application-change attention':'application-change');
+      card.dataset.requestId=String(item.request_id || item.id);
+      const summary=element('summary');
+      const heading=element('span',null,'application-change-heading');
+      heading.append(element('span',label,'application-change-kind'),
+        element('strong',`${item.id} · ${item.address || requestName(item.request_id)}`));
+      summary.append(heading,element('span',`${beforeName} → ${afterName}`,'application-change-route'));
+      card.append(summary);
+      const body=element('div',null,'application-change-body');
+      body.append(element('p',item.llm_explanation ? `Подробности расчёта: ${item.llm_explanation}` :
+        item.explanation || 'Проверенное объяснение пока не сохранено.',item.llm_explanation?'application-llm-note':null));
+      card.append(body);return card;
+    };
+    const list=$('application-visual-changes');
+    const expanded=new Set([...list.querySelectorAll('.application-change[open]')].map(card=>card.dataset.requestId));
+    const moreExpanded=!!list.querySelector('.application-more[open]');
+    if(!ordered.length){
+      list.replaceChildren(element('p','В этой версии нет сохранённых изменений отдельных назначений.','hint'));
+      return;
+    }
+    const visible=ordered.slice(0,4).map(changeCard);
+    if(ordered.length>4){
+      const extra=element('details',null,'application-more');
+      extra.append(element('summary',`Ещё ${ordered.length-4} изменений`),
+        ...ordered.slice(4).map(changeCard));
+      extra.open=moreExpanded;
+      visible.push(extra);
+    }
+    for(const card of visible){
+      if(card.classList.contains('application-change') && expanded.has(card.dataset.requestId))card.open=true;
+      for(const nested of card.querySelectorAll?.('.application-change') || [])
+        if(expanded.has(nested.dataset.requestId))nested.open=true;
+    }
+    list.replaceChildren(...visible);
+  }
+  function renderNotificationCenter(data) {
+    const notifications=data.dispatch_notifications || [];
+    if (!notificationsInitialized) {
+      lastSeenNotificationId=notifications[notifications.length-1]?.id || null;
+      notificationsInitialized=true;
+    }
+    const seenIndex=notifications.findIndex(item=>item.id===lastSeenNotificationId);
+    const unread=lastSeenNotificationId ? Math.max(0,notifications.length-seenIndex-1) : notifications.length;
+    $('notification-count').textContent=unread ? `(${unread})` : '';
+    const current=data.version===state?.version;
+    const pending=(data.incoming_requests || []).filter(item=>item.status==='new').length;
+    const unassigned=current ? (state.plan?.unassigned || []).length : 0;
+    const waiting=current ? (state.replanning_pool || []).filter(item=>item.status==='awaiting_replan').length : 0;
+    const applied=data.last_applied;
+    $('notifications-overview').textContent=current
+      ? `${applied ? `Последний применённый план №${applied.version}. ` : ''}Сейчас: без исполнителя ${unassigned}; новых заявок ${pending}; ждут пересчёта ${waiting}.`
+      : 'План изменился в другом окне. Загрузите изменения, чтобы увидеть актуальные назначения.';
+    $('notifications-replan').hidden=!current || !pending && !unassigned && !waiting;
+    $('notifications-replan').textContent=unassigned || waiting ? `Разобрать заявки · ${unassigned+waiting}` : `Открыть новые заявки · ${pending}`;
+    $('notification-total').textContent=`${notifications.length} событий`;
+    const labels={incoming:'Поступление',auto_applied:'Автопилот',manual_applied:'План применён',planning_mode:'Режим изменён',
+      explanation_ready:'Пояснение готово',
+      auto_error:'Нужно вмешательство',replan_required:'Требуется пересчёт'};
+    $('dispatch-notifications').replaceChildren(...(notifications.length ? [...notifications].reverse().map(item=>{
+      const card=element('article',null,'notification-card');
+      const head=element('div',null,'notification-card-head');
+      head.append(element('span',labels[item.kind] || 'Событие','notification-kind'),
+        element('small',`${item.time ? new Date(item.time).toLocaleString('ru-RU') : 'Время не указано'} · план №${item.version ?? '—'}`,'hint'));
+      card.append(head,element('strong',item.title || 'Событие'),element('p',item.text || ''));
+      if(['auto_applied','manual_applied'].includes(item.kind)){
+        const before=item.before_effective_assigned_count ?? item.before_assigned_count,after=item.after_assigned_count;
+        if(before!=null && after!=null)
+          card.append(element('small',`В основном плане назначено: ${before} → ${after}.`,'hint'));
+        if(item.backlog_attempted_request_ids?.length)
+          card.append(element('small',`Перепроверено ранее нераспределённых: ${item.backlog_attempted_request_ids.length}; назначено: ${item.recovered_request_ids?.length || 0}.`,'hint'));
+        if(item.plan_explanation){
+          const detail=element('details',null,'notification-explanation');
+          detail.append(element('summary',item.llm_status==='ready' ?
+              'Почему применён этот план · YandexGPT выделила главное' :
+              'Почему применён этот план · проверенные показатели'),
+            element('p',item.plan_explanation),
+            element('small',item.llm_status==='ready' ?
+              'YandexGPT выбрала акценты; факты и числа подставлены из проверенного расчёта.' :
+              'Показатели проверены расчётом; модель не формирует назначения.','hint'));
+          card.append(detail);
+        }
+        if(item.llm_status==='unavailable')
+          card.append(element('small',item.llm_notice || 'YandexGPT недоступна; назначения рассчитаны и применены без неё.','hint'));
+        else if(item.llm_status==null && !item.plan_explanation)
+          card.append(element('small','Пояснение YandexGPT для этого применения пока не сохранено.','hint'));
+      }
+      const left=(item.unassigned_request_ids || []).length;
+      if(left)card.append(element('p',`После этого решения без исполнителя: ${left}`,'notification-attention'));
+      if(item.cancelled_request_ids?.length)card.append(element('p',`Отменено и удалено из плана: ${item.cancelled_request_ids.length}.`,'hint'));
+      if((item.request_ids || []).length)card.append(element('small',`Заявок в событии: ${item.request_ids.length}`,'hint'));
+      if((item.changed_request_ids || []).length)card.append(element('small',`Изменены назначения: ${item.changed_request_ids.length}. Причины — в журнале справа.`,'hint'));
+      if(['auto_error','replan_required'].includes(item.kind) || left) {
+        const action=element('button','Открыть заявки','secondary');action.type='button';
+        action.addEventListener('click',openReplanningPool);card.append(action);
+      }
+      return card;
+    }) : [element('p','Событий пока нет. Новые заявки и перепланирования появятся здесь.','hint')]));
+    const decisions=data.decision_log || [];
+    const assignments=new Map(current ? (state.plan?.routes || []).flatMap(route=>(route.visits || []).map(visit=>[visit.request_id,{engineer_id:route.engineer_id,start:visit.start}])) : []);
+    const unresolved=new Set(current ? (state.plan?.unassigned || []).map(item=>item.request_id) : []);
+    const cancelled=new Set(current ? [
+      ...decisions.filter(item=>item.status==='cancelled' || item.change_type==='cancelled').map(item=>item.request_id),
+      ...notifications.flatMap(item=>item.cancelled_request_ids || []),
+      ...(data.incoming_requests || []).filter(item=>item.status==='cancelled').map(item=>
+        item.request_id || (item.event.type==='emergency'?'emergency:':'request:')+item.id),
+    ] : []);
+    const currentStatus=item=>assignments.has(item.request_id)?'assigned':unresolved.has(item.request_id)?'unassigned':cancelled.has(item.request_id)?'cancelled':null;
+    const wanted=$('decision-filter').value || 'all', query=$('decision-search').value.trim().toLocaleLowerCase('ru-RU');
+    const rows=[...decisions].reverse().filter(item=>(wanted==='all' || current && currentStatus(item)===wanted) &&
+      (!query || `${item.id} ${item.address || ''} ${item.request_id || ''}`.toLocaleLowerCase('ru-RU').includes(query)));
+    $('decision-count').textContent=`${rows.length} из ${decisions.length}`;
+    $('decision-log').replaceChildren(...(rows.length ? rows.map(item=>{
+      const actual=currentStatus(item), historical=item.status==='cancelled'?'отменена':item.status==='assigned'?'назначена':'без исполнителя';
+      const label=actual==='cancelled'?'Отменена':actual==='assigned'?'Сейчас назначена':actual==='unassigned'?'Сейчас без исполнителя':'Историческое решение';
+      const card=element('details',null,'decision-card');
+      const summary=element('summary');
+      summary.append(element('strong',item.id+' · '+(item.address || requestName(item.request_id))),
+        element('span',label,actual==='unassigned'?'decision-status attention':'decision-status'));
+      card.append(summary);
+      const body=element('div',null,'decision-body');
+      body.append(element('p',`${item.automatic?'Автопилот':'Диспетчер'} · решение плана №${item.version}: ${historical}.`,'hint'));
+      if(current && actual){
+        const assignment=assignments.get(item.request_id);
+        body.append(element('p',actual==='cancelled'?`Текущий план №${state.version}: заявка отменена и удалена из плана.`:assignment ? `Текущий план №${state.version}: ${engineerName(assignment.engineer_id)}, начало ${time(assignment.start)}.` :
+          `Текущий план №${state.version}: заявка без исполнителя.`,actual==='unassigned'?'notification-attention':'hint'));
+        if(actual!==item.status)body.append(element('p',`В текущем плане статус изменился: ${label.toLowerCase()}. Историческое объяснение ниже относится к плану №${item.version}.`,actual==='cancelled'?'hint':'notification-attention'));
+        else if(item.version!==state.version)body.append(element('p',`Объяснение ниже относится к прежнему плану №${item.version}; назначение и время могли измениться.`,'hint'));
+      }
+      body.append(element('p',item.llm_explanation ? `Подробности расчёта: ${item.llm_explanation}` :
+        item.explanation || 'Объяснение не сохранено.',item.llm_explanation?'application-llm-note':null));
+      if(item.plan_explanation){const detail=element('details');detail.append(element('summary','Компромисс плана №'+item.version),
+        element('p',item.plan_explanation));if(item.llm_notice)detail.append(element('small',item.llm_notice,'hint'));body.append(detail);}
+      card.append(body);return card;
+    }) : [element('p',decisions.length?'По этому фильтру решений нет.':'Решений по заявкам пока нет.','hint')]));
+  }
+  function renderInbox(data, settingsOnly = false) {
+    inboxSnapshot=data;
+    const settings = data.planning_settings || {mode:'manual',every_n_requests:1,every_n_minutes:null};
+    if (!settingsOnly) {
+      $('planning-mode').value = settings.mode;
+      $('auto-count').value = settings.every_n_requests ?? '';
+      $('auto-minutes').value = settings.every_n_minutes ?? '';
+    }
+    const rows = data.incoming_requests || [];
+    const pending = rows.filter(item => item.status === 'new');
+    const processed = rows.filter(item => item.status !== 'new');
+    const assigned=processed.filter(item=>item.status==='assigned').length;
+    const unassigned=processed.filter(item=>item.status==='unassigned').length;
+    const cancelled=processed.filter(item=>item.status==='cancelled').length;
+    $('incoming-summary').textContent = `Ожидают распределения ${pending.length} · назначены ${assigned} · без исполнителя ${unassigned}`+
+      (cancelled?` · отменены ${cancelled}`:'');
+    $('incoming-history-summary').textContent = `История обработанных · ${processed.length}`;
+    $('planning-mode-summary').textContent = settings.mode === 'autopilot'
+      ? `Сейчас включён автопилот: ${[settings.every_n_requests && `после ${settings.every_n_requests} новых заявок`, settings.every_n_minutes && `после ${settings.every_n_minutes} минут ожидания`].filter(Boolean).join(' или ')}.`
+      : 'Сейчас ручной режим: план считает и применяет диспетчер.';
+    updatePlanningDraft();
+    const incomingCard = item => {
+      const card = element('article', null, 'intake-card');
+      const kind = item.event.type === 'emergency' ? 'Аварийная' : 'Обычная';
+      const status = {new:'Ожидает',assigned:'Назначена',unassigned:'Без исполнителя',cancelled:'Отменена'}[item.status] || item.status;
+      card.append(element('strong', `${kind} · ${item.id} · ${status}`));
+      card.append(element('p', item.address));
+      const window = item.event.type === 'new_request' ? ` · окно ${time(item.event.window_start)}–${time(item.event.window_end)}` : '';
+      card.append(element('p', `Поступила ${time(item.event.time)}${window} · работа ${item.event.duration_minutes} мин`,'hint'));
+      return card;
+    };
+    $('incoming-list').replaceChildren(...(pending.length ? [...pending].reverse().map(incomingCard) : [element('p','Сейчас нет новых заявок.','hint')]));
+    $('incoming-history-list').replaceChildren(...(processed.length ? [...processed].reverse().slice(0,100).map(incomingCard) : [element('p','Обработанных заявок пока нет.','hint')]));
+    renderNotificationCenter(data);
+    renderApplicationVisual(data);
+    if(streamDemoEnabled)streamProgress();
+  }
   function renderState(data) {
     if (!data || data.version == null || !Array.isArray(data.requests) || !Array.isArray(data.engineers)) throw new Error('Сервер вернул неполное состояние.');
+    if(state && data.demo_run_id===state.demo_run_id && data.version<state.version)return;
+    if(state?.demo_run_id && data.demo_run_id && state.demo_run_id!==data.demo_run_id){
+      demoEpoch++;clearDemoWorkspace();
+    }
     state = data;
+    if(data.demo_stream_enabled) {
+      streamDemoEnabled=true;$('stream-demo-panel').hidden=false;
+      loadStreamRows();
+    }
     renderReplanningPool();
+    renderInbox(data);
+    const incoming=(data.incoming_requests || []).filter(item=>item.status==='new').length;
+    const waiting=(data.replanning_pool || []).filter(item=>item.status==='awaiting_replan').length;
+    const unresolved=(data.replanning_pool || []).filter(item=>item.status==='unassigned').length;
+    $('replan-overview').textContent = `Новых: ${incoming} · требуют назначения: ${waiting+unresolved}`+
+      (data.needs_replanning && !incoming && !waiting ? ' · есть новые факты' : '');
+    const applied=data.last_applied;
+    $('replan-last-applied').textContent=applied
+      ? `Последний план применён: №${applied.version}${applied.automatic===true?' автопилотом':applied.automatic===false?' диспетчером':''}. Новых обработано ${applied.incoming_count}, изменений назначений ${applied.changed_count}. Ноль во входящей очереди означает «не ждут обработки», а не «все назначены».`
+      : 'Применённых перепланирований ещё нет.';
+    $('replan-guidance').textContent=unresolved && !incoming && !waiting
+      ? 'Расчёт не удаляет неназначенные заявки: они исчезнут из этого списка только после применения плана, где им найден исполнитель. При тех же ресурсах повторный поиск может не улучшить охват.'
+      : incoming || waiting ? 'Сначала рассчитайте варианты, затем проверьте и примените выбранный план.' :
+        'Все заявки текущего плана распределены.';
+    $('replan-primary').textContent = unresolved && !incoming && !waiting && !data.needs_replanning ? 'Повторить расчёт' : 'Рассчитать варианты';
     $('remote-update').hidden = true;
     $('region').textContent = data.region || '—'; $('status').classList.toggle('attention', !!data.needs_replanning); $('version').textContent = data.version;
     $('clock').textContent = time(data.time); $('event-time').value = time(data.time); $('event-time').min = time(data.time);
     const count = (data.plan && data.plan.routes || []).reduce((sum, route) => sum + (route.visits || []).length, 0);
-    $('coverage').textContent = count + ' / ' + data.requests.length;
+    const coverage=data.assignment_summary;
+    $('coverage').textContent = (coverage?.assigned ?? Math.max(0,count-waiting)) + ' / ' + (coverage?.total ?? data.requests.length);
+    $('coverage-pending').textContent=coverage?.requires_assignment ?? waiting+unresolved;
     const mode = data.mode || 'simulation';
     $('mode-badge').textContent = mode === 'mixed' ? 'Смешанный учёт' : mode === 'manual' ? 'Ручной учёт' : 'Симуляция';
     $('clock-label').textContent = mode === 'simulation' ? 'Время симуляции' : 'Время состояния';
@@ -274,13 +702,13 @@
     populateSelect('fact-engineer', data.engineers, item => item.name + ' · ' + item.id);
     if (data.engineers.some(e => e.id === previousEngineer)) $('fact-engineer').value = previousEngineer;
     factRequests();
-    $('replan-needed').hidden = !data.needs_replanning; $('go-replan').hidden = !data.needs_replanning;
+    $('replan-needed').hidden = true; $('go-replan').hidden = !data.needs_replanning;
     populateSelect('fact-location', data.locations || [], item => item.label || item.id, 'Без уточнения места');
     const versions = data.versions && data.versions.length ? data.versions : [{version: data.version, time: data.time, label: 'Текущий план'}];
     $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', '№ ' + item.version + ' · ' + time(item.time) + ' · ' + (item.label || 'План') + (item.version === data.version ? ' · текущий' : '')); option.value = item.version; return option; }));
     $('plan-version').value = String(data.version); showPlan();
     renderFacts(); renderCompletions(); factFields(); targets(); resetCandidates();
-    window.dispatchEvent(new CustomEvent('planning-state',{detail:{version:data.version,time:data.time,
+    window.dispatchEvent(new CustomEvent('planning-state',{detail:{version:data.version,time:data.time,demoRunId:data.demo_run_id,
       engineers:data.engineers,excludedEngineerIds:data.excluded_engineer_ids || []}}));
   }
   function populateSelect(id, values, label, empty) {
@@ -291,9 +719,11 @@
   function showPlan() {
     if (!state) return;
     const version = $('plan-version').value, historical = String(state.version) !== version;
-    $('plan-frame').src = appUrl('/dispatcher?version=' + encodeURIComponent(version));
-    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : 'Текущий утверждённый план · версия ' + version + '.';
-    $('plan-context').classList.toggle('attention', !historical && !!state.needs_replanning);
+    $('plan-frame').src = appUrl('/dispatcher?version=' + encodeURIComponent(version) +
+      (state.demo_run_id?'&demo_run_id='+encodeURIComponent(state.demo_run_id):''));
+    const unresolved = (state.replanning_pool || []).filter(item => item.status === 'unassigned').length;
+    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : unresolved ? `Текущий план · версия ${version}. Без исполнителя: ${unresolved}; проверьте вкладку «Перепланирование».` : 'Текущий утверждённый план · версия ' + version + '.';
+    $('plan-context').classList.toggle('attention', !historical && (!!state.needs_replanning || unresolved > 0));
   }
   function factRequests() {
     const previous = $('fact-request').value;
@@ -526,6 +956,10 @@
     $('observation-warnings').textContent = (data.observation_warnings || []).join(' ');
     const order = $('candidate-sort').value;
     const ordered = data.candidates.filter(c => !c.duplicate_of).sort((a,b) => compareCandidates(a, b, order));
+    const currentAssigned=state.assignment_summary?.assigned ?? (state.plan?.routes || []).reduce((sum,route)=>sum+(route.visits || []).length,0);
+    const best=ordered.reduce((winner,candidate)=>candidate.facts.assigned>(winner?.facts.assigned ?? -1)?candidate:winner,null);
+    $('preview-coverage').hidden=!best;
+    if(best)$('preview-coverage').textContent=`Действующих назначений сейчас: ${currentAssigned}/${state.requests.length}. Лучший рассчитанный охват: ${best.facts.assigned}/${best.facts.assigned+best.facts.unassigned}. Расчёт не меняет назначения до «Применить план».`;
     const baseline = data.candidates.find(c => c.id === 'stable');
     const newEmergency = data.candidates.some(c => c.emergency);
     const responseTargets = data.candidates.some(c => c.facts.response_target_count > 0);
@@ -537,6 +971,11 @@
     const durationFacts = Number.isInteger(durationEvidence.observation_count) && durationEvidence.observation_count > 0
       ? durationEvidence.observation_count : 0;
     const notes = [];
+    if (data.event?.type === 'replan' && !(data.incoming_ids || []).length &&
+        ordered.length && ordered.every(candidate=>candidate.facts.unassigned >= (state.plan?.unassigned || []).length) &&
+        (state.plan?.unassigned || []).length) {
+      notes.push('Ни один вариант не уменьшил число заявок без исполнителя. Применение плана с тем же охватом не очистит этот список; проверьте доступность инженеров и окна клиентов.');
+    }
     if (data.insertion_policy) notes.push('Новая заявка добавляется без изменения прежних назначений и времени начала.');
     if (merged) notes.push(ordered.length === 1 ? 'Один уникальный план: все стратегии нашли одинаковые маршруты и время.' : 'Совпавшие планы объединены в одну карточку.');
     if (!newEmergency && !responseTargets && merged) notes.push('Аварий в остатке дня нет: «Быстрее к аварии» совпадает с «Меньше изменений».');
@@ -594,13 +1033,14 @@
       if (aliases.length) card.append(element('p', 'Совпадает с ' + aliases.map(id => '«' + strategyName({id}) + '»').join(', '), 'duplicate'));
       const f = candidate.facts || {}, dl = element('dl');
       card.append(element('p', 'Назначено: аварии ' + f.emergency_assigned + '/' + f.emergency_total + ' · подключения ' + f.connection_assigned + '/' + f.connection_total, 'priority-coverage'));
-      const metrics = [['Без назначения', f.unassigned], ['Смена исполнителя', f.reassigned], ['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Дорога, мин', f.travel_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
+      const metrics = [['Без назначения', f.unassigned], ['Смена исполнителя', f.reassigned], ['Дорога, мин', f.travel_minutes]];
+      const extraMetrics = [['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
       const risk = candidate.risk?.status === 'ready' && candidate.risk.summary ? candidate.risk : null;
       if (risk) metrics.unshift(
         ['P(SLA)', (risk.summary.p_sla_breach * 100).toFixed(1) + '%'],
         ['Ожидаемые потери', risk.summary.expected_loss.toFixed(2) + ' усл. ед.'],
-        ['Изменено обещаний', risk.affected_clients],
-        ['Ожидаемо под SLA-риском', risk.summary.expected_affected_customers.toFixed(2)]);
+        ['Изменено обещаний', risk.affected_clients]);
+      if (risk) extraMetrics.unshift(['Ожидаемо под SLA-риском', risk.summary.expected_affected_customers.toFixed(2)]);
       if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
       if (candidate.emergency) {
         const e = candidate.emergency;
@@ -613,6 +1053,10 @@
       }
       metrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); dl.append(row); });
       card.append(dl);
+      const more = element('details', null, 'candidate-details');
+      const moreList = element('dl');
+      extraMetrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); moreList.append(row); });
+      more.append(element('summary', 'Ещё показатели'), moreList); card.append(more);
       if (risk) card.append(element('p', 'Risk Engine · ' + risk.iterations + ' прогонов'
         + (durationFacts ? ' · доступно фактов: ' + durationFacts : ''), 'risk-candidate-note'));
       const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
@@ -671,7 +1115,7 @@
       localScopeEngineerIds}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
     resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Расчёт может занять несколько секунд…';
-    try { renderBatch(await request('/api/preview', payload)); $('status').textContent = 'Расчёт завершён. Выберите вариант и проверьте изменения.'; }
+    try { renderBatch(await request('/api/preview', payload)); $('status').textContent = 'Расчёт завершён. Выберите вариант и проверьте изменения.'; $('comparison-panel').scrollIntoView({block:'start'}); $('comparison-panel').focus(); }
     catch (error) { failure(error); $('error').scrollIntoView({block:'center'}); }
     finally { busy = false; controls(); }
   });
@@ -679,13 +1123,18 @@
     if (busy || !state || !batch || !selected || batch.version !== state.version) return;
     const payload = {version: state.version, batch_id: batch.id, candidate_id: selected.id};
     busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Утверждение выбранного плана…';
-    try { renderState(await request('/api/approve', payload)); $('status').textContent = 'План утверждён. Сохранена версия ' + state.version + '.'; }
+    try { renderState(await request('/api/approve', payload)); const unresolved=(state.replanning_pool || []).filter(item=>item.status==='unassigned').length; $('status').textContent = unresolved ? `План утверждён. Без исполнителя осталось ${unresolved}; проверьте заявки, требующие внимания.` : 'План утверждён. Сохранена версия ' + state.version + '.'; }
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   });
-  const tabs = ['plan', 'risk', 'events', 'facts', 'gps'];
+  const tabs = ['plan', 'risk', 'events', 'notifications', 'facts', 'gps'];
   function activateTab(name) {
     tabs.forEach(tab => { const active = tab === name; $('tab-' + tab).setAttribute('aria-selected', String(active)); $('tab-' + tab).tabIndex = active ? 0 : -1; $('panel-' + tab).hidden = !active; });
+    if (name === 'notifications' && inboxSnapshot) {
+      const notices=inboxSnapshot.dispatch_notifications || [];
+      lastSeenNotificationId=notices[notices.length-1]?.id || null;
+      renderInbox(inboxSnapshot,true);
+    }
     if (name === 'plan') requestAnimationFrame(() => $('plan-frame').resizePlan?.());
     window.dispatchEvent(new CustomEvent('workbench-tab', {detail: {name}}));
   }
@@ -722,7 +1171,7 @@
       if ([...$('fact-engineer').options].some(o => o.value === event.detail.engineerId)) $('fact-engineer').value = event.detail.engineerId;
       factRequests(); factFields(); $('fact-engineer').focus();
     } else if (event.detail.action === 'replan') {
-      $('event-type').value = 'replan'; targets(); resetCandidates(); activateTab('events'); $('preview').focus();
+      $('event-type').value = 'replan'; targets(); resetCandidates(); activateTab('events'); $('manual-event-panel').open=true; $('preview').focus();
     } else if (event.detail.action === 'exclude') {
       const ids=event.detail.engineerIds || [];
       if (event.detail.version!==state.version) {
@@ -748,7 +1197,7 @@
       }
       $('fact-engineer').focus();
     }
-    if (event.detail?.action === 'replan') {activateTab('events');$('event-type').focus();}
+    if (event.detail?.action === 'replan') {activateTab('events');$('manual-event-panel').open=true;$('event-type').focus();}
     if (event.detail?.action === 'preview') {
       if (event.detail.planVersion !== state.version) {
         $('error').textContent = 'Рекомендация относится к другой версии плана. Обновите показатели риска.';
@@ -773,9 +1222,72 @@
     });
   });
   $('plan-version').addEventListener('change', showPlan);
+  $('planning-mode').addEventListener('change',updatePlanningDraft);
+  $('auto-count').addEventListener('input',updatePlanningDraft);
+  $('auto-minutes').addEventListener('input',updatePlanningDraft);
+  $('planning-save').addEventListener('click', async () => {
+    if (busy || !state || !updatePlanningDraft()) return;
+    const payload={version:state.version,...planningDraft()};
+    busy=true;controls();$('error').hidden=true;
+    try {renderState(await request('/api/inbox/settings',payload));$('status').textContent='Режим планирования сохранён.';}
+    catch(error){failure(error);}finally{busy=false;controls();}
+  });
+  $('stream-demo-start').addEventListener('click',()=>{
+    if(!streamDemoEnabled || !streamRows || streamRunning || demoResetting)return;
+    if(!$('planning-save').disabled){
+      $('stream-demo-status').textContent='Сначала сохраните выбранный режим распределения.';return;
+    }
+    streamGeneration++;streamRunning=true;streamProgress();streamNext();
+  });
+  $('stream-demo-pause').addEventListener('click',()=>{
+    stopStream();streamProgress();
+  });
+  $('stream-demo-reset').addEventListener('click',restartDemo);
+  $('notifications-replan').addEventListener('click',openReplanningPool);
+  for(const id of ['decision-search','decision-filter'])$(id).addEventListener(id==='decision-search'?'input':'change',()=>{
+    if(inboxSnapshot && state)renderNotificationCenter(inboxSnapshot);
+  });
+  $('intake-file').addEventListener('change', async () => {
+    const file=$('intake-file').files?.[0];if(!file)return;
+    if(file.size>60000){$('intake-feedback').textContent='Файл слишком большой для одного пакета.';return;}
+    $('intake-json').value=await file.text();$('intake-feedback').textContent='Файл загружен. Проверьте и нажмите «Принять заявки».';
+  });
+  $('intake-submit').addEventListener('click', async () => {
+    if(busy||!state)return;
+    let payload;
+    try {
+      const parsed=JSON.parse($('intake-json').value);
+      payload=Array.isArray(parsed)?{requests:parsed}:parsed && parsed.id?{request:parsed}:parsed;
+      if(!payload || typeof payload!=='object')throw new Error('Ожидается JSON заявки или массива requests.');
+    } catch(error){$('intake-feedback').textContent='Проверьте JSON: '+error.message;return;}
+    busy=true;controls();$('intake-feedback').textContent='Принимаем заявки…';$('error').hidden=true;
+    try {
+      const result=await request('/api/inbox/requests',payload);
+      renderState(result.state);
+      $('intake-feedback').textContent=`Принято: ${result.added}; повторов без изменений: ${result.duplicates}.`;
+      $('intake-json').value='';$('intake-file').value='';
+      $('status').textContent=result.added?'Заявки поступили в очередь.':'Все заявки уже были получены.';
+    } catch(error){if(!error.staleDemoRun)$('intake-feedback').textContent=error.message;}
+    finally{busy=false;controls();}
+  });
+  function runQueueReplan() {
+    if(!state || busy)return;
+    $('event-type').value='replan';targets();resetCandidates();
+    $('event-time').value=time(state.time);
+    $('event-form').requestSubmit();
+  }
+  function renderLiveState(data) {
+    const draft=!$('planning-save').disabled?planningDraft():null;
+    renderState(data);
+    if(draft){
+      $('planning-mode').value=draft.mode;$('auto-count').value=draft.every_n_requests ?? '';
+      $('auto-minutes').value=draft.every_n_minutes ?? '';updatePlanningDraft();
+    }
+  }
+  $('replan-primary').addEventListener('click', runQueueReplan);
   $('fact-status').addEventListener('change', () => { factRequests(); factFields(); });
   $('fact-engineer').addEventListener('change', () => { factRequests(); factFields(); });
-  $('go-replan').addEventListener('click', () => { $('event-type').value='replan'; targets(); resetCandidates(); $('status').textContent=''; activateTab('events'); $('preview').focus(); });
+  $('go-replan').addEventListener('click', () => { $('event-type').value='replan'; targets(); resetCandidates(); $('status').textContent=''; activateTab('events'); $('manual-event-panel').open=true; $('preview').focus(); });
   $('fact-late').addEventListener('change',()=>{factRequests();factFields();});
   $('fact-edit').addEventListener('change',()=>{
     const f=(state.fact_journal || []).find(f=>f.id===$('fact-edit').value);
@@ -827,17 +1339,36 @@
   setInterval(async () => {
     if (!state || busy || polling || document.hidden) return;
     polling = true;
+    const epoch=demoEpoch;
     try {
       const revision = await request('/api/revision');
-      if (state && revision.version !== state.version) {
-        $('remote-update-text').textContent = 'Есть новые факты или назначения с другого устройства (версия ' + revision.version + '). Загрузите изменения перед продолжением.';
-        $('remote-update').hidden = false;
+      if(epoch!==demoEpoch)return;
+      if(revision.demo_run_id && revision.demo_run_id!==state.demo_run_id){
+        stopStream();await reload();
+        $('status').textContent='Симуляция начата заново. Загружен исходный день без прежней истории.';
+        return;
       }
-    } catch {
+      const inbox=await request('/api/inbox');
+      if(epoch!==demoEpoch)return;
+      if(inbox.demo_run_id && inbox.demo_run_id!==state.demo_run_id){stopStream();await reload();return;}
+      const serverVersion=inbox.version ?? revision.version;
+      if (state && serverVersion !== state.version) {
+        const autoApplied=inbox.last_applied?.automatic===true && inbox.last_applied.version>state.version;
+        if(!batch && (autoApplied || streamDemoEnabled)) {
+          renderLiveState(await request('/api/state'));
+          $('status').textContent=autoApplied?'Автопилот применил план; расписание дня обновлено.':
+            'Поступления и применения плана обновлены.';
+        } else {
+          $('remote-update-text').textContent = 'Есть новые факты или назначения с другого устройства (версия ' + serverVersion + '). Загрузите изменения перед продолжением.';
+          $('remote-update').hidden = false;
+        }
+      } else renderInbox(inbox, true);
+    } catch(error) {
+      if(error.staleDemoRun || epoch!==demoEpoch)return;
       $('remote-update-text').textContent = 'Связь с сервером потеряна. Показанные данные могут быть устаревшими.';
       $('remote-update').hidden = false;
     } finally { polling = false; }
-  }, 5000);
+  }, 2000);
   reload();
 })();
 

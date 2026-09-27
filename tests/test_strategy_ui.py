@@ -37,7 +37,7 @@ const assert = require('node:assert/strict');
 class Element {
   constructor(tag) {
     this.tagName=tag.toUpperCase(); this.children=[]; this.dataset={}; this.events={};
-    this.attributes={}; this._text=''; this._value=null; this.hidden=false; this.disabled=false;
+    this.attributes={}; this._text=''; this._value=null; this.hidden=false; this.disabled=false; this.open=false;
     this.classList={
       contains:name=>(this.className||'').split(' ').includes(name),
       toggle:(name,on)=>{const names=new Set((this.className||'').split(' ').filter(Boolean)); if(on) names.add(name); else names.delete(name); this.className=[...names].join(' ');}
@@ -52,6 +52,7 @@ class Element {
   get options() {return this.children.filter(x=>x.tagName==='OPTION');}
   get selectedOptions() {return this.options.filter(x=>x.value===this.value);}
   setAttribute(key,value) {this.attributes[key]=String(value);}
+  getAttribute(key) {return this.attributes[key] ?? null;}
   addEventListener(type,handler) {(this.events[type] ||= []).push(handler);}
   async dispatch(type) {const event={target:this,preventDefault(){}}; for(let n=this;n;n=n.parentNode) for(const handler of n.events[type]||[]) await handler(event);}
   matches(selector) {
@@ -116,7 +117,7 @@ def client(expression, before=''):
     node = shutil.which('node')
     if not node:
         pytest.skip('Node.js is required for client checks')
-    markup = Markup((STATIC / 'scenarios.html').read_text()).tree
+    markup = Markup((STATIC / 'scenarios.html').read_text(encoding='utf-8')).tree
     script = 'const markup=' + json.dumps(markup) + ';' + HARNESS + before
     script += '\nrequire(' + json.dumps(str(STATIC / 'scenarios.js')) + ');'
     script += '\n(async()=>{await settle();' + expression + '})().catch(error=>{console.error(error);process.exitCode=1;});'
@@ -137,8 +138,23 @@ assert.deepEqual(row('Расстояние, км'),['10.0','9.0 (−1.0)','12.0 
 assert.deepEqual(row('Смена исполнителя'),['1','3 (+2)','2 (+1)']);
 assert.deepEqual(row('Сдвиги начала, мин'),['20','80 (+60)','50 (+30)']);
 assert.deepEqual(row('Из них предотвратимые'),['1','2','1']);
+assert.ok($('preview-coverage').textContent.includes('Действующих назначений сейчас: 0/0. Лучший рассчитанный охват: 4/4'));
 assert.match($('comparison-metrics').textContent,/относительно «Меньше изменений»/);
 assert.equal($('approve').disabled,true,'Recommendation does not approve or select');
+''')
+
+
+def test_candidate_cards_show_decision_metrics_before_secondary_details():
+    client('''
+await submit();
+const card=cards()[0];
+assert.deepEqual(card.querySelectorAll('dl')[0].querySelectorAll('dt').map(item=>item.textContent),
+  ['Без назначения','Смена исполнителя','Дорога, мин']);
+const extra=card.querySelectorAll('details').find(item=>item.querySelector('summary')?.textContent==='Ещё показатели');
+assert.ok(extra);
+assert.equal(extra.open,false);
+assert.deepEqual(extra.querySelectorAll('dt').map(item=>item.textContent),
+  ['Из них предотвратимые','Сдвиги начала, мин','Расстояние, км']);
 ''')
 
 
@@ -294,3 +310,359 @@ window.dispatchEvent(new CustomEvent('gps-intent',{detail:{action:'replan'}}));
 await submit();
 assert.equal(requests.filter(r=>r.url.endsWith('/preview')).at(-1).payload.local_scope_engineer_ids,undefined);
 """)
+
+
+def test_incoming_history_and_unassigned_pool_are_separate_and_actionable():
+    client('''
+assert.match($('incoming-summary').textContent,/Ожидают распределения 1 · назначены 1 · без исполнителя 0/);
+assert.match($('incoming-list').textContent,/new-1/);
+assert.doesNotMatch($('incoming-list').textContent,/done-1/);
+assert.match($('incoming-history-list').textContent,/done-1/);
+assert.equal($('incoming-section').open,false);
+assert.equal($('manual-event-panel').open,false);
+assert.equal($('replan-primary').disabled,false);
+assert.match($('replanning-pool-summary').textContent,/Требуют назначения · 2/);
+assert.match($('replanning-pool').textContent,/old-1/);
+assert.match($('replanning-pool').textContent,/old-2/);
+assert.match($('replan-overview').textContent,/Новых: 1 · требуют назначения: 2/);
+await $('replan-primary').dispatch('click'); await settle();
+assert.equal(requests.filter(r=>r.url.endsWith('/preview')).at(-1).payload.event.type,'replan');
+''', before='''
+Object.assign(state,{
+  request_labels:{'old-1':'old-1','old-2':'old-2'},
+  incoming_requests:[
+    {id:'new-1',status:'new',address:'Москва, дом 1',event:{type:'new_request',time:600,window_start:660,window_end:720,duration_minutes:20}},
+    {id:'done-1',status:'assigned',address:'Москва, дом 2',event:{type:'new_request',time:590,window_start:660,window_end:720,duration_minutes:20}}
+  ],
+  replanning_pool:[
+    {request_id:'old-1',address:'Москва, дом 3',status:'awaiting_replan',reason:'Инженер недоступен'},
+    {request_id:'old-2',address:'Москва, дом 4',status:'unassigned',reason:'Не включена в найденный план'}
+  ]
+});
+''')
+
+
+def test_unassigned_only_still_offers_manual_retry():
+    client('''
+assert.match($('incoming-summary').textContent,/Ожидают распределения 0/);
+assert.equal($('replan-primary').disabled,false);
+assert.equal($('replan-primary').textContent,'Повторить расчёт');
+assert.match($('plan-context').textContent,/Без исполнителя: 1/);
+''', before='''
+state.replanning_pool=[{request_id:'old-2',address:'Москва, дом 4',status:'unassigned',reason:'Не включена в найденный план'}];
+''')
+
+
+def test_current_header_and_pool_count_invalidated_assignments_as_uncovered():
+    client('''
+assert.equal($('coverage').textContent,'52 / 66');
+assert.equal($('coverage-pending').textContent,'14');
+assert.equal($('replanning-pool-summary').textContent,'Требуют назначения · 14');
+assert.match($('replanning-pool').textContent,/Нужно заменить исполнителя · 14/);
+assert.doesNotMatch($('replanning-pool-summary').textContent,/исполнителя · 0/);
+''', before='''
+state.requests=Array.from({length:66},(_,i)=>({id:'job-'+i,address:'Адрес '+i}));
+state.plan={routes:[{engineer_id:'e1',visits:state.requests.map(item=>({request_id:item.id}))}]};
+state.replanning_pool=state.requests.slice(0,14).map(item=>({request_id:item.id,status:'awaiting_replan',reason:'Инженер недоступен'}));
+state.assignment_summary={assigned:52,total:66,requires_assignment:14};
+''')
+
+
+def test_repeat_preview_does_not_claim_unassigned_jobs_disappear():
+    client('''
+await $('replan-primary').dispatch('click');await settle();
+assert.ok($('preview-coverage').textContent.includes('Лучший рассчитанный охват: 54/67'));
+assert.match($('variants-note').textContent,/Ни один вариант не уменьшил число заявок без исполнителя/);
+assert.match($('replan-guidance').textContent,/Расчёт не удаляет неназначенные заявки/);
+''', before='''
+state.plan.unassigned=Array.from({length:13},(_,i)=>({request_id:'old-'+i}));
+state.replanning_pool=state.plan.unassigned.map(item=>({request_id:item.request_id,status:'unassigned',reason:'Не включена в найденный план'}));
+for(const c of preview.candidates)Object.assign(c.facts,{assigned:54,unassigned:13});
+preview.event={type:'replan',time:600};preview.incoming_ids=[];
+''')
+
+
+def test_planning_mode_is_visible_and_can_be_switched_both_ways():
+    client('''
+assert.equal($('planning-mode').value,'autopilot');
+assert.equal($('autopilot-thresholds').hidden,false);
+assert.match($('planning-mode-summary').textContent,/Сейчас включён автопилот/);
+$('planning-mode').value='manual';await $('planning-mode').dispatch('change');
+assert.equal($('autopilot-thresholds').hidden,true);
+assert.equal($('planning-save').disabled,false);
+await $('planning-save').dispatch('click');await settle();
+assert.deepEqual(requests.filter(r=>r.url.endsWith('/inbox/settings')).at(-1).payload,
+  {version:7,mode:'manual',every_n_requests:3,every_n_minutes:null});
+''', before="state.planning_settings={mode:'autopilot',every_n_requests:3,every_n_minutes:null};")
+    client('''
+$('planning-mode').value='autopilot';await $('planning-mode').dispatch('change');
+assert.equal($('autopilot-thresholds').hidden,false);
+assert.equal($('planning-save').disabled,true,'Autopilot needs a threshold');
+$('auto-count').value='5';await $('auto-count').dispatch('input');
+assert.equal($('planning-save').disabled,false);
+await $('planning-save').dispatch('click');await settle();
+assert.deepEqual(requests.filter(r=>r.url.endsWith('/inbox/settings')).at(-1).payload,
+  {version:7,mode:'autopilot',every_n_requests:5,every_n_minutes:null});
+''', before="state.planning_settings={mode:'manual',every_n_requests:null,every_n_minutes:null};")
+
+
+def test_stream_demo_is_isolated_and_arrival_uses_json_intake():
+    client('''
+assert.equal($('stream-demo-panel').hidden,false);
+assert.equal($('stream-demo-start').disabled,false);
+await $('stream-demo-start').dispatch('click');await settle();await settle();
+const posted=requests.filter(item=>item.url.endsWith('/api/inbox/requests'));
+assert.equal(posted.length,1);
+assert.equal(posted[0].payload.request.id,'demo-stream-01');
+assert.match($('stream-demo-status').textContent,/Поток завершён: поступило 1 из 1/);
+''', before='''
+state.demo_stream_enabled=true;state.incoming_requests=[];
+const originalFetch=global.fetch;
+global.fetch=async(url,options={})=>{
+  if(url.endsWith('/api/demo-stream/requests'))return {ok:true,json:async()=>({requests:[{id:'demo-stream-01',time:'10:00'}]})};
+  if(url.endsWith('/api/inbox/requests')){
+    const row=JSON.parse(options.body).request;
+    state.version++;state.incoming_requests.push({id:row.id,status:'new',address:'Москва, дом 1',event:{type:'new_request',time:600,duration_minutes:20,window_start:660,window_end:720}});
+    requests.push({url,payload:JSON.parse(options.body)});
+    return {ok:true,json:async()=>({added:1,state})};
+  }
+  if(url.endsWith('/api/inbox'))return {ok:true,json:async()=>state};
+  return originalFetch(url,options);
+};
+''')
+
+
+def test_stream_demo_sends_one_request_per_ten_second_tick():
+    client('''
+await $('stream-demo-start').dispatch('click');await settle();await settle();
+for(let count=1;count<=6;count++){
+  assert.equal(requests.filter(item=>item.url.endsWith('/api/inbox/requests')).length,count);
+  if(count===6)break;
+  const timer=scheduled.shift();assert.equal(timer.ms,10000);
+  await timer.fn();await settle();
+}
+assert.equal(scheduled.length,0);
+assert.equal($('stream-demo-start').disabled,true);
+assert.match($('stream-demo-status').textContent,/Поток завершён: поступило 6 из 6/);
+''', before='''
+state.demo_stream_enabled=true;state.time=540;state.incoming_requests=[];
+const scheduled=[];
+global.setTimeout=(fn,ms)=>{scheduled.push({fn,ms});return scheduled.length;};
+const originalFetch=global.fetch;
+global.fetch=async(url,options={})=>{
+  if(url.endsWith('/api/demo-stream/requests'))return {ok:true,json:async()=>({requests:Array.from({length:6},(_,i)=>({id:'demo-stream-'+String(i+1).padStart(2,'0'),time:'09:10'}))})};
+  if(url.endsWith('/api/inbox/requests')){
+    const row=JSON.parse(options.body).request;
+    state.version++;state.incoming_requests.push({id:row.id,status:'new',address:'Москва, дом 1',event:{type:'new_request',time:550,duration_minutes:20,window_start:660,window_end:720}});
+    requests.push({url,payload:JSON.parse(options.body)});
+    return {ok:true,json:async()=>({added:1,state})};
+  }
+  if(url.endsWith('/api/inbox'))return {ok:true,json:async()=>state};
+  return originalFetch(url,options);
+};
+''')
+
+
+DEMO_RESET_FIXTURE = '''
+const fixtureRows=[{id:'demo-stream-01',time:'09:10'},{id:'demo-stream-02',time:'09:10'}];
+const firstIncoming={id:'demo-stream-01',status:'assigned',address:'Москва',event:{type:'new_request',time:550,duration_minutes:20,window_start:660,window_end:720}};
+Object.assign(state,{demo_stream_enabled:true,demo_reset_enabled:true,demo_run_id:'run-a',time:550,
+  incoming_requests:[firstIncoming,{...firstIncoming,id:'demo-stream-02'}],
+  dispatch_notifications:[{id:'old-notice',kind:'auto_applied',version:7,title:'Старое событие',text:'Старый план',time:'2026-09-27T00:10:00Z'}],
+  planning_settings:{mode:'autopilot',every_n_requests:3,every_n_minutes:null}});
+let live=structuredClone(state), pendingIntake=null, deferIntake=false;
+const cleanState=()=>({...structuredClone(state),version:1,time:540,demo_run_id:'run-b',incoming_requests:[],
+  dispatch_notifications:[],decision_log:[],last_applied:null,versions:[{version:1,time:540,label:'Исходный план'}],
+  planning_settings:{mode:'manual',every_n_requests:3,every_n_minutes:null}});
+const scheduled=[];let poll;
+global.setTimeout=(fn,ms)=>{const timer={fn,ms};scheduled.push(timer);return timer;};
+global.clearTimeout=timer=>{const index=scheduled.indexOf(timer);if(index>=0)scheduled.splice(index,1);};
+global.setInterval=fn=>{poll=fn;return 1;};
+const originalFetch=global.fetch;
+const response=data=>({ok:true,json:async()=>structuredClone(data)});
+global.fetch=async(url,options={})=>{
+  const payload=options.body?JSON.parse(options.body):null;
+  if(url.endsWith('/api/demo-stream/requests'))return response({requests:fixtureRows,demo_run_id:live.demo_run_id});
+  if(url.endsWith('/api/demo-stream/reset')){requests.push({url,payload});live=cleanState();return response(live);}
+  if(url.endsWith('/api/inbox/requests')){
+    requests.push({url,payload});
+    if(deferIntake)return new Promise(resolve=>{pendingIntake=()=>resolve(response({added:1,state}));});
+    live.incoming_requests.push({...firstIncoming,id:payload.request.id,status:'new'});live.version++;
+    return response({added:1,state:live});
+  }
+  if(['/api/state','/api/inbox','/api/revision'].some(path=>url.endsWith(path)))return response(live);
+  return originalFetch(url,options);
+};
+'''
+
+
+def test_completed_demo_can_reset_to_clean_day_and_start_same_requests_again():
+    client('''
+assert.equal($('stream-demo-start').hidden,true);
+assert.equal($('stream-demo-reset').hidden,false);
+assert.match($('dispatch-notifications').textContent,/Старое событие/);
+$('decision-search').value='старое';$('decision-filter').value='unassigned';
+await $('stream-demo-reset').dispatch('click');await settle();
+assert.deepEqual(requests.find(r=>r.url.endsWith('/reset')).payload,{demo_run_id:'run-a',version:7});
+assert.equal($('version').textContent,'1');assert.equal($('clock').textContent,'09:00');
+assert.equal($('planning-mode').value,'manual');
+assert.equal($('decision-search').value,'');assert.equal($('decision-filter').value,'all');
+assert.doesNotMatch($('dispatch-notifications').textContent,/Старое событие/);
+assert.equal($('plan-version').options.length,1);
+assert.equal($('stream-demo-start').hidden,false);
+assert.match($('stream-demo-status').textContent,/Поступило 0 из 2/);
+assert.match($('plan-frame').src,/demo_run_id=run-b/);
+await $('stream-demo-start').dispatch('click');await settle();await settle();
+const intake=requests.find(r=>r.url.endsWith('/api/inbox/requests'));
+assert.equal(intake.payload.request.id,'demo-stream-01');assert.equal(intake.payload.demo_run_id,'run-b');
+assert.match($('stream-demo-status').textContent,/Поступило 1 из 2/);
+''', before=DEMO_RESET_FIXTURE)
+
+
+def test_reset_discards_inflight_arrival_and_does_not_resurrect_old_timer_or_history():
+    client('''
+await $('stream-demo-start').dispatch('click');await settle();
+assert.ok(pendingIntake,'The old intake request is in flight');
+await $('stream-demo-reset').dispatch('click');await settle();
+pendingIntake();await settle();await settle();
+assert.equal($('version').textContent,'1');
+assert.match($('stream-demo-status').textContent,/Поступило 0 из 2/);
+assert.doesNotMatch($('dispatch-notifications').textContent,/Старое событие/);
+assert.equal(scheduled.length,0,'An old callback cannot schedule another arrival');
+assert.equal($('stream-demo-start').disabled,false);
+''', before=DEMO_RESET_FIXTURE+'''
+live.incoming_requests=[];deferIntake=true;
+''')
+
+
+def test_poll_detects_new_demo_generation_when_version_number_is_reused():
+    client('''
+assert.equal($('version').textContent,'7');
+live={...cleanState(),version:7};
+await poll();await settle();
+assert.equal($('version').textContent,'7');
+assert.equal($('clock').textContent,'09:00');
+assert.doesNotMatch($('dispatch-notifications').textContent,/Старое событие/);
+assert.match($('plan-frame').src,/demo_run_id=run-b/);
+assert.match($('stream-demo-status').textContent,/Поступило 0 из 2/);
+''', before=DEMO_RESET_FIXTURE)
+
+
+def test_autopilot_poll_updates_whole_plan_while_preserving_unsaved_mode_choice():
+    client('''
+$('planning-mode').value='manual';await $('planning-mode').dispatch('change');
+assert.equal($('planning-save').disabled,false);
+live.version=8;live.last_applied={automatic:true,version:8,incoming_count:2,changed_count:1};
+live.dispatch_notifications=[{id:'new-notice',kind:'auto_applied',version:8,title:'Новый план применён',text:'Текущий результат',time:'2026-09-27T00:11:00Z'}];
+await poll();await settle();
+assert.equal($('version').textContent,'8');
+assert.match($('plan-frame').src,/version=8/);
+assert.match($('dispatch-notifications').textContent,/Новый план применён/);
+assert.doesNotMatch($('dispatch-notifications').textContent,/Старое событие/);
+assert.equal($('planning-mode').value,'manual','Unsaved mode choice survives applied plan refresh');
+assert.equal($('planning-save').disabled,false);
+live.dispatch_notifications[0].text='Дополнено объяснением';
+await poll();await settle();
+assert.match($('dispatch-notifications').textContent,/Дополнено объяснением/);
+assert.equal($('version').textContent,'8');
+''', before=DEMO_RESET_FIXTURE)
+
+
+def test_cancelled_incoming_job_is_history_not_unassigned_or_lost_assignment():
+    client('''
+assert.match($('incoming-summary').textContent,/назначены 0 · без исполнителя 0 · отменены 1/);
+assert.match($('incoming-history-summary').textContent,/История обработанных · 1/);
+assert.match($('incoming-history-list').textContent,/Отменена/);
+const card=$('application-visual-changes').querySelector('.application-change');
+assert.match(card.textContent,/Отменена/);assert.match(card.textContent,/Удалена из плана/);
+assert.doesNotMatch(card.textContent,/Без исполнителя|Потеря назначения/);
+assert.equal(card.classList.contains('attention'),false);
+assert.match($('dispatch-notifications').textContent,/Отменено и удалено из плана: 1/);
+assert.match($('decision-log').textContent,/решение плана №7: отменена/);
+$('decision-filter').value='unassigned';await $('decision-filter').dispatch('change');
+assert.equal($('decision-log').querySelectorAll('.decision-card').length,0);
+$('decision-filter').value='cancelled';await $('decision-filter').dispatch('change');
+assert.equal($('decision-log').querySelectorAll('.decision-card').length,1);
+assert.match($('decision-log').textContent,/заявка отменена и удалена из плана/);
+''', before='''
+state.incoming_requests=[{id:'client-1',status:'cancelled',address:'Москва',event:{type:'new_request',time:550,duration_minutes:20,window_start:660,window_end:720}}];
+state.last_applied={version:7,automatic:false,incoming_count:0,changed_count:1};
+state.dispatch_notifications=[{id:'cancelled-notice',kind:'manual_applied',version:7,title:'Заявка отменена',text:'Удалена из плана',time:'2026-09-27T00:10:00Z',cancelled_request_ids:['request:client-1'],unassigned_request_ids:[]}];
+state.decision_log=[{id:'client-1',request_id:'request:client-1',version:7,status:'cancelled',change_type:'cancelled',previous_engineer_id:'e1',previous_start:660,engineer_id:null,start:null,explanation:'Отмена подтверждена диспетчером.'}];
+''')
+
+
+def test_notifications_distinguish_historical_decision_from_current_plan():
+    client('''
+assert.match($('notifications-overview').textContent,/без исполнителя 1/);
+assert.match($('dispatch-notifications').textContent,/После этого решения без исполнителя: 1/);
+assert.match($('decision-log').textContent,/В текущем плане статус изменился/);
+$('decision-filter').value='assigned';await $('decision-filter').dispatch('change');
+assert.match($('decision-log').textContent,/По этому фильтру решений нет/);
+$('decision-filter').value='unassigned';await $('decision-filter').dispatch('change');
+assert.match($('decision-log').textContent,/client-1/);
+await $('notifications-replan').dispatch('click');
+assert.equal($('replanning-pool-section').open,true);
+assert.equal($('tab-events').attributes['aria-selected'],'true');
+''', before='''
+state.plan={routes:[],unassigned:[{request_id:'request:client-1',reason:'Не включена в план'}]};
+state.replanning_pool=[{request_id:'request:client-1',address:'Москва, дом 1',status:'unassigned',reason:'Не включена в план'}];
+state.dispatch_notifications=[{id:'n1',kind:'manual_applied',version:7,time:'2026-09-27T00:10:00Z',title:'План пересчитан',text:'Часть заявок без исполнителя',unassigned_request_ids:['request:client-1']}];
+state.decision_log=[{id:'client-1',request_id:'request:client-1',address:'Москва, дом 1',status:'assigned',automatic:true,version:6,explanation:'Тогда была назначена.'}];
+''')
+    client('''
+assert.match($('decision-log').textContent,/Текущий план №7: e2, начало 11:00/);
+assert.match($('decision-log').textContent,/Объяснение ниже относится к прежнему плану №6/);
+''', before='''
+state.plan={routes:[{engineer_id:'e2',visits:[{request_id:'request:client-1',start:660}]}],unassigned:[]};
+state.decision_log=[{id:'client-1',request_id:'request:client-1',address:'Москва, дом 1',status:'assigned',automatic:true,version:6,explanation:'Тогда была назначена.'}];
+''')
+
+
+def test_latest_application_shows_compact_before_after_and_job_reason():
+    client('''
+assert.equal($('application-visual').hidden,false);
+assert.match($('application-visual-title').textContent,/Автопилот обновил план/);
+assert.match($('application-visual-metrics').textContent,/12 → 13/);
+assert.match($('application-visual-changes').textContent,/e1 · 10:00 → e2 · 11:00/);
+assert.match($('application-visual-changes').textContent,/Подробности расчёта: Мастер ближе к следующей точке/);
+assert.match($('application-visual-explanation').textContent,/YandexGPT расставила акценты/);
+''', before='''
+state.last_applied={version:7,automatic:true,incoming_count:3,changed_count:1};
+state.dispatch_notifications=[{id:'applied',kind:'auto_applied',version:7,
+  request_ids:['client-1'],changed_request_ids:['request:client-2'],
+  before_unassigned_count:12,after_unassigned_count:13,unassigned_request_ids:Array(13).fill('x')}];
+state.decision_log=[{id:'client-2',request_id:'request:client-2',address:'Москва, дом 2',status:'assigned',automatic:true,version:7,
+  previous_engineer_id:'e1',previous_start:600,engineer_id:'e2',start:660,
+  explanation:'Проверены окно и квалификация.',llm_explanation:'Мастер ближе к следующей точке',
+  plan_explanation:'Выбран компромисс по SLA.',llm_notice:'YandexGPT проверила факты.'}];
+''')
+
+
+def test_application_explanation_can_arrive_without_changed_decisions():
+    client('''
+assert.equal($('application-visual').hidden,false);
+assert.match($('application-visual-explanation').textContent,/YandexGPT расставила акценты/);
+assert.match($('application-visual-explanation').textContent,/Применён стабильный план/);
+assert.match($('dispatch-notifications').textContent,/Почему применён этот план/);
+''', before='''
+state.last_applied={version:8,automatic:true,incoming_count:0,changed_count:0};
+state.dispatch_notifications=[{id:'applied-8',kind:'auto_applied',version:8,
+  request_ids:[],changed_request_ids:[],before_unassigned_count:2,after_unassigned_count:2,
+  llm_status:'ready',plan_explanation:'Применён стабильный план.'}];
+state.decision_log=[];
+''')
+
+
+def test_application_keeps_verified_explanation_when_model_unavailable():
+    client('''
+assert.match($('application-visual-explanation').textContent,/Почему выбран этот вариант/);
+assert.match($('application-visual-explanation').textContent,/Охват проверен/);
+assert.match($('dispatch-notifications').textContent,/Почему применён этот план · проверенные показатели/);
+''', before='''
+state.last_applied={version:9,automatic:true,incoming_count:0,changed_count:0};
+state.dispatch_notifications=[{id:'applied-9',kind:'auto_applied',version:9,
+  request_ids:[],changed_request_ids:[],llm_status:'unavailable',
+  llm_notice:'YandexGPT недоступна',plan_explanation:'Охват проверен.'}];
+state.decision_log=[];
+''')

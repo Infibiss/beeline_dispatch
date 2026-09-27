@@ -81,6 +81,20 @@ def test_only_finite_in_range_geo_coordinates_are_accepted():
     assert json.loads(result.stdout) == [True, False, False, True]
 
 
+def test_pending_reassignment_is_actionable_but_retains_its_previous_visit():
+    result = run_js(r'''
+const scenario={requests:[{id:'a',priority:'urgent'},{id:'b'}],engineers:[{id:'e'}]};
+const plan={routes:[{engineer_id:'e',visits:[{request_id:'a',start:600}]}],unassigned:[{request_id:'b'}]};
+const ops={assignment_summary:{pending_request_ids:['a']}};
+const records=core.buildRecords(scenario,plan,ops);
+console.log(JSON.stringify({pending:records[0].pendingReassignment,oldStart:records[0].visit.start,
+  attention:core.filterRecords(records,'__unassigned__','').map(r=>r.request.id),
+  priority:core.prioritySummary(scenario,plan,ops)}));
+''')
+    assert json.loads(result.stdout) == {'pending': True, 'oldStart': 600,
+        'attention': ['a', 'b'], 'priority': {'served': 0, 'total': 1}}
+
+
 def test_report_and_region_links_escape_labels_and_reject_script_urls():
     html = render({'scenario': {}, 'plans': [], 'datasets': [
         {'region': '<img src=x>', 'url': '../north/dispatcher.html'},

@@ -90,12 +90,23 @@
     });
   }
   function setPlanning(data) {
-    if(planning && data.version<planning.version)return;
-    if(planning?.version!==data.version) {
+    const runChanged = (planning?.demoRunId || null) !== (data.demoRunId || null);
+    if(planning && !runChanged && data.version<planning.version)return;
+    if(runChanged) {
+      generation++; snapshot = null; optionsKey = ''; replayState = null; taskLoad++;
+      historyCursor = null; historyEngineer = null;
+      $('gps-people').replaceChildren(); $('gps-metrics').replaceChildren();
+      $('gps-trace').textContent = ''; $('gps-diagnostics').textContent = '';
+      $('gps-replay-changes').hidden = true; $('gps-replay-task').replaceChildren();
+      $('gps-history-next').hidden = true;
+      markers?.clearLayers(); excludedSelection.clear(); replayControls();
+    }
+    if(runChanged || planning?.version!==data.version) {
       excludedSelection.clear();
       $('gps-exclusion-time').value=String(Math.floor(data.time/60)).padStart(2,'0')+':'+String(data.time%60).padStart(2,'0');
     }
     planning=data;syncExclusions();
+    if(runChanged && visible) refresh();
   }
   window.addEventListener('planning-state',event=>setPlanning(event.detail));
   window.addEventListener('planning-busy',event=>{planningBusy=event.detail.busy;syncExclusions();});
@@ -272,7 +283,12 @@
     if (visible) {
       refresh();setTimeout(() => map?.invalidateSize(),0);
       // A fast initial state request may have completed before this deferred script.
-      if(!planning)request('/api/state').then(data=>setPlanning({version:data.version,time:data.time,engineers:data.engineers,excludedEngineerIds:data.excluded_engineer_ids || []})).catch(e=>exclusionError(e.message));
+      if(!planning) {
+        const token = generation;
+        request('/api/state').then(data=>{
+          if(token===generation)setPlanning({version:data.version,demoRunId:data.demo_run_id || null,time:data.time,engineers:data.engineers,excludedEngineerIds:data.excluded_engineer_ids || []});
+        }).catch(e=>{if(token===generation)exclusionError(e.message);});
+      }
     }
   });
   $('gps-channel').addEventListener('change', () => {
@@ -414,14 +430,14 @@
       if(token!==generation || eid!==$('gps-trace-engineer').value) return;
       historyCursor=data.next_cursor; $('gps-history-next').hidden=!historyCursor;
       $('gps-trace').textContent=JSON.stringify(data,null,2);
-    } catch(error) {$('gps-trace').textContent=error.message;}
+    } catch(error) {if(token===generation)$('gps-trace').textContent=error.message;}
   }
   $('gps-history-load').addEventListener('click',()=>loadHistory());
   $('gps-history-next').addEventListener('click',()=>loadHistory(true));
   $('gps-trace-load').addEventListener('click', async () => {
     const token = generation;
     try { const data = await request('/api/gps/trace?channel=' + channel + '&engineer_id=' + encodeURIComponent($('gps-trace-engineer').value)); if (token === generation) $('gps-trace').textContent = JSON.stringify(data, null, 2); }
-    catch (e) { $('gps-trace').textContent = e.message; }
+    catch (e) { if(token===generation)$('gps-trace').textContent = e.message; }
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   setInterval(refresh, 5000);

@@ -1233,6 +1233,9 @@ class ScenarioSession:
         # explicit SLA/Cost alternatives remain available to the dispatcher.
         batch['recommendation_policy']='preserve_approved' if plain_retry else 'risk_aware'
         batch['recommended_candidate_id']=eligible_candidates(batch)[0]['id']
+        from .explanation_card import build_card
+        for candidate in batch['candidates']:
+            candidate['explanation_card']=build_card(batch,candidate)
         batch['response_focus_request_id']=focus
         if event.type=='new_request':
             batch['insertion_policy']='preserve_existing_assignments_and_starts'
@@ -1373,6 +1376,7 @@ class ScenarioSession:
             'text':detail+('После расчёта часть заявок всё ещё без исполнителя. Откройте «Заявки, требующие внимания».'
                     if unresolved else 'Все заявки остатка дня распределены.'),
             'plan_explanation':candidate.get('explanation',''),
+            'explanation_card':candidate.get('explanation_card'),
             'request_ids':list(batch.get('incoming_ids',[])), 'changed_request_ids':changed,
             'cancelled_request_ids':cancelled_request_ids,
             'unassigned_request_ids':unresolved,

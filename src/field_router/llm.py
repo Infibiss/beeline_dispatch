@@ -22,6 +22,9 @@ travel — время дороги; priorities — охват аварий и п
   risk — P(SLA), ожидаемые потери, затронутые клиенты и P(переработки);
   changes при смене исполнителей, travel при разнице дороги. Не сочиняй другие идентификаторы.
  Все стратегии соблюдают одинаковый порядок приоритетов: аварии, подключения, остальные.
+Выбирай различия, полезные для решения диспетчера. Не приписывай варианту
+ускорение аварии только по названию стратегии. Не скрывай потерю назначения
+и ухудшения. P(SLA) — риск хотя бы одного нарушения, а не доля всех заявок.
 """
 
 
@@ -264,6 +267,7 @@ class Explainer:
         key=hashlib.sha256(json.dumps([batch['id'],batch['version'],body],sort_keys=True).encode()).hexdigest()
         with self.lock:
             if key in self.cache:return dict(self.cache[key])
+            emphasis=[]
             result={'text':candidate['explanation'],'source':'template','notice':'LLM недоступна; показано объяснение по проверенным показателям.'}
             if recommend:
                 result.update(candidate_id=candidate_id,source='rule',notice='Объяснение по правилу: охват по приоритетам → риск → реакция на новую аварию → стабильность → дорога.')
@@ -307,6 +311,7 @@ class Explainer:
                         order=(essential+[k for k in order if k not in essential])[:4]
                     text=(recommendation_text(batch,choice,order) if recommend else
                           selected_plan_text(batch,candidate,order))
+                    emphasis=selection['points']
                     result={'text':text,'source':'yandexgpt','notice':'YandexGPT выбрала акценты; текст и числа сформированы из проверенных показателей.'}
                     if recommend:result.update(candidate_id=choice['id'],notice='YandexGPT объясняет выбор по правилам. Показатели проверены; решение за диспетчером.')
                 except HTTPError as exc:
@@ -315,6 +320,9 @@ class Explainer:
                     result['notice']='Нет защищённого соединения с YandexGPT; показано объяснение по проверенным данным.'
                 except (ValueError,TypeError,KeyError,AttributeError):
                     result['notice']='Ответ YandexGPT не прошёл проверку; показано объяснение по проверенным данным.'
+            from .explanation_card import build_card
+            selected=next(c for c in batch['candidates'] if c['id']==result.get('candidate_id',candidate_id))
+            result['card']=build_card(batch,selected,emphasis=emphasis)
             self.cache[key]=result
             if len(self.cache)>128:self.cache.pop(next(iter(self.cache)))
             return dict(result)

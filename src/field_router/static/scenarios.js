@@ -460,7 +460,9 @@
     const explanation=llm || ordinary;
     const explainer=$('application-visual-explanation');
     explainer.replaceChildren();
-    if(explanation){
+    if(event?.explanation_card){
+      renderExplanationCard(explainer,event.explanation_card,{applied:true,ai:!!llm,unavailable:event.llm_status==='unavailable'});
+    }else if(explanation){
       explainer.append(element('strong',llm?'YandexGPT расставила акценты · проверенные показатели':'Почему выбран этот вариант · проверенные показатели'),
         element('p',explanation.plan_explanation));
       if(!llm)explainer.append(element('small',event?.llm_status==='unavailable' ?
@@ -876,14 +878,32 @@
     const candidate = data.candidates.find(c => c.id === id);
     return candidate?.duplicate_of ? data.candidates.find(c => c.id === candidate.duplicate_of) : candidate;
   }
+  function renderExplanationCard(target, card, {applied=false,ai=false,unavailable=false}={}) {
+    target.replaceChildren();
+    const box=element('div',null,'explanation-card');
+    box.append(element('h4',(applied?'Применён вариант':'Рекомендуем')+' «'+card.label+'»'),element('p',card.summary,'explanation-summary'));
+    for(const [key,label] of [['reasons','Почему'],['tradeoffs','Компромисс'],['attention',applied?'Требует внимания':'Перед применением']]) {
+      if(!card[key]?.length)continue;
+      const section=element('div',null,'explanation-section'+(key==='attention'?' explanation-attention':''));
+      section.append(element('strong',label));
+      const list=element('ul');
+      for(const text of card[key])list.append(element('li',text));
+      section.append(list);box.append(section);
+    }
+    if(card.note)box.append(element('small',card.note,'explanation-note'));
+    box.append(element('small',ai?'Пояснение с ИИ · показатели проверены':unavailable?'ИИ недоступен · объяснение по расчёту':'Объяснение по расчёту','explanation-source'));
+    target.append(box);
+  }
   function renderRecommendation() {
     const choice = batch.candidates.find(c => c.id === recommendation?.candidate_id);
     const canonical = canonicalCandidate(batch, choice?.id);
-    $('ai-panel').hidden = !batch.candidates.length;
+    $('ai-panel').hidden = !batch.candidates.length || (!batch.llm_enabled && !recommendation);
     $('ai-recommend').hidden = !batch.llm_enabled;
     $('ai-result').textContent = recommendationPending ? 'Сравниваем варианты…' : choice
       ? 'Рекомендуем «' + strategyName(choice) + '». ' + [recommendation.notice, recommendation.text].filter(Boolean).join(' ')
-      : 'Сравните показатели и проверьте изменения перед применением.';
+      : recommendation?.error || 'Сравните варианты самостоятельно или запросите объяснение с ИИ.';
+    if(!recommendationPending && choice && recommendation?.card)
+      renderExplanationCard($('ai-result'),recommendation.card,{ai:recommendation.source==='yandexgpt',unavailable:recommendation.source!=='yandexgpt'});
     document.querySelectorAll('.candidate').forEach(card => {
       const recommended = card.dataset.id === canonical?.id;
       card.classList.toggle('recommended', recommended);
@@ -900,7 +920,7 @@
       if (!canonicalCandidate(current, result.candidate_id)) throw new Error('Неизвестный вариант');
       recommendation = result;
     } catch (_) {
-      if (batch === current) recommendation = {candidate_id:current.recommended_candidate_id, text:'ИИ недоступен. Сравните показатели и проверьте изменения перед применением.'};
+      if (batch === current) recommendation = {error:'Не удалось получить объяснение. Попробуйте ещё раз или сравните варианты самостоятельно.'};
     } finally {
       if (batch === current) { recommendationPending = false; renderRecommendation(); controls(); }
     }
@@ -943,7 +963,7 @@
   function renderBatch(data) {
     if (!data || !Array.isArray(data.candidates) || data.version !== state.version) throw new Error('Варианты не соответствуют текущей версии.');
     if (batch !== data) {
-      recommendation = {candidate_id:data.recommended_candidate_id, text:'Проверьте изменения перед применением.'};
+      recommendation = null;
       recommendationPending = false;
     }
     batch = data; selected = null;

@@ -41,6 +41,7 @@ def _incoming(key):
 def test_slow_yandex_explanation_does_not_block_next_autopilot_batch(make_scenario,tmp_path):
     first_started=threading.Event()
     first_release=threading.Event()
+    second_started=threading.Event()
     calls=[]
     class Explainer:
         def explain(self,batch,candidate_id):
@@ -48,6 +49,7 @@ def test_slow_yandex_explanation_does_not_block_next_autopilot_batch(make_scenar
             if len(calls)==1:
                 first_started.set()
                 assert first_release.wait(8)
+            else:second_started.set()
             return {'source':'yandexgpt','text':'Проверенные компромиссы выбранного плана.'}
         def recommend(self,batch):
             raise AssertionError('После применения нельзя повторно выбирать вариант')
@@ -75,7 +77,9 @@ def test_slow_yandex_explanation_does_not_block_next_autopilot_batch(make_scenar
                 break
             time.sleep(.05)
         assert sum(note['kind']=='auto_applied' for note in snapshot['dispatch_notifications'])==2
-        assert len(calls)>=2
+        assert all(note.get('explanation_card',{}).get('summary')
+                   for note in snapshot['dispatch_notifications'] if note['kind']=='auto_applied')
+        assert second_started.wait(5)
         first_release.set()
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
@@ -117,6 +121,7 @@ def test_unavailable_provider_is_visible_without_falsely_claiming_model_text(mak
             time.sleep(.05)
         assert applied[-1]['llm_status']=='unavailable'
         assert 'YandexGPT' in applied[-1]['llm_notice']
+        assert applied[-1]['explanation_card']['summary']
         assert applied[-1]['plan_explanation']
         assert applied[-1]['llm_status']=='unavailable'
         assert snapshot['decision_log'][-1]['llm_status']=='unavailable'

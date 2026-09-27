@@ -205,6 +205,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         'Пояснение YandexGPT готово; назначения и риски проверены алгоритмом.'
                         if model_ready else explanation.get('notice','YandexGPT недоступна; проверенное объяснение сохранено.'))
                     if model_ready:notice['plan_explanation']=explanation['text']
+                    if explanation.get('card'):notice['explanation_card']=explanation['card']
                     changed=True
             if changed:
                 if model_ready:

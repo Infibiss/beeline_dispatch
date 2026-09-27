@@ -167,13 +167,41 @@ assert.match(cards()[0].textContent,/Совпадает с «Быстрее к �
 assert.match($('variants-note').textContent,/Один уникальный план/);
 assert.equal($('comparison-table').querySelectorAll('tr')[0].children.length,2);
 assert.equal($('comparison-tools').hidden,true);
-assert.equal($('ai-panel').hidden,false,'Server recommendation is available without AI');
+assert.equal($('ai-panel').hidden,true,'No recommendation before an explicit AI request');
 assert.equal($('ai-recommend').hidden,true);
-assert.equal(cards()[0].classList.contains('recommended'),true);
+assert.equal(cards()[0].classList.contains('recommended'),false);
 ''', before='''
 preview.llm_enabled=false;
 preview.candidates[1].strategy_ids=['stable','sla','cost'];
 for(const c of preview.candidates) if(c.id!=='stable') c.duplicate_of='stable';
+''')
+
+
+def test_structured_ai_card_is_opt_in_and_renders_safe_sections():
+    client('''
+await submit();
+assert.equal(cards().some(c=>c.classList.contains('recommended')),false);
+await $('ai-recommend').dispatch('click');
+const result=$('ai-result');
+assert.equal(result.querySelectorAll('h4').length,1);
+assert.match(result.textContent,/Компромисс/);
+assert.match(result.textContent,/<script>bad/);
+assert.equal(result.querySelectorAll('script').length,0);
+assert.equal(result.querySelectorAll('details').length,0);
+''', before='''
+ai.card={label:'Быстрее к аварии',summary:'Все заявки назначены.',reasons:['<script>bad</script>'],tradeoffs:['Дороги больше.'],attention:['Потеря назначения.'],note:'Оценка модели.'};
+''')
+
+
+def test_autopilot_card_is_visible_without_llm_or_decision_rows():
+    client('''
+const result=$('application-visual-explanation');
+assert.match(result.textContent,/Применён вариант «Меньше изменений»/);
+assert.match(result.textContent,/Останутся без исполнителя/);
+assert.equal(result.querySelectorAll('details').length,0);
+''', before='''
+state.last_applied={version:7,automatic:true,incoming_count:0,changed_count:0};
+state.dispatch_notifications=[{id:'a',kind:'auto_applied',version:7,explanation_card:{label:'Меньше изменений',summary:'План сохранён.',reasons:[],tradeoffs:[],attention:['Останутся без исполнителя: 2.']}}];
 ''')
 
 
@@ -182,7 +210,7 @@ def test_alias_recommendation_highlights_canonical_card_and_preserves_apply_guar
 await submit();
 assert.deepEqual(cards().map(c=>c.dataset.id),['stable','cost']);
 assert.equal($('candidates').dataset.count,'2');
-assert.equal(cards()[1].classList.contains('recommended'),true);
+assert.equal(cards()[1].classList.contains('recommended'),false);
 await $('ai-recommend').dispatch('click');
 assert.match($('ai-result').textContent,/Рекомендуем «Быстрее к аварии»/);
 assert.equal(cards()[0].classList.contains('recommended'),true);
@@ -212,6 +240,7 @@ assert.equal($('candidate-sort').options.find(o=>o.value==='distance').textConte
 def test_risk_sort_and_comparison_expose_monte_carlo_tradeoffs():
     client('''
 await submit();
+$('candidate-sort').value='risk'; await $('candidate-sort').dispatch('change');
 assert.deepEqual(cards().map(c=>c.dataset.id),['cost','sla','stable']);
 assert.deepEqual(row('P(SLA), %'),['8.0 (−12.0)','12.0 (−8.0)','20.0']);
 assert.deepEqual(row('Ожидаемые потери, усл. ед.'),['1.20 (−1.80)','1.80 (−1.20)','3.00']);
@@ -666,3 +695,26 @@ state.dispatch_notifications=[{id:'applied-9',kind:'auto_applied',version:9,
   llm_notice:'YandexGPT недоступна',plan_explanation:'Охват проверен.'}];
 state.decision_log=[];
 ''')
+
+
+def test_recommendation_network_failure_stays_neutral_and_reports_error():
+    client('''
+      await submit();
+      await $('ai-recommend').dispatch('click');
+      assert.match($('ai-result').textContent,/Не удалось получить объяснение/);
+      assert.ok(cards().every(c=>!c.classList.contains('recommended')));
+    ''', before='''
+      const savedFetch=global.fetch;
+      global.fetch=async(url,options)=>{if(url.endsWith('/recommend'))throw new Error('offline');return savedFetch(url,options);};
+    ''')
+
+
+def test_default_sort_does_not_imply_risk_recommendation():
+    client("""
+      await submit();
+      assert.equal($('candidate-sort').value,'default');
+      assert.deepEqual(cards().map(c=>c.dataset.id),['stable','sla','cost']);
+      assert.ok(cards().every(c=>!c.classList.contains('recommended')));
+    """, before="""
+      for(const c of preview.candidates)c.risk={status:'ready',affected_clients:0,summary:{p_sla_breach:c.id==='cost'?.1:.9,expected_loss:1,expected_affected_customers:1,p_late_start:0,p_overtime:0}};
+    """)

@@ -42,7 +42,7 @@ p.append(name,document.createTextNode(text));target.append(p);
 }
 function showAssumptions(target,assumptions){target.replaceChildren(...(assumptions||[]).map(text=>node('li',text)));}
 function selectedPreset(){return state?.presets?.find(p=>p.id===$('preset-select').value);}
-function describePreset(){const preset=selectedPreset();$('preset-description').textContent=preset?.description||'';showChanges($('preset-changes'),preset?.changes);showAssumptions($('preset-assumptions'),preset?.assumptions);}
+function describePreset(){const preset=selectedPreset();$('preset-description').textContent=preset?.description||'';}
 function showComparison(){
 const table=node('table'),head=node('thead'),heading=node('tr'),body=node('tbody');
 for(const title of ['Показатель','Сейчас','Новый план']){const th=node('th',title);th.scope='col';heading.append(th);}head.append(heading);

@@ -44,17 +44,17 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.equal(await page.locator('#risk-engine-meta').isVisible(),false);
     await page.screenshot({path:path.join(tmp,'risk-desktop.png'),fullPage:true});
     await tab('demo');await page.click('#risk-demo');
-    assert.equal(await page.locator('#risk-demo-notice').isVisible(),true);
+    assert.equal(await page.locator('#panel-risk').isVisible(),true);
     await tab('risk');
     assert.match(await page.locator('#risk-model-status').textContent(),/Учебный пример/);
     assert.equal(await page.locator('.risk-prediction').count(),3);
-    assert.match(await page.locator('[data-risk="sla"] .risk-probability').textContent(),/31/);
+    assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'0 из 1');
     assert.equal(await page.locator('[data-risk="vehicle"]').count(),0);
     assert.equal(await page.locator('#risk-routes button').count(),0,'Fictitious demo visits cannot open fact actions');
     assert.equal(await page.locator('#risk-advisories button').count(),0);
     assert.doesNotMatch(await page.locator('#panel-risk').textContent(),/0[.,]62|условных ед|P50|P80|P90|Монте/i);
-    await tab('technical');
-    assert.equal(await page.locator('#risk-engine-meta').isVisible(),true);
+    assert.equal(await page.locator('#tab-technical').count(),0);
+    assert.equal(await page.locator('#risk-engine-meta').isVisible(),false);
     assert.match(await page.locator('#risk-engine-meta').textContent(),/условных ед/);
     await tab('risk');
     assert.deepEqual(await get('/api/state'),before);assert.deepEqual(posts,[]);
@@ -86,7 +86,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.match(await page.locator('#risk-model-status').textContent(),/устарел/);
     forecast={...forecast,plan_version:snapshot.context.plan_version,risks:[{...forecast.risks[0],value:7}]};await refresh();
     assert.equal(await page.locator('[data-risk="windows"]').count(),0);
-    // Real contract: compact estimates and actual visits; technical details stay on their own tab.
+    // Real contract: integer review counts and actual visits; diagnostics are outside the UI.
     const malicious='<img src=x onerror=alert(1)>';
     forecast={status:'ready',region:snapshot.context.region,plan_version:snapshot.context.plan_version,
       model_version:'risk-engine-v1.1',calibrated:false,iterations:600,loss_unit:'conditional_loss_units',
@@ -103,10 +103,10 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
         title:'Проверить SLA',summary:malicious,plan_version:snapshot.context.plan_version,engineer_id:before.engineers[0].id,request_id:'R-1'}]};
     await refresh();
     assert.equal(await page.locator('.risk-prediction').count(),4);
-    assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'41%');
+    assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'1 из 1');
     assert.equal(await page.locator('[data-risk="vehicle"] .risk-probability').textContent(),'64 / 100');
     assert.doesNotMatch(await page.locator('#risk-model-status').textContent(),/калибр|risk-engine|600/i);
-    assert.match(await page.locator('[data-risk="sla"] .risk-prediction-label').textContent(),/оценка/);
+    assert.match(await page.locator('[data-risk="sla"] .risk-prediction-label').textContent(),/визитов/);
     assert.equal(await page.locator('#risk-engine-meta').isVisible(),false);
     assert.equal(await page.locator('#risk-routes').isVisible(),true);
     assert.match(await page.locator('#risk-routes').textContent(),/10:20/);
@@ -116,11 +116,11 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.ok((await page.locator('#risk-routes').textContent()).includes(malicious),'Visit text must be escaped, not discarded');
     assert.ok((await page.locator('#risk-advisories').textContent()).includes(malicious),'Advisory text must be escaped, not discarded');
     assert.equal(await page.locator('#panel-risk img').count(),0);
-    await tab('technical');
+    assert.equal(await page.locator('#tab-technical').count(),0);
     assert.match(await page.locator('#risk-engine-meta').textContent(),/не подтверждена/);
     assert.match(await page.locator('#risk-engine-meta').textContent(),/3 подтверждённых фактов/);
     assert.match(await page.locator('#risk-engine-meta').textContent(),/4,2 условных ед/);
-    await page.locator('#risk-assumption-details summary').click();
+    assert.equal(await page.locator('#risk-assumption-details').isVisible(),false);
     assert.match(await page.locator('#risk-assumptions').textContent(),/synthetic priors/);
     await tab('risk');
     // A stale advisory remains visible but cannot trigger a request.
@@ -165,7 +165,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.equal(await page.locator('.risk-prediction').count(),0);
     assert.equal(await page.locator('#risk-route-details').isVisible(),false);
     assert.deepEqual(errors,[]);
-    console.log('PASS risk dashboard: compact metrics, separate demo/technical tabs, escaped visits/advisories, preview payload, stale/invalid estimates, failure recovery, roles/regions, 320/390/768 px.');
+    console.log('PASS risk dashboard: compact metrics, demo navigation and hidden diagnostics, escaped visits/advisories, preview payload, stale/invalid estimates, failure recovery, roles/regions, 320/390/768 px.');
     console.log('Screenshots: '+tmp);
   } finally {
     if(browser)await browser.close();

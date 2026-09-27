@@ -6,10 +6,10 @@ def test_settings_and_diagnostics_do_not_share_operational_forms():
     client('''
       assert.equal($('planning-mode').closest('section').id,'panel-settings');
       assert.equal($('execution-mode').closest('section').id,'panel-settings');
-      assert.ok($('risk-engine-meta').closest('#panel-technical'));
+      assert.ok($('risk-engine-meta').closest('#internal-diagnostics'));
       assert.ok($('intake-json').closest('#panel-demo'));
       assert.ok($('region-select').closest('header'));
-      await $('open-settings').dispatch('click');
+      await $('tab-settings').dispatch('click');
       assert.equal($('panel-settings').hidden,false);
       assert.equal($('panel-plan').hidden,true);
       await $('tab-plan').dispatch('click');
@@ -35,7 +35,7 @@ def test_primary_actions_lead_to_existing_forms_without_changing_plan():
       await $('new-request-action').dispatch('click');
       assert.equal($('panel-events').hidden,false);
       assert.equal($('event-type').value,'new_request');
-      assert.equal($('manual-event-panel').open,true);
+      assert.equal($('manual-event-panel').tagName,'SECTION');
       assert.equal(requests.filter(r=>r.payload).length,0);
       await $('record-fact-action').dispatch('click');
       assert.equal($('panel-facts').hidden,false);
@@ -86,3 +86,38 @@ def test_missing_shell_on_scoped_page_never_loads_default_region():
       assert.equal($('error').hidden,false);
       assert.match($('error').textContent,/навигац/);
     ''',before="location.pathname='/regions/south/';")
+
+
+def test_header_switch_saves_mode_without_leaving_plan_and_keeps_thresholds():
+    client('''
+      const base=global.fetch;
+      global.fetch=async(url,options)=>{
+        if(url.endsWith('/inbox/settings')){
+          const payload=JSON.parse(options.body);state.planning_settings={...payload};
+        }
+        return base(url,options);
+      };
+      $('quick-planning-mode').value='autopilot';await $('quick-planning-mode').dispatch('change');
+      assert.equal($('panel-plan').hidden,false);
+      assert.equal($('quick-planning-mode').value,'autopilot');
+      assert.deepEqual(requests.filter(r=>r.url.endsWith('/inbox/settings')).at(-1).payload,
+        {version:7,mode:'autopilot',every_n_requests:3,every_n_minutes:15});
+      $('auto-count').value='4';await $('auto-count').dispatch('input');
+      $('quick-planning-mode').value='manual';await $('quick-planning-mode').dispatch('change');
+      assert.equal($('auto-count').value,'4');
+      assert.equal($('quick-planning-mode').value,'manual');
+      assert.equal($('panel-plan').hidden,false);
+    ''',before="state.planning_settings={mode:'manual',every_n_requests:3,every_n_minutes:15};")
+
+
+def test_failed_header_mode_switch_rolls_back_and_preserves_settings_draft():
+    client('''
+      $('auto-count').value='4';await $('auto-count').dispatch('input');
+      const base=global.fetch;
+      global.fetch=async(url,options)=>url.endsWith('/inbox/settings')?
+        {ok:false,status:503,json:async()=>({error:'Сервис недоступен'})}:base(url,options);
+      $('quick-planning-mode').value='manual';await $('quick-planning-mode').dispatch('change');
+      assert.equal($('quick-planning-mode').value,'autopilot');
+      assert.equal($('auto-count').value,'4');
+      assert.equal($('error').hidden,false);
+    ''',before="state.planning_settings={mode:'autopilot',every_n_requests:3,every_n_minutes:null};")

@@ -105,9 +105,10 @@
   const notice = $('notice');
   notice.classList.toggle('geo',realGeography);
   notice.textContent = realGeography
-    ? 'Время в пути расчётное, без живых пробок. Пунктир на карте — приблизительный маршрут.'
+    ? ''
     : 'Демо: условные координаты и время в пути. Реальные дороги и пробки не учтены.';
   if (!plans.length) notice.textContent += ' Планы отсутствуют: доступны исходные заявки.';
+  notice.hidden=!notice.textContent;
   if (plans.length) plans.forEach((item,index) => {
     const option = node('option',SOLVERS[item.solver] || item.solver || 'План '+(index+1));
     option.value = String(index); $('plan-select').append(option);
@@ -275,7 +276,6 @@
       const record=records.find(item=>item.route===route),item=node('span',null,'legend-item'),swatch=node('span',null,'swatch');
       swatch.style.background=color(record);item.append(swatch,node('span',record.engineer?.name || route.engineer_id));target.append(item);
     });
-    const item=node('span','Пунктир — оценка, не дорожный маршрут','muted');target.append(item);
   }
   function shapeFor(route) { return geo.route_shapes?.[plan.solver]?.[route.engineer_id]; }
   function routeLocationIds(route) {

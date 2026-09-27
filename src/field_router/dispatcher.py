@@ -137,9 +137,8 @@ def render_dispatcher(payload: dict) -> str:
 <aside class="panel detail-panel" aria-label="Карточка выбранной заявки"><div class="panel-heading"><h2>Карточка заявки</h2><span class="badge">ДЕТАЛИ</span></div><div id="request-card" aria-live="polite"></div></aside>
 </section>
 <section class="panel schedule-panel" aria-labelledby="schedule-title"><div class="panel-heading"><div><h2 id="schedule-title">Расписание дня</h2><p class="muted">Выберите участок работы, чтобы открыть заявку.</p></div><div class="timeline-legend"><span class="travel-key">Переезд</span><span class="wait-key">Ожидание</span><span class="work-key">Работа</span></div></div><div id="schedule" tabindex="-1"></div></section>
-''' + operations_history + '''
-<section class="bottom-grid"><details class="panel"><summary>Утренняя загрузка оборудования</summary><div id="equipment" class="scroll"></div></details>
-<details class="panel"><summary>Источники, ограничения и проверка</summary><div id="provenance" class="provenance"></div></details></section>
+''' + ('<div hidden>' + operations_history + '</div>') + '''
+<div hidden><div id="equipment"></div><div id="provenance"></div></div>
 <footer>Просмотр готового плана · Выбор на карте, в списке и в расписании синхронизирован. Для изменения назначений нужен новый расчёт.</footer>
 </main><noscript><p class="notice">Для интерактивного рабочего окна включите JavaScript. Табличный отчёт report.html доступен отдельно.</p></noscript>
 <script id="dispatcher-data" type="application/json">''' + data + '''</script>

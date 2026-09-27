@@ -62,3 +62,4 @@
 .risk-assumption-details li{margin:6px 0;overflow-wrap:anywhere}
 @media(max-width:1100px){.risk-next{align-items:flex-start;flex-direction:column}.risk-card{padding:16px}}
 @media(max-width:760px){.risk-grid,.risk-advisories{grid-template-columns:1fr}.risk-heading{align-items:flex-start}.risk-heading h2{font-size:20px}.risk-section-label{align-items:flex-start;flex-direction:column;gap:4px}.risk-card{padding:16px}.risk-card h3{font-size:13px}.risk-indicator-value{font-size:25px;margin-top:8px}.risk-forecast{padding:16px 12px}.risk-actions{width:100%}.risk-actions button{flex:1;min-height:44px}.risk-advisory .risk-preview{min-height:44px}#risk-context{overflow-wrap:anywhere}.risk-engine-meta{grid-template-columns:1fr}.risk-route-details>summary{min-height:36px}.risk-visit-table td,.risk-visit-table th{padding:9px}.risk-next{padding-bottom:8px}}
+.risk-count-threshold{display:block;margin-top:10px;font-size:11px;color:var(--muted)}

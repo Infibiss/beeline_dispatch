@@ -41,6 +41,14 @@
     return forecast.routes.flatMap(route => Array.isArray(route?.visits) ? route.visits : []).filter(item => item && typeof item === 'object').slice(0, 500);
   }
 
+  // Review threshold, not an expected count or a confirmed late arrival.
+  function forecastCounts(forecast) {
+    const visits=collectVisits(forecast),routes=Array.isArray(forecast?.routes)?forecast.routes:[];
+    const count=(rows,field)=>rows.length && rows.every(row=>probability(row?.[field]))
+      ? {count:rows.filter(row=>row[field]>=.2).length,total:rows.length} : null;
+    return {sla:count(visits,'p_sla_breach'),late:count(visits,'p_late_start'),overtime:count(routes,'p_overtime')};
+  }
+
   function derivedReasons(kind, forecast) {
     const result = [];
     if (kind.id === 'sla') {
@@ -88,7 +96,7 @@
     return unit.replaceAll('_', ' ');
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = {isEngineForecast, engineRisks, collectVisits, lossUnitLabel};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {forecastCounts,isEngineForecast, engineRisks, collectVisits, lossUnitLabel};
   if (typeof document === 'undefined') return;
 
   const $ = id => document.getElementById(id);
@@ -157,10 +165,14 @@
     return number(score) + ' / 100';
   }
 
-  function renderRiskCard(result, isDemo) {
+  function renderRiskCard(result, isDemo, counts) {
     const card = text('article', null, 'risk-prediction'); card.dataset.risk = result.id;
-    card.append(text('h4', result.title), text('strong', riskDisplay(result), 'risk-probability'),
-      text('span', result.measure === 'probability' ? (result.id === 'overtime' ? 'оценка для хотя бы одного маршрута' : 'оценка для хотя бы одного визита') : 'индекс · не вероятность', 'risk-prediction-label'));
+    const count=counts?.[result.id];
+    const counted=['sla','late','overtime'].includes(result.id);
+    const label=result.id==='overtime'?'бригад с риском переработки':result.id==='late'?'визитов с риском позднего начала':'визитов с риском нарушения срока';
+    card.append(text('h4', result.title), text('strong', counted ? (count ? count.count+' из '+count.total : '—') : riskDisplay(result), 'risk-probability'),
+      text('span', counted ? (count ? label : 'нет подробной оценки') : result.measure==='probability'?'оценка вероятности':'индекс · не вероятность', 'risk-prediction-label'));
+    if(count)card.append(text('small','Оценка риска ≥ 20%', 'risk-count-threshold'));
     if (isDemo) card.append(text('span', 'Демонстрационная оценка', 'risk-demo-tag'));
     return card;
   }
@@ -324,7 +336,7 @@
       ? (demo ? 'Учебный пример. ' : '') + 'Оценки помогают выбрать, что проверить. Фактические отклонения уточняйте у инженера.'
       : forecast.status === 'ready' ? notices.stale : notices[forecast.status] || notices.error;
     const risks = modern ? engineRisks(forecast) : legacyResults(forecast, usable);
-    $('risk-forecasts').replaceChildren(...(usable ? risks.filter(validRisk).map(result => renderRiskCard(result, demo)) : []));
+    $('risk-forecasts').replaceChildren(...(usable ? risks.filter(validRisk).map(result => renderRiskCard(result, demo, forecastCounts(forecast))) : []));
     const advisoryForecast = Array.isArray(snapshot.advisories) && !Array.isArray(forecast.advisories)
       ? {...forecast, advisories:snapshot.advisories} : forecast;
     const explicitAdvisories = Array.isArray(advisoryForecast.advisories);
@@ -388,7 +400,7 @@
   $('risk-demo').onclick = () => {if (snapshot) {demo = !demo; renderForecast();}};
   $('risk-facts').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'facts'}}));
   $('risk-replan').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'replan'}}));
-  window.addEventListener('workbench-tab', event => {active = ['risk','demo','technical'].includes(event.detail.name); if (active) load();});
+  window.addEventListener('workbench-tab', event => {active = ['risk','demo'].includes(event.detail.name); if (active) load();});
   window.addEventListener('planning-busy', event => {
     planningBusy = !!event.detail?.busy;
     document.querySelectorAll('.risk-preview').forEach(button => {button.disabled = planningBusy || button.dataset.stale === 'true';});

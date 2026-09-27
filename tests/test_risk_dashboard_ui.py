@@ -150,13 +150,13 @@ def test_overtime_estimate_is_labelled_for_routes_and_available_vehicle_score_is
     client(r'''
 snapshot.forecast.risks=[{id:'vehicle',measure:'heuristic_score',value:64}];await refresh();
 const overtime=$('risk-forecasts').children.find(x=>x.dataset.risk==='overtime');
-assert.match(overtime.textContent,/маршрут/);
+assert.match(overtime.textContent,/бригад/);
 const vehicle=$('risk-forecasts').children.find(x=>x.dataset.risk==='vehicle');
 assert.match(vehicle.textContent,/64 \/ 100/);assert.match(vehicle.textContent,/не вероятность/);
 ''')
 
 
-@pytest.mark.parametrize('panel', ['demo', 'technical'])
+@pytest.mark.parametrize('panel', ['demo'])
 def test_new_owning_panels_load_data_without_opening_control_day_first(panel):
     client('''
 fire('planning-state',{version:7,demoRunId:'fresh'});
@@ -175,3 +175,20 @@ assert.equal(full.forecast.expected_affected_customers,.62);
 fire('planning-state',{version:8,demoRunId:'new'});
 assert.equal($('risk-raw-payload').textContent,'');assert.equal($('risk-raw-details').hidden,true);
 ''')
+
+
+def test_forecast_counts_flagged_visits_and_crews_not_plan_wide_probability():
+    result = node('''
+      const f={p_sla_breach:1,routes:[
+        {engineer_id:'a',p_overtime:.2,visits:[{p_sla_breach:.19,p_late_start:.2},{p_sla_breach:.8,p_late_start:.1}]},
+        {engineer_id:'b',p_overtime:.1,visits:[{p_sla_breach:.4,p_late_start:.7}]}]};
+      console.log(JSON.stringify(risk.forecastCounts(f)));
+    ''')
+    assert result == {'sla': {'count': 2, 'total': 3}, 'late': {'count': 2, 'total': 3}, 'overtime': {'count': 1, 'total': 2}}
+
+
+def test_partial_missing_probabilities_are_not_reported_as_zero_risk():
+    result = node('''
+      console.log(JSON.stringify(risk.forecastCounts({routes:[{visits:[{p_sla_breach:.4},{}]}]})));
+    ''')
+    assert result == {'sla': None, 'late': None, 'overtime': None}

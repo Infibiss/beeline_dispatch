@@ -403,3 +403,18 @@ textarea{padding:10px;width:100%;resize:vertical}label{font-size:12px;font-weigh
 #panel-risk>.risk-heading{float:right;margin:0 0 12px 16px}#panel-risk>.risk-section-label{clear:both}
 #panel-settings>.page-heading,#panel-demo>.page-heading,#panel-technical>.page-heading{display:none}
 #status.attention:not(:empty){background:transparent;border-left:3px solid #e5c500;padding:3px 10px;color:#665810}
+/* Consistent form controls across operational and preparation screens. */
+input:not([type=checkbox]):not([type=radio]):not([type=file]),select{box-sizing:border-box;height:44px;min-height:44px;padding:10px 12px;line-height:22px}
+select{appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,#727477 50%),linear-gradient(135deg,#727477 50%,transparent 50%);background-position:calc(100% - 17px) 19px,calc(100% - 12px) 19px;background-size:5px 5px;background-repeat:no-repeat}
+textarea{box-sizing:border-box;width:100%;max-width:100%;padding:12px;resize:vertical;line-height:1.5}
+.plan-toolbar{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}.plan-toolbar>div{display:flex;flex:1 1 550px;align-items:center;gap:16px;min-width:0}.plan-toolbar label{white-space:nowrap}.plan-toolbar select{width:100%;max-width:700px;min-width:0;font-size:13px}.plan-toolbar .hint{flex:1 1 240px;max-width:500px;margin:0}
+#manual-event-panel>form{margin-top:18px}
+#panel-demo{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}#panel-demo[hidden]{display:none}
+#panel-demo>.panel,#panel-demo>.intake-import{margin:0;padding:24px;background:#fff;border:1px solid var(--line);border-radius:12px;min-width:0}
+#panel-demo h3{margin:0 0 14px}#panel-demo button{min-height:44px}.demo-example-panel>button{margin:2px 0 10px}.demo-example-panel .hint{margin-top:6px}
+.demo-source-row{display:flex;align-items:end;justify-content:space-between;gap:20px}.demo-source-row>div{width:300px;max-width:100%}.demo-source-row h3{align-self:center}.demo-source-row label{margin-top:0}
+#panel-demo #gps-demo-tools{border:0;border-radius:0;padding:20px 0 0;background:transparent;margin:18px 0;border-top:1px solid var(--line)}
+#panel-demo .intake-import label{display:block}#panel-demo .intake-import input[type=file]{display:block;margin:8px 0 16px;min-height:44px;width:100%}
+#panel-demo .stream-demo-controls{align-items:center;margin-top:16px}.stream-demo-controls>p{margin:0}.stream-demo-controls+ .hint{margin-top:16px}
+@media(max-width:640px){.plan-toolbar>div{flex:1 1 auto;display:block}.plan-toolbar label{display:block;margin-bottom:8px}.plan-toolbar select{max-width:100%}.plan-toolbar .hint{flex:0 1 auto}.demo-source-row{display:block}.demo-source-row>div{width:100%}#panel-demo>.panel,#panel-demo>.intake-import{padding:18px}.stream-demo-controls button{flex:1}.gps-demo-controls{gap:16px}}
+.input-pair>div,.crew-grid>div{display:flex;flex-direction:column;justify-content:flex-end;min-width:0}

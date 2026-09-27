@@ -21,3 +21,9 @@
 - A reused browser tab failed to load the common shell. A fresh tab and repeated region changes loaded the correct dataset. Added an explicit scoped-page guard: a missing shell cannot silently fetch the primary region. Covered by a regression test.
 - Browser sessions used disposable state and accounts. No production facts changed; no GPS device permission or external LLM call was needed for presentation testing.
 - Full check: 836 passed, 3 upstream SWIG warnings; wheel built and package assets verified; final focused UI checks repeated after review fixes. Browser screenshots saved under output/local/product-ui/ (not committed).
+
+## Follow-up polish
+- Applied the user's ten UI corrections: removed duplicate/technical text and lower plan disclosures; always-visible event form; uniform 44 px fields, wider plan history, centered profile chevron; grouped demo panels; immediate persisted header mode switch.
+- Header mode save uses the scoped/versioned existing API, retains thresholds and unsaved threshold edits, blocks concurrent changes, and rolls back the displayed mode on failure.
+- Forecast cards count visits/crews whose individual probability is at least 20%; incomplete estimates are not displayed as zero. This UI review threshold is documented as an assumption.
+- Full check: 839 passed; package built and assets verified. Repeated focused checks after final copy/layout changes. Browser exercised both header modes, six arrivals with automatic application and history, reset, demo risk navigation, crew field heights, and mobile form alignment. All browser data was disposable.

@@ -45,7 +45,8 @@
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&profile.open){close();trigger.focus();}});
     try {
       const account=await ready;
-      trigger.textContent=account.username || 'Демо';
+      trigger.replaceChildren(el('span',account.username || 'Демо','account-name'));
+      trigger.title=account.username || 'Демо';
       menu.append(el('strong',account.username || 'Демонстрация'),el('span',account.role==='engineer'?'Инженер':account.role==='demo'?'Демо-доступ':'Диспетчер','account-role'));
       if(account.role==='admin'){
         const accounts=el('a','Доступ сотрудников');accounts.href='/accounts';menu.append(accounts);

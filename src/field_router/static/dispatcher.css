@@ -47,3 +47,5 @@
 /* The workspace displays the same plan version and stale-state warning above the frame. */
 .embedded section[aria-label="Состояние версии"]{display:none}
 .embedded #notice{background:transparent;border:0;padding:4px 0 12px;color:#737373;font-size:11px}
+
+[hidden]{display:none!important}

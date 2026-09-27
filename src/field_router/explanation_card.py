@@ -31,7 +31,11 @@ def build_card(batch, choice, emphasis=()):
         risk,other_risk=risk_metrics(choice),risk_metrics(other)
         if risk and other_risk:
             compare(risk['p_sla_breach']*100,other_risk['p_sla_breach']*100,'Риск хотя бы одного нарушения окна или срока реакции, %',category='risk')
-            compare(risk['expected_loss'],other_risk['expected_loss'],'Потери по модели, усл. ед.',category='risk')
+            loss,reference=risk['expected_loss'],other_risk['expected_loss']
+            if loss is not None and reference is not None and loss!=reference:
+                lower=loss<reference
+                (reasons if lower else tradeoffs).append('Оценка последствий задержек '+('ниже' if lower else 'выше')+' по модели.')
+                if lower:reason_categories.append('risk')
             compare(risk['affected_clients'],other_risk['affected_clients'],'Изменено обещаний',category='risk')
             compare(risk['p_overtime']*100,other_risk['p_overtime']*100,'Риск переработки, %',category='risk')
         compare(facts.get('outside_scope_changes'),other['facts'].get('outside_scope_changes'),'Изменений вне выбранных бригад')

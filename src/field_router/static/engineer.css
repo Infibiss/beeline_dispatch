@@ -20,3 +20,20 @@ dialog{border:0;border-radius:22px;width:min(600px,calc(100% - 24px));padding:24
 
 .app-install-download{display:inline-flex;align-items:center;justify-content:center;max-width:100%;text-align:center;text-decoration:none;overflow-wrap:anywhere}.app-install-download[aria-disabled="true"]{opacity:.6;cursor:wait}
 .pill.pending_replan{background:#fff2d9;color:#8b570c}.unavailability-entry{padding:12px 0;border-top:1px solid var(--line);font-size:13px}.unavailability-entry strong{display:block}.unavailability-entry p{white-space:pre-wrap;overflow-wrap:anywhere}.unavailability-entry small{display:block;color:var(--muted)}#unavailability-list{margin-top:16px}#unavailability-submit{margin-top:14px;width:100%}
+
+/* Shared product rhythm, with touch targets preserved for field work. */
+:root{--ink:#202124;--muted:#74777d;--line:#e4e6e8;--paper:#f5f6f7}
+main{max-width:1000px;padding-top:28px}
+.app-header .brand>span:last-child{font-size:12px}
+button,.primary,.secondary,input,select,textarea,.icon-button{border-radius:8px}
+.identity{padding:18px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.identity label{font-size:11px}.identity .icon-button{height:48px}
+.sync-line{margin:10px 2px 24px}.page-heading{margin:22px 0 18px}
+h1{font-size:28px;letter-spacing:-.7px}.stats{gap:12px}.stats>div{border-radius:12px;padding:16px 18px}.stats strong{font-size:28px}
+.next-card{border-radius:12px;background:#202124}.next-card h2,.task-info strong{overflow-wrap:anywhere}
+.filters button{min-height:42px}.filters button[aria-pressed=true]{background:#fff3ae}.task-card{border-radius:12px}
+.surface{border-radius:12px;padding:22px}.section-top{flex-wrap:wrap}.notice{border-radius:8px}.detail-grid{gap:16px}
+.bottom-nav{gap:6px}.bottom-nav button{border-radius:8px;min-height:56px}.bottom-nav button[aria-current=page]{background:#fff4b3}
+dialog{border-radius:16px}.input-pair>div{min-width:0}.equipment>div{min-width:0}
+#gps-explanation{font-size:13px;color:var(--muted);line-height:1.6}
+@media(max-width:600px){main{padding-top:20px}.identity{padding:14px}.stats{gap:8px}.stats>div{padding:13px}.stats strong{font-size:25px}.surface{padding:18px}.app-header .dispatcher-link{font-size:11px}.button-row{gap:8px}.button-row>button{min-width:140px}h1{font-size:26px}}

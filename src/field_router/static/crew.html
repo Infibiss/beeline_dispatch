@@ -9,21 +9,22 @@
   <script src="/crew.js" defer></script>
 <script src="/time-input.js" defer></script>
 </head>
-<body>
-<header><div class="brand"><strong>билайн</strong><span>Бригады и запас</span></div><a id="back-link" href="/">← К диспетчеру</a></header>
+<body class="crew-page">
+<header><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span class="brand-caption">Выездная служба</span></a></header>
 <main>
-  <h1>Подготовка дня</h1>
+  <a id="back-link" class="back-link" href="/">← Диспетчерская</a>
+  <div class="page-heading"><div><p class="eyebrow">Подготовка дня</p><h1>Бригады и оборудование</h1></div></div>
   <p id="context"></p><p id="status" role="status"></p><p id="error" role="alert" hidden></p>
   <details class="help"><summary>Как выдаётся оборудование</summary><p>«Под план + резерв»: склад обеспечивает назначенные заявки, сверху выдаётся указанный резерв. «Фиксированный запас»: назначаются только обеспеченные этим запасом заявки. Запас уже у бригады к началу смены, в том числе при старте из дома.</p></details>
   <form id="crew-form">
     <fieldset id="fields" disabled>
       <div class="preset-panel">
         <div class="preset-controls">
-          <div><label for="preset-select">Вариант настройки</label><select id="preset-select" aria-describedby="preset-description preset-hint"></select></div>
+          <div><label for="preset-select">Готовая настройка</label><select id="preset-select" aria-describedby="preset-description preset-hint"></select></div>
           <button id="recommend" type="button" class="secondary">Заполнить форму</button>
         </div>
         <p id="preset-description"></p>
-        <p id="preset-hint" class="hint">Каждый вариант рассчитан от текущего состава. Заполнение заменит правки в форме; затем рассчитайте план.</p>
+        <p id="preset-hint" class="hint">Заполнение заменит правки в форме. Перед сохранением вы сможете сравнить новый план.</p>
         <details id="preset-details" class="change-details"><summary>Что изменит вариант</summary><div id="preset-changes"></div><ul id="preset-assumptions" class="assumptions"></ul></details>
       </div>
       <div id="rows"></div>
@@ -33,7 +34,7 @@
   <section id="preview" aria-labelledby="preview-title" hidden>
     <h2 id="preview-title">Новый план</h2>
     <div id="comparison" class="table-scroll"></div>
-    <details class="change-details"><summary>Изменения состава и допущения</summary><div id="changes"></div><ul id="assumptions" class="assumptions"></ul></details>
+    <details class="change-details"><summary>Изменения и условия расчёта</summary><div id="changes"></div><ul id="assumptions" class="assumptions"></ul></details>
     <details id="unassigned-details" class="change-details"><summary id="unassigned-summary">Без назначения</summary><div id="unassigned"></div></details>
     <details class="change-details"><summary>Участие бригад в расчёте</summary><div id="participation"></div></details>
     <details class="change-details"><summary>Утренняя выдача</summary><div id="issue"></div></details>

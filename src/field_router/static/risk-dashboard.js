@@ -7,9 +7,9 @@
     ['equipment', 'Нехватка оборудования', 'Для выполнения заявки не окажется нужного устройства.']
   ];
   const engineKinds = [
-    {id:'sla', aliases:['sla','sla_breach','window_sla'], field:'p_sla_breach', title:'Нарушение SLA',
+    {id:'sla', aliases:['sla','sla_breach','window_sla'], field:'p_sla_breach', title:'Нарушение срока',
       definition:'Хотя бы один визит нарушит применимый SLA окна или реакции.'},
-    {id:'late', aliases:['late','late_start'], field:'p_late_start', title:'Позднее начало',
+    {id:'late', aliases:['late','late_start'], field:'p_late_start', title:'Начало позже плана',
       definition:'Хотя бы один визит начнётся позже утверждённого времени.'},
     {id:'overtime', aliases:['overtime'], field:'p_overtime', title:'Переработка',
       definition:'Хотя бы один маршрут завершится после конца смены.'},
@@ -46,7 +46,6 @@
     if (kind.id === 'sla') {
       if (probability(forecast.p_window_sla_breach)) result.push('SLA клиентского окна: ' + Math.round(forecast.p_window_sla_breach * 1000) / 10 + '%.');
       if (probability(forecast.p_emergency_response_sla_breach)) result.push('SLA реакции на аварию: ' + Math.round(forecast.p_emergency_response_sla_breach * 1000) / 10 + '%.');
-      if (isFiniteNumber(forecast.expected_affected_customers)) result.push('Ожидаемо затронуто клиентов: ' + Math.round(forecast.expected_affected_customers * 100) / 100 + '.');
     } else if (kind.id === 'late') {
       const visits = collectVisits(forecast).filter(visit => probability(visit.p_late_start) && visit.p_late_start > 0);
       if (visits.length) result.push('Визитов с ненулевой оценкой позднего начала: ' + visits.length + '.');
@@ -60,7 +59,7 @@
 
   function defaultRecommendation(id) {
     return {
-      sla:'Сравните варианты по вероятности нарушения SLA, ожидаемым потерям и числу затронутых клиентов.',
+      sla:'Проверьте визиты с риском нарушения срока и сравните варианты плана.',
       late:'Уточните текущий статус и остаток работ, затем рассчитайте варианты по подтверждённым фактам.',
       overtime:'Сравните перераспределение оставшихся визитов до окончания смен.',
       vehicle:'Проверьте назначенную машину, пробег, срок ТО и открытые дефекты перед изменением маршрута.'
@@ -101,32 +100,27 @@
   const clock = value => value == null || value === '' || !isFiniteNumber(Number(value)) ? '—'
     : String(Math.floor(Number(value) / 60)).padStart(2, '0') + ':' + String(Math.round(Number(value) % 60)).padStart(2, '0');
 
-  function ring(value, caption) {
-    const wrap = text('div', null, 'risk-ring');
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 120 120'); svg.setAttribute('aria-hidden', 'true');
-    for (const cls of ['risk-track', 'risk-arc']) {
-      const circle = document.createElementNS(svg.namespaceURI, 'circle');
-      for (const [key, val] of Object.entries({cx:60,cy:60,r:51,fill:'none','stroke-width':9,pathLength:100,class:cls})) circle.setAttribute(key, val);
-      if (cls === 'risk-arc') circle.setAttribute('stroke-dasharray', Math.min(100, Math.max(0, value || 0)) + ' 100');
-      svg.append(circle);
-    }
-    const label = text('div', null, 'risk-ring-label');
-    label.append(text('strong', percent(value)), text('span', value == null ? 'нет оценки' : 'по плану'));
-    wrap.setAttribute('aria-label', percent(value) + ' · ' + caption); wrap.append(svg, label); return wrap;
-  }
-
-  function details(label, explanation, recommendation) {
-    const box = text('details', null, 'risk-details');
-    const summary = text('summary', label); summary.title = recommendation;
-    box.append(summary, text('p', explanation), text('strong', 'Что проверить'), text('p', recommendation)); return box;
-  }
-
   function renderIndicators() {
     $('risk-indicators').replaceChildren(...snapshot.indicators.map(item => {
       const card = text('article', null, 'risk-card'); card.dataset.indicator = item.id;
-      card.append(text('h3', item.title), ring(item.value, item.caption), text('p', item.caption, 'risk-caption'),
-        text('p', item.detail, 'risk-detail'), details('Как читать и что проверить', item.explanation, item.recommendation));
+      const facts = item.facts || {};
+      let value = percent(item.value), label = item.caption, detail = item.detail;
+      if (item.id === 'capacity') {
+        label = 'времени смен занято';
+      } else if (item.id === 'windows') {
+        value = Number.isInteger(facts.tight_visits) && Number.isInteger(facts.checked_visits)
+          ? facts.tight_visits + ' из ' + facts.checked_visits : '—';
+        label = 'визитов с небольшим запасом';
+        detail = 'До конца окна — ' + (isFiniteNumber(facts.threshold_minutes) ? number(facts.threshold_minutes) : '15') + ' мин или меньше';
+      } else if (item.id === 'equipment') {
+        const equipment = Array.isArray(facts.equipment) ? facts.equipment : [];
+        const known = equipment.length && equipment.every(row => Number.isInteger(row.needed) && Number.isInteger(row.on_hand));
+        const missing = known ? equipment.reduce((total, row) => total + Math.max(0, row.needed - row.on_hand), 0) : null;
+        value = missing === null ? '—' : missing ? number(missing) : 'Хватает';
+        label = missing ? 'устройств не хватает' : 'оборудование по району';
+      }
+      card.append(text('h3', item.title), text('strong', value, 'risk-indicator-value'),
+        text('span', label, 'risk-caption'), text('p', detail, 'risk-detail'));
       return card;
     }));
   }
@@ -163,31 +157,11 @@
     return number(score) + ' / 100';
   }
 
-  function riskLabel(result, forecast) {
-    if (!validRisk(result)) return result?.status === 'insufficient_data' || result?.measure === 'not_available'
-      ? 'Недостаточно данных' : 'Нет оценки';
-    if (result.measure === 'probability') return Number.isInteger(forecast.iterations) && forecast.iterations > 0
-      ? 'оценка по ' + forecast.iterations + ' сценариям' : 'симуляционная вероятность';
-    return 'эвристический индекс · не вероятность';
-  }
-
-  function renderRiskCard(result, forecast, isDemo) {
+  function renderRiskCard(result, isDemo) {
     const card = text('article', null, 'risk-prediction'); card.dataset.risk = result.id;
-    card.append(text('h4', result.title), text('p', result.definition, 'risk-definition'),
-      text('strong', riskDisplay(result), 'risk-probability'), text('span', riskLabel(result, forecast), 'risk-prediction-label'));
+    card.append(text('h4', result.title), text('strong', riskDisplay(result), 'risk-probability'),
+      text('span', result.measure === 'probability' ? (result.id === 'overtime' ? 'оценка для хотя бы одного маршрута' : 'оценка для хотя бы одного визита') : 'индекс · не вероятность', 'risk-prediction-label'));
     if (isDemo) card.append(text('span', 'Демонстрационная оценка', 'risk-demo-tag'));
-    if (validRisk(result)) {
-      const explanation = text('details', null, 'risk-details');
-      explanation.append(text('summary', 'Почему такая оценка и что сделать'));
-      const list = text('ul'); (result.reasons || []).forEach(reason => list.append(text('li', reason)));
-      if (!list.children.length) list.append(text('li', 'Оценка рассчитана по вариациям дороги и длительности работ поверх утверждённого плана.'));
-      explanation.append(list, text('strong', 'Рекомендация'), text('p', result.recommendation)); card.append(explanation);
-    } else {
-      const message = result.id === 'vehicle'
-        ? 'Риск поломки не рассчитывается без автомобиля, пробега, ТО и истории отказов.'
-        : 'Для этой оценки нет совместимых данных.';
-      card.append(text('p', message, 'risk-placeholder risk-unavailable'));
-    }
     return card;
   }
 
@@ -222,6 +196,7 @@
       ? 'опоздание ' + number(weights.late_start) + ' · SLA ' + number(weights.sla_breach) + ' · переработка ' + number(weights.overtime_minute) + '/мин'
       : 'не указаны';
     box.replaceChildren(
+      metaItem('Версия модели', boundedText(forecast.model_version, 200) || 'не указана'),
       metaItem('Калибровка', calibrated ? 'подтверждена на фактической истории' : 'не подтверждена · нужна проверка на исходах', calibrated ? '' : 'risk-uncalibrated'),
       metaItem('Данные длительности', observationCount
         ? observationCount + ' подтверждённых фактов · ' + groupCount + ' групп'
@@ -233,43 +208,33 @@
     );
   }
 
-  function metric(term, value) { const wrap = text('div'); wrap.append(text('dt', term), text('dd', value)); return wrap; }
-
-  function renderRoutes(forecast, usable, modern) {
+  function renderRoutes(forecast, usable, modern, isDemo) {
     const detailsNode = $('risk-route-details'), container = $('risk-routes');
     const routes = usable && modern && Array.isArray(forecast.routes)
-      ? forecast.routes.filter(route => route && typeof route === 'object').slice(0, 100) : [];
+      ? forecast.routes.filter(route => route && typeof route === 'object').slice(0, 100)
+      : usable && modern && collectVisits(forecast).length ? [{visits:collectVisits(forecast)}] : [];
     detailsNode.hidden = !routes.length; container.replaceChildren();
     if (!routes.length) return;
-    detailsNode.querySelector('summary').textContent = 'Маршруты и визиты · ' + routes.length;
+    detailsNode.open = true;
+    const visitCount = routes.reduce((total, route) => total + (Array.isArray(route.visits) ? route.visits.filter(visit => visit && typeof visit === 'object').slice(0, 200).length : 0), 0);
+    detailsNode.querySelector('summary').textContent = 'Визиты в плане · ' + visitCount;
     container.replaceChildren(...routes.map(route => {
       const card = text('article', null, 'risk-route');
-      card.append(text('h4', 'Маршрут · ' + (boundedText(route.engineer_name, 300) || boundedText(route.engineer_id, 300) || 'инженер не указан')));
-      const metrics = text('dl', null, 'risk-route-metrics');
-      metrics.append(metric('P(SLA)', probability(route.p_sla_breach) ? percent(route.p_sla_breach * 100) : '—'),
-        metric('P(позднего старта)', probability(route.p_late_start) ? percent(route.p_late_start * 100) : '—'),
-        metric('P(переработки)', probability(route.p_overtime) ? percent(route.p_overtime * 100) : '—'),
-        metric('Потери', isFiniteNumber(route.expected_loss) ? number(route.expected_loss) + ' ' + lossUnitLabel(forecast) : '—'),
-        metric('Затронуто клиентов', isFiniteNumber(route.expected_affected_customers) ? number(route.expected_affected_customers) : '—'));
-      card.append(metrics);
+      card.append(text('h4', boundedText(route.engineer_name, 300) || boundedText(route.engineer_id, 300) || 'Визиты'));
       const visits = Array.isArray(route.visits) ? route.visits.filter(visit => visit && typeof visit === 'object').slice(0, 200) : [];
       if (visits.length) {
         const scroll = text('div', null, 'risk-visit-table'), table = text('table'), head = text('thead'), header = text('tr');
-        ['Визит','План / SLA','P50 / P80 / P90 работы','P(SLA)','P(опоздания)','P(переработки)','Потери'].forEach(label => header.append(text('th', label)));
+        ['Визит','Начало','Срок','Риск нарушения срока','Действие'].forEach(label => { const cell = text('th', label); cell.setAttribute('scope', 'col'); header.append(cell); });
         head.append(header); const body = text('tbody');
         visits.forEach(visit => {
-          const duration = visit.service_duration || {};
-          const durationFacts = Number.isInteger(duration.observation_count) && duration.observation_count > 0 ? duration.observation_count : 0;
-          const quantiles = [duration.p50_minutes,duration.p80_minutes,duration.p90_minutes].map(value => isFiniteNumber(value) ? number(value) : '—').join(' / ') + ' мин'
-            + (durationFacts ? ' · ' + durationFacts + ' факт.' : ' · априорная оценка');
           const deadline = isFiniteNumber(visit.emergency_response_sla_deadline) ? visit.emergency_response_sla_deadline : visit.planned_sla_deadline;
-          const row = text('tr'); row.append(
-            text('td', boundedText(visit.request_name, 300) || boundedText(visit.request_id, 300) || '—'),
-            text('td', clock(visit.planned_start) + ' / ' + clock(deadline)), text('td', quantiles),
-            text('td', probability(visit.p_sla_breach) ? percent(visit.p_sla_breach * 100) : '—'),
-            text('td', probability(visit.p_late_start) ? percent(visit.p_late_start * 100) : '—'),
-            text('td', probability(visit.p_overtime) ? percent(visit.p_overtime * 100) : '—'),
-            text('td', isFiniteNumber(visit.expected_loss) ? number(visit.expected_loss) : '—'));
+          const row = text('tr'), action = text('td');
+          const requestId = boundedText(visit.request_id, 300);
+          if (requestId && !isDemo) action.append(previewButton({id:'visit-' + requestId, action:'facts', planVersion:snapshot.context.plan_version,
+            riskId:'sla', engineerId:boundedText(visit.engineer_id, 300) || boundedText(route.engineer_id, 300), requestId}));
+          row.append(text('td', boundedText(visit.request_name, 300) || requestId || 'Без названия'),
+            text('td', clock(visit.planned_start)), text('td', clock(deadline)),
+            text('td', probability(visit.p_sla_breach) ? percent(visit.p_sla_breach * 100) + ' · оценка' : 'Нет оценки'), action);
           body.append(row);
         });
         table.append(head, body); scroll.append(table); card.append(scroll);
@@ -302,7 +267,7 @@
     }));
     return risks.filter(result => validRisk(result) && result.value > 0).map(result => ({
       id:'risk-' + result.id, riskId:result.id, title:'Проверить · ' + result.title,
-      summary:result.recommendation, severity:severityFor(result), engineerId:null, requestId:null, planVersion:null
+      summary:defaultRecommendation(result.id) || result.recommendation, severity:severityFor(result), engineerId:null, requestId:null, planVersion:null
     }));
   }
 
@@ -311,7 +276,7 @@
     const button = text('button', stale ? 'Рекомендация устарела' : advisory.action === 'facts' ? 'Уточнить факт' : 'Рассчитать варианты', 'secondary risk-preview'); button.type = 'button';
     button.disabled = planningBusy || stale; button.dataset.advisory = advisory.id; button.dataset.stale = String(stale);
     button.addEventListener('click', () => {
-      if (!snapshot || planningBusy) return;
+      if (!snapshot || planningBusy || stale || advisory.planVersion != null && advisory.planVersion !== snapshot.context.plan_version) return;
       window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:advisory.action || 'preview', planVersion:advisory.planVersion ?? snapshot.context.plan_version,
         advisoryId:advisory.id, riskId:advisory.riskId, engineerId:advisory.engineerId, requestId:advisory.requestId}}));
     });
@@ -333,6 +298,7 @@
   }
 
   function clearForecastDetails() {
+    $('risk-raw-details').hidden=true;$('risk-raw-payload').textContent='';
     $('risk-engine-meta').hidden = true; $('risk-engine-meta').replaceChildren();
     $('risk-advisory-section').hidden = true; $('risk-advisories').replaceChildren();
     $('risk-route-details').hidden = true; $('risk-routes').replaceChildren();
@@ -341,7 +307,7 @@
 
   function renderForecast() {
     $('risk-demo').setAttribute('aria-pressed', String(demo));
-    $('risk-demo').textContent = demo ? 'Вернуться к прогнозу для плана' : 'Показать пример Risk Engine';
+    $('risk-demo').textContent = demo ? 'Вернуться к прогнозу для плана' : 'Показать учебный пример';
     $('risk-demo-notice').hidden = !demo;
     $('risk-forecasts').classList.toggle('risk-example', demo);
     const forecast = demo ? example() : snapshot.forecast || {};
@@ -349,24 +315,24 @@
     const matches = forecast.region === snapshot.context.region && forecast.plan_version === snapshot.context.plan_version;
     const horizonValid = forecast.horizon_minutes == null ? modern : Number.isInteger(forecast.horizon_minutes) && forecast.horizon_minutes > 0 && forecast.horizon_minutes <= 1440;
     const usable = forecast.status === 'ready' && matches && (demo || !snapshot.context.needs_replanning) && horizonValid;
-    const notices = {not_connected:'Risk Engine ещё не подключён. Вероятности пока не рассчитываются.',
+    const notices = {not_connected:'Оценка пока недоступна. Проверьте текущие показатели и статусы.',
       insufficient_data:'Для прогноза недостаточно данных. Показатели плана доступны выше.',
       error:'Прогноз временно недоступен. Планирование и показатели плана продолжают работать.',
-      pending:'Risk Engine рассчитывает прогноз. Показатели плана доступны выше.',
+      pending:'Обновляем оценку текущего плана…',
       stale:'Прогноз устарел. Нужна оценка текущей версии плана.'};
-    const horizon = Number.isInteger(forecast.horizon_minutes) ? ' · горизонт ' + forecast.horizon_minutes + ' мин' : ' · остаток утверждённого плана';
     $('risk-model-status').textContent = usable
-      ? (demo ? 'Пример формата ответа · ' : 'Модель: ' + (forecast.model_version || 'версия не указана')) + horizon
-        + (modern ? ' · динамический расчёт по текущему плану' : '')
+      ? (demo ? 'Учебный пример. ' : '') + 'Оценки помогают выбрать, что проверить. Фактические отклонения уточняйте у инженера.'
       : forecast.status === 'ready' ? notices.stale : notices[forecast.status] || notices.error;
     const risks = modern ? engineRisks(forecast) : legacyResults(forecast, usable);
-    $('risk-forecasts').replaceChildren(...risks.map(result => renderRiskCard(usable ? result : {...result,value:null,measure:'not_available'}, forecast, demo)));
+    $('risk-forecasts').replaceChildren(...(usable ? risks.filter(validRisk).map(result => renderRiskCard(result, demo)) : []));
     const advisoryForecast = Array.isArray(snapshot.advisories) && !Array.isArray(forecast.advisories)
       ? {...forecast, advisories:snapshot.advisories} : forecast;
     const explicitAdvisories = Array.isArray(advisoryForecast.advisories);
     const advisoryUsable = explicitAdvisories ? matches : usable;
+    $('risk-raw-details').hidden=!usable;
+    $('risk-raw-payload').textContent=usable?JSON.stringify({demo,context:snapshot.context,forecast},null,2):'';
     renderMeta(forecast, usable, modern); renderAdvisories(advisoryForecast, risks, advisoryUsable, modern, demo);
-    renderRoutes(forecast, usable, modern); renderAssumptions(forecast, usable, modern);
+    renderRoutes(forecast, usable, modern, demo); renderAssumptions(forecast, usable, modern);
   }
 
   function validSnapshot(data) {
@@ -387,6 +353,7 @@
     $('risk-refresh').disabled = true; $('risk-demo').disabled = true;
     $('risk-error').hidden = true; $('risk-context').textContent = 'Обновляем показатели…';
     try {
+      if(!window.FieldRouter && typeof location!=='undefined' && /^\/(r|regions)\//.test(location.pathname || ''))throw Error('Не загрузилась навигация района. Обновите страницу; данные другого района не будут показаны.');
       const url = window.FieldRouter ? window.FieldRouter.url('/api/risk') : '/api/risk';
       const fetcher = window.FieldRouter ? window.FieldRouter.fetch : fetch;
       const response = await fetcher(url, {cache:'no-store',signal});
@@ -397,15 +364,15 @@
       if (version !== null && data.context.plan_version !== version) throw Error('Версия плана изменилась. Нажмите «Обновить» в шапке и откройте показатели снова.');
       snapshot = data;
       const c = data.context, m = data.summary;
-      $('risk-context').textContent = c.region + ' · ' + c.date + ' · версия ' + c.plan_version + ' · на ' + clock(c.time)
+      $('risk-context').textContent = c.region + ' · ' + c.date + ' · на ' + clock(c.time)
         + ' · бригад в расчёте ' + m.engineers + ' из ' + m.roster + ' · без назначения ' + m.unassigned;
       $('risk-stale').hidden = !c.needs_replanning;
-      $('risk-stale').textContent = 'Есть новые факты: утверждённый план требует пересчёта. Показатели справочные; прежний прогноз Risk Engine не показывается.';
+      $('risk-stale').textContent = 'Есть новые факты. Уточните статусы и пересчитайте оставшиеся визиты.';
       renderIndicators(); renderForecast();
     } catch (error) {
       if (current !== sequence) return;
       snapshot = null; demo = false;
-      $('risk-demo').setAttribute('aria-pressed', 'false'); $('risk-demo').textContent = 'Показать пример Risk Engine';
+      $('risk-demo').setAttribute('aria-pressed', 'false'); $('risk-demo').textContent = 'Показать учебный пример';
       $('risk-indicators').replaceChildren(); $('risk-forecasts').replaceChildren(); clearForecastDetails();
       $('risk-stale').hidden = true; $('risk-demo-notice').hidden = true;
       $('risk-model-status').textContent = 'Прогноз недоступен до загрузки текущего плана.';
@@ -421,7 +388,7 @@
   $('risk-demo').onclick = () => {if (snapshot) {demo = !demo; renderForecast();}};
   $('risk-facts').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'facts'}}));
   $('risk-replan').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'replan'}}));
-  window.addEventListener('workbench-tab', event => {active = event.detail.name === 'risk'; if (active) load();});
+  window.addEventListener('workbench-tab', event => {active = ['risk','demo','technical'].includes(event.detail.name); if (active) load();});
   window.addEventListener('planning-busy', event => {
     planningBusy = !!event.detail?.busy;
     document.querySelectorAll('.risk-preview').forEach(button => {button.disabled = planningBusy || button.dataset.stale === 'true';});
@@ -437,7 +404,7 @@
       $('risk-indicators').replaceChildren(); $('risk-forecasts').replaceChildren(); clearForecastDetails();
       $('risk-demo').disabled = true; $('risk-refresh').disabled = false;
       $('risk-demo').setAttribute('aria-pressed', 'false');
-      $('risk-demo').textContent = 'Показать пример Risk Engine';
+      $('risk-demo').textContent = 'Показать учебный пример';
       $('risk-demo-notice').hidden = true; $('risk-stale').hidden = true; $('risk-error').hidden = true;
       $('risk-context').textContent = 'Показатели появятся при открытии вкладки.';
       if (active) load();

@@ -38,7 +38,11 @@
   if(typeof document==='undefined')return;
   const $ = id => document.getElementById(id);
   const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
-  const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
+  const appUrl = path => {
+    if(window.FieldRouter)return window.FieldRouter.url(path);
+    if(typeof location!=='undefined' && /^\/(r|regions)\//.test(location.pathname || ''))throw Error('Не загрузилась навигация района. Обновите страницу; данные другого района не будут показаны.');
+    return path;
+  };
   if (!$('panel-gps')) return;
   let visible = false, busy = false, channel = 'device', generation = 0, map = null, markers = null, points = [];
   let snapshot = null, optionsKey = '';
@@ -61,10 +65,9 @@
   const fresh = (row, config) => row.tracking_state === 'active' && row.point_age_seconds !== null && row.point_age_seconds <= config.stale_seconds && !row.alerts.some(a => a.code === 'quality');
   function metric(title, count, total, detail, className) {
     const card = el('article', undefined, 'gps-metric ' + (className || ''));
-    const percent = total ? Math.round(count / total * 100) : 0;
-    card.title = detail; card.append(el('h3', title), el('strong', percent + '%'), el('p', count + ' из ' + total + ' инженеров'));
-    const progress = el('progress'); progress.max = total || 1; progress.value = count; progress.setAttribute('aria-label', title + ': ' + count + ' из ' + total);
-    const help = el('details'); help.append(el('summary', 'Что это значит'), el('p', detail)); card.append(progress, help); return card;
+    card.title = detail;
+    card.append(el('h3', title), el('strong', count + ' / ' + total), el('p', 'инженеров'));
+    return card;
   }
   function intent(action, eid) { window.dispatchEvent(new CustomEvent('gps-intent', {detail: {action, engineerId: eid}})); }
   function exclusionError(message) {$('gps-exclusion-error').textContent=message;$('gps-exclusion-error').hidden=!message;}
@@ -152,7 +155,7 @@
         ': около '+value+' по прямой','gps-age'));
     }
     if (analysis?.target) card.append(el('p', (analysis.target.basis==='plan'?'Следующая по плану: № ':'К заявке № ') + analysis.target.id + ' · ' + analysis.target.address));
-    if(row.clock)card.append(el('p',(channel==='demo'?'Тестовое время: ':'Время сервера: ')+hhmm(row.clock.minute)+(channel==='device'?' · '+row.clock.local_date:'')+' · план '+row.plan_date,'gps-subtle'));
+    if(row.clock && channel==='demo')card.append(el('p','Тестовое время: '+hhmm(row.clock.minute),'gps-subtle'));
     if (analysis?.eta) {
       card.append(el('p', 'Прибытие ориентировочно через ' + analysis.eta.low_minutes + '–' + analysis.eta.high_minutes + ' мин. '+analysis.eta.description, 'gps-subtle'));
       const schedule=analysis.eta.schedule;
@@ -169,7 +172,6 @@
     }
     if(row.last_accuracy_m>config.max_accuracy_m) card.append(el('p','Последнее измерение: погрешность ±'+Math.round(row.last_accuracy_m)+' м. Это не расстояние до заявки. В оценке маршрута оно не участвует.','gps-subtle'));
     if(row.source==='native') card.append(el('p','Данные с телефона инженера.','gps-subtle'));
-    if (!row.date_matches) card.append(el('p', 'Дата плана отличается от сегодняшней: координаты и потеря связи проверяются, опоздания по старому плану не оцениваются. Для рабочего теста нужен план на сегодня; для исторического — тестовый режим с выбранным временем.', 'gps-subtle'));
     for (const item of row.alerts) {
       const box = el('div', undefined, 'gps-alert ' + item.level); box.append(el('h4', item.title), el('p', item.detail));
       const advice = el('details'); advice.open = item.level === 'warning'; advice.append(el('summary', 'Что можно сделать'), el('p', item.action)); box.append(advice); card.append(box);
@@ -227,13 +229,10 @@
     const rows = data.rows, total = rows.length, good = rows.filter(row => fresh(row, data.config)).length;
     const attention = rows.filter(row => row.alerts.some(a => a.level === 'warning')).length;
     const metrics = $('gps-metrics');
-    // Preserve open explanations during background refresh.
-    const opened = [...metrics.querySelectorAll('details')].map(d => d.open);
     metrics.replaceChildren(
       metric('Свежие координаты', good, total, 'Точка не старше ' + data.config.stale_seconds + ' сек, передача активна, точность достаточна. Это показатель видимости, а не подтверждение выполнения работ.'),
       metric('Нужна проверка', attention, total, 'У инженера есть хотя бы один сигнал: связь, качество координат или ситуация на маршруте. Откройте карточку ниже и уточните причину.', 'warning'),
       metric('Без свежей точки', total - good, total, 'Сюда входят выключенный GPS, пауза, неточность и устаревшие точки. Проверьте разрешение, интернет и открытое приложение. Это не означает отсутствие сотрудника.', 'muted'));
-    metrics.querySelectorAll('details').forEach((d, i) => { d.open = !!opened[i]; });
     $('gps-context').textContent = channel === 'demo'
       ? 'ДЕМО · Искусственные ситуации на дате плана ' + data.plan_date + '. Реальные GPS-данные и факты не изменяются.'
       : 'Устройства · План от ' + data.plan_date + '. ' + (rows.some(r => !r.date_matches) ? 'Дата не совпадает с сегодняшней: проверяем связь и качество, не сравниваем GPS с прошлыми окнами.' : 'Сигналы сверяются с подтверждёнными статусами инженеров.');
@@ -279,7 +278,7 @@
     finally { busy = false; if (token !== generation && visible) setTimeout(refresh, 0); }
   }
   window.addEventListener('workbench-tab', event => {
-    visible = event.detail.name === 'gps';
+    visible = ['gps','demo','technical'].includes(event.detail.name);
     if (visible) {
       refresh();setTimeout(() => map?.invalidateSize(),0);
       // A fast initial state request may have completed before this deferred script.

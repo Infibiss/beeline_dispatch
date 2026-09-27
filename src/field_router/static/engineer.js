@@ -462,7 +462,7 @@
       const result = await request('/api/engineer/facts', payload);
       action = null; dialog.close(); render(result); syncStatus(true); error('');
       window.dispatchEvent(new CustomEvent('engineer-action',{detail:{status:payload.status}}));
-      notice(payload.status === 'completed' ? 'Сообщение о выполнении отправлено. Окончательное закрытие подтвердит диспетчер.' : 'Отметка сохранена: у диспетчера → «Статусы инженеров» → «Журнал статусов». Назначения изменятся после утверждения нового плана.');
+      notice(payload.status === 'completed' ? 'Сообщение о выполнении отправлено. Окончательное закрытие подтвердит диспетчер.' : 'Отметка сохранена: у диспетчера → «Бригады» → «Журнал статусов». Назначения изменятся после утверждения нового плана.');
     } catch (failure) {
       $('action-error').textContent = failure.message; $('action-error').hidden = false;
       if (failure.status === 409) {

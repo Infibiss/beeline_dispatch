@@ -12,8 +12,8 @@ const labelField={name:'Имя',transport:'Транспорт',vehicle_id:'Ав�
 function node(tag,text){const n=document.createElement(tag);if(text!=null)n.textContent=text;return n;}
 function canEdit(){return !busy&&state?.editable;}
 function reset(){draft=null;$('preview').hidden=true;$('plan-link').removeAttribute('href');controls();}
-function updateContext(){if(state)$('context').textContent=state.region+' · в системе '+state.engineers.length+' · в форме '+$('rows').children.length+' · версия '+state.version+(state.control_count?' · контрольная численность '+state.control_count:'')+'. Ориентир, не обязательный штат.';}
-function markDirty(){if(!canEdit())return;dirty=true;reset();updateContext();status('Есть несохранённые изменения. Рассчитайте план и сравните его перед применением.');}
+function updateContext(){if(state)$('context').textContent='Бригад в составе: '+state.engineers.length+' · в форме: '+$('rows').children.length;}
+function markDirty(){if(!canEdit())return;dirty=true;reset();updateContext();status('Есть изменения. Рассчитайте план перед сохранением.');}
 function status(message){$('status').textContent=message;$('error').hidden=true;}
 function controls(){ $('fields').disabled=busy||!state?.editable;$('apply').disabled=busy||!state?.editable||!draft; }
 async function api(path,payload){const r=await appFetch(appUrl(path),payload?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error((d.error||'Ошибка сервера')+(r.status===409?' Обновите страницу и повторите настройку.':''));return d;}
@@ -62,7 +62,7 @@ input.title='Время в формате ЧЧ:ММ, от 00:00 до 23:59';inpu
 input.value=value;box.append(l,input);parent.append(box);return input;}
 function row(e){const card=node('section');card.className='crew-row';card.dataset.id=e.id;card.dataset.vehicleId=e.vehicle_id||'';const grid=node('div');grid.className='crew-grid';
 const saved=state.engineers.some(person=>person.id===e.id);
-const membership=node('p',state.region+' · '+(saved?'В системе · заявок в текущем плане: '+(state.assignments?.[e.id]||0):'Новая бригада · ещё не сохранена'));membership.className='crew-membership';card.append(membership,grid);
+const membership=node('p',saved?'Заявок в текущем плане: '+(state.assignments?.[e.id]||0):'Новая бригада · ещё не сохранена');membership.className='crew-membership';card.append(membership,grid);
 field(grid,'Имя','name',e.name).maxLength=100;field(grid,'Транспорт','transport',e.transport,'text',Object.entries(labelTransport));
 field(grid,'Начало смены','start',clock(e.shift.start),'time');field(grid,'Конец смены','end',clock(e.shift.end),'time');
 field(grid,'График дня','off_duty',e.off_duty?'yes':'no','text',[['no','Работает'],['yes','Выходной']]);
@@ -75,8 +75,8 @@ const details=node('details'),summary=node('summary','Другой старто�
 const search=node('button','Найти адрес');search.type='button';search.disabled=!state.network;const results=node('select');results.className='address-results';results.setAttribute('aria-label','Найденные стартовые адреса');results.append(node('option','Выберите результат'));results.options[0].value='';const hint=node('p');
 search.onclick=()=>{if(!canEdit()||!state.network)return;return run(async()=>{if(!query.value.trim())throw Error('Введите адрес');reset();status('Поиск стартовой точки…');const data=await api('/api/address/search',{version:state.version,address:query.value});results.replaceChildren();const empty=node('option','Выберите результат');empty.value='';results.append(empty);for(const c of data.candidates){const o=node('option',c.label+(c.quality==='approximate'?' · приблизительно':''));o.value=c.id;o.dataset.label=c.original_address||c.label;results.append(o);}status('Выберите найденную точку.');});};
 results.onchange=()=>{if(!canEdit())return;card.dataset.candidate=results.value;hint.textContent=results.value?'Старт будет заменён найденной точкой при расчёте. Проверьте адрес; координаты могут быть приблизительными.':'';markDirty();};start.onchange=()=>{if(!canEdit())return;delete card.dataset.candidate;results.value='';hint.textContent='';};
-details.append(search,results,hint);card.append(details);const remove=node('button','Убрать бригаду');remove.type='button';remove.className='secondary';remove.onclick=()=>{if(!canEdit())return;card.remove();markDirty();};card.append(remove);
-if(saved){const mobile=node('a','Открыть приложение инженера ↗');mobile.className='crew-mobile-link';mobile.href=appUrl('/engineer?engineer_id='+encodeURIComponent(e.id));mobile.target='_blank';mobile.rel='noopener';card.append(mobile);}
+details.append(search,results,hint);card.append(details);const remove=node('button','Убрать бригаду');remove.type='button';remove.className='secondary remove-crew';remove.onclick=()=>{if(!canEdit())return;card.remove();markDirty();};card.append(remove);
+if(saved){const mobile=node('a','Кабинет инженера ↗');mobile.className='crew-mobile-link';mobile.href=appUrl('/engineer?engineer_id='+encodeURIComponent(e.id));mobile.target='_blank';mobile.rel='noopener';card.append(mobile);}
 $('rows').append(card);
 }
 function collect(){return [...$('rows').children].map(card=>{const get=k=>card.querySelector('[data-key="'+k+'"]').value;const transport=get('transport');return {id:card.dataset.id,name:get('name').trim(),transport,vehicle_id:transport==='car'?(card.dataset.vehicleId||null):null,shift:{start:minutes(get('start')),end:minutes(get('end'))},off_duty:get('off_duty')==='yes',skills:[...card.querySelectorAll('[data-skill]:checked')].map(x=>x.value),start_location:get('start_location'),start_candidate_id:card.dataset.candidate||null,stock_mode:get('stock_mode'),router:Number(get('router')),tv_box:Number(get('tv_box'))};});}
@@ -88,5 +88,5 @@ $('crew-form').onsubmit=e=>{e.preventDefault();if(!canEdit())return;return run(a
 $('apply').onclick=()=>{if(!canEdit()||!draft)return;return run(async()=>{await api('/api/crew/apply',{id:draft.id,version:state.version});dirty=false;location.href=appUrl('/');});};
 window.addEventListener('region-change',event=>{if(busy||dirty){event.preventDefault();$('error').textContent='Примените состав после предпросмотра или обновите страницу, чтобы отменить изменения.';$('error').hidden=false;window.scrollTo({top:0});}});
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-run(async()=>{state=await api('/api/crew');$('back-link').href=appUrl('/');state.engineers.forEach(row);updateContext();$('preset-select').replaceChildren(...(state.presets||[]).map(p=>{const option=node('option',p.label);option.value=p.id;return option;}));describePreset();status(state.editable?'Настройка до начала дня. Сначала расчёт, затем применение.':'День уже начат: состав доступен только для просмотра.');});
+run(async()=>{state=await api('/api/crew');$('back-link').href=appUrl('/');state.engineers.forEach(row);updateContext();$('preset-select').replaceChildren(...(state.presets||[]).map(p=>{const option=node('option',p.label);option.value=p.id;return option;}));describePreset();status(state.editable?'Настройте смены, навыки и запас перед началом дня.':'День уже начат: состав доступен только для просмотра.');});
 })();

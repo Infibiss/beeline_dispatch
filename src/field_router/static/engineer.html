@@ -23,19 +23,19 @@
   </header>
   <main id="main">
     <section class="identity" aria-label="Рабочий профиль">
-      <div class="identity-select"><label for="engineer-select">Демо-профиль инженера</label><select id="engineer-select" disabled><option>Загрузка инженеров…</option></select></div>
+      <div class="identity-select"><label for="engineer-select">Инженер</label><select id="engineer-select" disabled><option>Загрузка инженеров…</option></select></div>
       <button type="button" class="icon-button" id="refresh" aria-label="Обновить задания">↻</button>
     </section>
     <div class="sync-line"><span id="connection" role="status">Подключение…</span><span id="plan-version">—</span></div>
     <p id="error" class="notice error" role="alert" hidden></p>
     <p id="updates" class="notice" role="status" hidden></p>
-    <p id="replan-note" class="notice" hidden>Диспетчер получил новые факты. Пока показаны назначения из последнего утверждённого плана.</p>
+    <p id="replan-note" class="notice" hidden>Диспетчер обновляет план. Пока действуют последние утверждённые назначения.</p>
     <section id="panel-tasks" class="tab-panel" aria-labelledby="tab-tasks">
       <div class="page-heading"><div><p id="work-date" class="eyebrow">РАБОЧИЙ ДЕНЬ</p><h1>Мои задачи</h1></div><span id="region" class="region"></span></div>
       <div class="stats" aria-label="Итоги дня"><div><strong id="pending-count">—</strong><span>осталось</span></div><div><strong id="done-count">—</strong><span>выполнено</span></div><div><strong id="distance">—</strong><span>км по плану</span></div></div>
       <article id="next-task" class="next-card" hidden></article>
       <label class="sr-only" for="search">Найти заявку по номеру или адресу</label><input id="search" type="search" placeholder="Номер заявки или адрес" autocomplete="off">
-      <div class="filters" role="group" aria-label="Фильтр заданий"><button type="button" data-filter="pending" aria-pressed="true">В работе дня</button><button type="button" data-filter="completed" aria-pressed="false">Выполненные</button><button type="button" data-filter="all" aria-pressed="false">Все</button></div>
+      <div class="filters" role="group" aria-label="Фильтр заданий"><button type="button" data-filter="pending" aria-pressed="true">На сегодня</button><button type="button" data-filter="completed" aria-pressed="false">Выполненные</button><button type="button" data-filter="all" aria-pressed="false">Все</button></div>
       <div id="task-list" class="task-list" aria-live="polite"><p class="empty">Загружаем маршрут…</p></div>
     </section>
     <section id="panel-map" class="tab-panel" aria-labelledby="tab-map" hidden>
@@ -50,7 +50,7 @@
       <article class="surface"><div class="section-top"><h2 id="engineer-name">Инженер</h2><span id="engineer-status" class="pill">Нет отметки</span></div><dl id="shift-details" class="detail-grid"></dl><div class="button-row"><button type="button" class="primary" id="shift-start">На смене / свободен</button><button type="button" class="secondary" id="shift-problem">Сообщить о недоступности</button></div></article>
       <article class="surface" aria-labelledby="unavailability-title">
         <h2 id="unavailability-title">Период недоступности</h2>
-        <p class="muted">Сообщите, когда не сможете работать: на несколько часов или дней. Диспетчер увидит период и перепланирует затронутые заявки после проверки вариантов. Выходной сотрудник не вызывается автоматически из-за новой заявки или аварии.</p>
+        <p class="muted">Укажите, когда не сможете работать. Диспетчер проверит период и переназначит заявки. В выходной новые заявки автоматически не назначаются.</p>
         <form id="unavailability-form"><fieldset id="unavailability-fields" disabled>
           <div class="input-pair"><div><label for="unavailability-start-date">С даты</label><input id="unavailability-start-date" type="date" required></div><div><label for="unavailability-start-time">С времени</label><input id="unavailability-start-time" type="time" required></div></div>
           <div class="input-pair"><div><label for="unavailability-end-date">По дату</label><input id="unavailability-end-date" type="date" required></div><div><label for="unavailability-end-time">До времени</label><input id="unavailability-end-time" type="time" required></div></div>
@@ -70,7 +70,7 @@
       </article>
       <article class="surface gps-box" aria-labelledby="gps-title">
         <div class="section-top"><h2 id="gps-title">Геолокация</h2><span id="gps-state" class="pill">Выключена</span></div>
-        <p id="gps-explanation">Включите передачу координат, чтобы диспетчер видел ваше положение. История сохраняется на сервере до 7 дней (срок может настроить администратор), отдельно от плана.</p>
+        <p id="gps-explanation">Передавайте координаты диспетчеру во время смены. История хранится до 7 дней; срок может изменить администратор.</p>
         <div class="button-row"><button id="gps-start" class="primary" type="button" disabled>Включить GPS</button><button id="gps-stop" class="secondary" type="button" disabled>Выключить</button></div>
         <p id="gps-feedback" role="status" class="gps-message">Передача начинается только с вашего разрешения.</p>
         <label><input id="gps-keep-awake" type="checkbox"> Не выключать экран во время передачи из браузера</label>
@@ -102,7 +102,7 @@
       </article>
       <article class="surface"><h2>Оборудование</h2><p class="muted">Выдано утром, использовано и доступно с учётом резерва текущей работы.</p><div id="equipment" class="equipment"></div></article>
       <article class="surface"><h2>Мои отметки</h2><p class="muted">Отправленные статусы и комментарии видны диспетчеру.</p><div id="fact-list"></div></article>
-      <p class="demo-note">Данные относятся к дате плана; время события задаётся при отправке. Здесь можно включить браузерный GPS или подключить фоновую передачу через Traccar Client. Push-уведомления не подключены.</p>
+      <p class="demo-note">Проверьте дату смены и время перед отправкой отметок. Push-уведомления пока недоступны.</p>
     </section>
   </main>
   <nav class="bottom-nav" aria-label="Разделы инженера">
@@ -120,7 +120,7 @@
         <h3 id="action-title"></h3>
         <p id="action-day" class="muted"></p>
         <label for="action-time">Время факта</label><input id="action-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" required>
-        <p class="muted">Проверьте время перед отправкой. Это отметка в демонстрационном дне, а не часы телефона.</p>
+        <p class="muted">Укажите время события в текущем рабочем дне.</p>
         <div id="location-field"><label for="action-location">Где вы сейчас</label><select id="action-location"></select></div>
         <div id="remaining-field"><label for="action-remaining" id="remaining-label">Осталось работы, мин</label><input id="action-remaining" type="number" inputmode="numeric" min="1" max="1440" step="1"></div>
         <div id="consumed-fields"><p class="field-label">Фактически использовано</p><div class="input-pair"><div><label for="action-router">Роутеров</label><input id="action-router" type="number" inputmode="numeric" min="0" step="1"></div><div><label for="action-tv">ТВ-приставок</label><input id="action-tv" type="number" inputmode="numeric" min="0" step="1"></div></div></div>
@@ -132,7 +132,7 @@
     <form id="decline-form" hidden>
       <fieldset id="decline-fields">
         <h3>Не могу выехать на заявку</h3>
-        <p class="muted">Заявка останется в пуле перепланирования. Диспетчер проверит варианты и применит новый план.</p>
+        <p class="muted">Диспетчер получит сообщение и проверит новое назначение.</p>
         <label for="decline-time">Время сообщения</label><input id="decline-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required>
         <label for="decline-comment">Почему не можете выехать</label><textarea id="decline-comment" rows="3" minlength="3" maxlength="1000" placeholder="Причина для диспетчера" required></textarea>
         <p id="decline-error" role="alert" class="notice error" hidden></p>

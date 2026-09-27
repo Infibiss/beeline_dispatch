@@ -3,10 +3,9 @@
   const match = location.pathname.match(/^\/(r|regions)\/([a-zA-Z0-9_-]+)(?:\/|$)/);
   const base = match ? '/' + match[1] + '/' + match[2] : '';
   const url = path => base + '/' + path.replace(/^\/+/, '');
-  let identity = null;
   const ready = fetch('/api/auth/me', {cache:'no-store'}).then(async response => {
     if (!response.ok) {location.replace('/login');throw Error('Войдите в учётную запись');}
-    identity = await response.json(); return identity;
+    return response.json();
   });
   ready.catch(() => {});
   async function authenticatedFetch(path, options = {}) {
@@ -18,56 +17,75 @@
     return response;
   }
   window.FieldRouter = Object.freeze({url, base, ready, fetch:authenticatedFetch});
+  const el=(tag,text,className)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(className)n.className=className;return n;};
   document.addEventListener('DOMContentLoaded', async () => {
-    const bar = document.getElementById('region-context') || document.createElement('div'); bar.className = 'region-context';
-    const label = bar.querySelector('label') || document.createElement('label'); label.textContent = 'Район данных';
-    const select = document.createElement('select'); select.id = 'region-select'; select.disabled = true;
-    const caption = document.createElement('span'); caption.textContent = 'Сервер: ' + location.host;
-    const hint = document.createElement('span'); hint.className = 'region-hint';
-    hint.textContent = 'У каждого района свой состав и план.';
-    label.append(select); bar.append(label, caption, hint);
-    const main = document.querySelector('main'); if (!main) return;
-    main.prepend(bar);
+    let header=document.querySelector('header');
+    if(!header){header=el('header');document.body.prepend(header);}
+    header.classList.add('product-header');
+    if(!header.querySelector('.brand')){
+      const brand=el('a',null,'brand');brand.href=url('/');
+      const mark=el('span',null,'brand-mark');mark.setAttribute('aria-hidden','true');brand.append(mark,el('strong','билайн'));header.prepend(brand);
+    }
+    const bar=document.getElementById('region-context') || el('div',null,'header-region');
+    bar.id='region-context';bar.className='header-region';
+    const label=el('label');const labelText=el('span','Район');
+    const select=document.getElementById('region-select') || el('select');
+    select.id='region-select';select.setAttribute('aria-label','Район');select.disabled=true;select.replaceChildren();
+    label.append(labelText,select);bar.replaceChildren(label);
+    if(!header.contains(bar))header.append(bar);
+    let slot=document.getElementById('account-slot');
+    if(!slot){slot=el('div',null,'account-slot');slot.id='account-slot';header.append(slot);}
+    const profile=el('details',null,'account-menu');profile.id='account-menu';
+    const trigger=el('summary','Профиль');trigger.setAttribute('aria-label','Профиль и доступ');
+    const menu=el('div',null,'account-dropdown');
+    const feedback=el('p',null,'account-feedback');feedback.setAttribute('role','status');
+    profile.append(trigger,menu);slot.replaceChildren(profile);
+    const close=()=>{profile.open=false;};
+    document.addEventListener('click',event=>{if(!profile.contains(event.target))close();});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&profile.open){close();trigger.focus();}});
     try {
-      const account = await ready;
-      if(account.role!=='demo') {
-        caption.textContent = account.username+' · '+(account.role==='engineer'?'Инженер':'Диспетчер');
-        const logout=document.createElement('button');logout.type='button';logout.textContent='Выйти';logout.id='sign-out';
-        logout.onclick=async()=>{logout.disabled=true;try {
-          const detail={tasks:[]};window.dispatchEvent(new CustomEvent('account-logout',{detail}));
-          await Promise.race([Promise.all(detail.tasks),new Promise(resolve=>setTimeout(resolve,1500))]);
-          const response=await authenticatedFetch('/api/auth/logout',{method:'POST'});
-          if(!response.ok)throw Error('Не удалось выйти. Повторите.');
-          location.replace('/login');
-        } catch(error){hint.textContent=error.message;logout.disabled=false;}};
-        bar.append(logout);
-        if(account.role==='admin') {
-          const link=document.createElement('a');link.href='/accounts';link.textContent='Доступ сотрудников';bar.append(link);
-        } else {
-          label.hidden=true;hint.textContent='Личный рабочий профиль';
-        }
+      const account=await ready;
+      trigger.textContent=account.username || 'Демо';
+      menu.append(el('strong',account.username || 'Демонстрация'),el('span',account.role==='engineer'?'Инженер':account.role==='demo'?'Демо-доступ':'Диспетчер','account-role'));
+      if(account.role==='admin'){
+        const accounts=el('a','Доступ сотрудников');accounts.href='/accounts';menu.append(accounts);
+        const crews=el('a','Состав и оборудование');crews.href=url('/crew');menu.append(crews);
       }
-      const response = await authenticatedFetch(url('/api/regions'), {cache:'no-store'});
-      if (!response.ok) throw Error('Районы недоступны');
-      const data = await response.json();
-      for (const region of data.regions) {
-        const option = document.createElement('option'); option.value = region.id;
-        option.textContent = region.label; select.append(option);
+      if(account.role==='engineer')bar.hidden=true;
+      if(account.role!=='demo'){
+        const logout=el('button','Выйти');logout.type='button';logout.id='sign-out';
+        logout.addEventListener('click',async()=>{
+          logout.disabled=true;feedback.textContent='';
+          try{
+            const detail={tasks:[]};window.dispatchEvent(new CustomEvent('account-logout',{detail}));
+            await Promise.race([Promise.all(detail.tasks),new Promise(resolve=>setTimeout(resolve,1500))]);
+            const response=await authenticatedFetch('/api/auth/logout',{method:'POST'});
+            if(!response.ok)throw Error('Не удалось выйти. Повторите.');
+            location.replace('/login');
+          }catch(error){feedback.textContent=error.message;logout.disabled=false;}
+        });
+        menu.append(logout);
       }
-      select.value = data.current; select.disabled = data.regions.length < 2;
-      let planningBusy = false;
-      window.addEventListener('planning-busy', event => {
-        planningBusy = Boolean(event.detail?.busy);
-        select.disabled = planningBusy || data.regions.length < 2;
+      menu.append(feedback);
+      const response=await authenticatedFetch(url('/api/regions'),{cache:'no-store'});
+      if(!response.ok)throw Error('Районы недоступны');
+      const data=await response.json();
+      for(const region of data.regions){const option=el('option',region.label);option.value=region.id;select.append(option);}
+      select.value=data.current;select.disabled=data.regions.length<2;
+      let planningBusy=false;
+      window.addEventListener('planning-busy',event=>{planningBusy=Boolean(event.detail?.busy);select.disabled=planningBusy||data.regions.length<2;});
+      select.addEventListener('change',()=>{
+        if(planningBusy){select.value=data.current;return;}
+        const event=new CustomEvent('region-change',{cancelable:true});
+        if(!window.dispatchEvent(event)){select.value=data.current;return;}
+        const chosen=data.regions.find(region=>region.id===select.value);
+        if(!chosen)return;
+        const page=location.pathname.slice(base.length)||'/';
+        location.href=chosen.path+page;
       });
-      select.addEventListener('change', () => {
-        if (planningBusy) {select.value = data.current; return;}
-        const event = new CustomEvent('region-change', {cancelable:true});
-        if (!window.dispatchEvent(event)) {select.value = data.current; return;}
-        const chosen = data.regions.find(region => region.id === select.value);
-        const page = location.pathname.slice(base.length) || '/';
-        location.href = chosen.path + page; // Do not carry another region's engineer ID.
-      });
-    } catch {hint.textContent = 'Не удалось загрузить районы. Обновите страницу.';}
+    }catch{
+      const failure=el('span','Не удалось загрузить профиль или районы. Обновите страницу.','header-error');
+      failure.setAttribute('role','alert');bar.append(failure);
+    }
   });
 })();

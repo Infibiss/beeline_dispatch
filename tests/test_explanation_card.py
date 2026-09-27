@@ -19,7 +19,8 @@ def test_card_exposes_actual_risk_tradeoff_without_claiming_faster_emergency():
     from field_router.explanation_card import build_card
     b=example(); card=build_card(b,b['candidates'][0])
     text=str(card)
-    assert '79.45' in text and '86.31' in text
+    assert 'Оценка последствий задержек ниже' in text
+    assert 'усл. ед.' not in text
     assert '92' in text and '333' in text and '5' in text
     assert 'не откалиброван' in text
     assert 'раньше' not in text
@@ -51,7 +52,7 @@ def test_model_emphasis_cannot_hide_primary_reason_or_warnings():
     a['facts'].update(unassigned=0,travel_minutes=1400,avoidable_reassigned=0,time_shift_minutes=0)
     b['candidates'][1]['facts']['avoidable_reassigned']=2
     card=build_card(b,a,emphasis=['coverage','travel','changes'])
-    assert 'Потери по модели' in card['reasons'][0]
+    assert 'Оценка последствий задержек ниже' in card['reasons'][0]
     assert 'Дороги' in card['reasons'][1]
     assert 'визит' in str(card['attention'])
 

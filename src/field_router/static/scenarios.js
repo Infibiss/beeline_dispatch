@@ -96,7 +96,11 @@
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id);
   const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
-  const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
+  const appUrl = path => {
+    if(window.FieldRouter)return window.FieldRouter.url(path);
+    if(typeof location!=='undefined' && /^\/(r|regions)\//.test(location.pathname || ''))throw Error('Не загрузилась навигация района. Обновите страницу; данные другого района не будут показаны.');
+    return path;
+  };
   let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false, localScopeEngineerIds = [];
   let inboxSnapshot = null, lastSeenNotificationId = null, notificationsInitialized = false;
   let streamDemoEnabled=false, streamRows=null, streamTimer=null, streamRunning=false;
@@ -151,6 +155,7 @@
     updatePlanningDraft();
     $('replan-primary').disabled=busy || !state || !state.needs_replanning &&
       !(state.incoming_requests || []).some(item=>item.status==='new') && !(state.replanning_pool || []).length;
+    for(const id of ['new-request-action','record-fact-action'])$(id).disabled=busy||!state;
     $('approve').disabled = busy || !state || !batch || !selected || batch.version !== state.version;
     $('ai-recommend').disabled = busy || !batch || recommendationPending;
     document.querySelectorAll('.candidate button').forEach(button => { button.disabled = busy; });
@@ -351,14 +356,17 @@
         if(item.status==='awaiting_replan')row.append(element('p',item.reason,'pool-reason'));
         else {const why=element('details');why.append(element('summary','Почему пока без исполнителя'),element('p',item.reason));row.append(why);}
       }
-      if (item.start_date && item.end_date) row.append(element('p', 'Недоступен: ' + item.start_date + ' ' + item.start_time + ' — ' + item.end_date + ' ' + item.end_time));
-      if (item.comment) row.append(element('p', 'Комментарий: ' + item.comment));
+      if (item.start_date || item.comment) {
+        const detail=element('details');detail.append(element('summary','Сообщение инженера'));
+        if(item.start_date && item.end_date)detail.append(element('p','Недоступен: '+item.start_date+' '+item.start_time+' — '+item.end_date+' '+item.end_time));
+        if(item.comment)detail.append(element('p',item.comment));row.append(detail);
+      }
       return row;
     };
     const sections = [];
     if (waiting.length) {
       sections.push(element('h3', `Нужно заменить исполнителя · ${waiting.length}`));
-      sections.push(element('p', 'Прежний инженер недоступен или отказался от выезда. Старое назначение сохранено для сравнения, но больше не считается действующим.', 'hint'));
+      sections.push(element('p', 'Прежний инженер недоступен или отказался от выезда.', 'hint'));
       sections.push(...waiting.map(card));
     }
     if (unresolved.length) {
@@ -366,8 +374,8 @@
       if(state.last_applied)sections.push(element('p',
         `Список по применённому плану №${state.last_applied.version}. Назначенные и отменённые заявки здесь больше не показываются.`, 'hint'));
       sections.push(element('p', unresolved.every(item=>item.code==='SEARCH_UNASSIGNED')
-        ? 'Все эти заявки не вошли в найденный план за лимит поиска. Это не доказательство невозможности; при тех же ресурсах и окнах повторный расчёт может вернуть тот же результат.'
-        : 'Это остаток утверждённого плана, а не очередь уже назначенных задач. Проверьте ограничения, доступных инженеров и временные окна.', 'hint'));
+        ? 'Заявки не вошли в найденный план. Проверьте ресурсы и окна; повторный расчёт может дать тот же результат.'
+        : 'Проверьте причины, доступных инженеров и окна клиентов.', 'hint'));
       sections.push(...unresolved.map(card));
     }
     $('replanning-pool').replaceChildren(...(sections.length ? sections : [element('p', 'Нет заявок, требующих внимания.', 'hint')]));
@@ -638,6 +646,7 @@
     $('planning-mode-summary').textContent = settings.mode === 'autopilot'
       ? `Сейчас включён автопилот: ${[settings.every_n_requests && `после ${settings.every_n_requests} новых заявок`, settings.every_n_minutes && `после ${settings.every_n_minutes} минут ожидания`].filter(Boolean).join(' или ')}.`
       : 'Сейчас ручной режим: план считает и применяет диспетчер.';
+    $('open-settings').textContent=settings.mode==='autopilot'?'Автопилот':'Ручной режим';
     updatePlanningDraft();
     const incomingCard = item => {
       const card = element('article', null, 'intake-card');
@@ -675,11 +684,11 @@
       (data.needs_replanning && !incoming && !waiting ? ' · есть новые факты' : '');
     const applied=data.last_applied;
     $('replan-last-applied').textContent=applied
-      ? `Последний план применён: №${applied.version}${applied.automatic===true?' автопилотом':applied.automatic===false?' диспетчером':''}. Новых обработано ${applied.incoming_count}, изменений назначений ${applied.changed_count}. Ноль во входящей очереди означает «не ждут обработки», а не «все назначены».`
-      : 'Применённых перепланирований ещё нет.';
+      ? `Последний план применён: №${applied.version}${applied.automatic===true?' автопилотом':applied.automatic===false?' диспетчером':''}. Новых обработано ${applied.incoming_count}, изменений назначений ${applied.changed_count}. `
+      : 'План ещё не пересчитывался.';
     $('replan-guidance').textContent=unresolved && !incoming && !waiting
-      ? 'Расчёт не удаляет неназначенные заявки: они исчезнут из этого списка только после применения плана, где им найден исполнитель. При тех же ресурсах повторный поиск может не улучшить охват.'
-      : incoming || waiting ? 'Сначала рассчитайте варианты, затем проверьте и примените выбранный план.' :
+      ? 'Остались заявки без исполнителя. Проверьте ресурсы и пересчитайте план.'
+      : incoming || waiting ? 'Рассчитайте варианты и выберите подходящий.' :
         'Все заявки текущего плана распределены.';
     $('replan-primary').textContent = unresolved && !incoming && !waiting && !data.needs_replanning ? 'Повторить расчёт' : 'Рассчитать варианты';
     $('remote-update').hidden = true;
@@ -705,6 +714,8 @@
     if (data.engineers.some(e => e.id === previousEngineer)) $('fact-engineer').value = previousEngineer;
     factRequests();
     $('replan-needed').hidden = true; $('go-replan').hidden = !data.needs_replanning;
+    $('fact-next-step').textContent=data.needs_replanning ? 'План требует пересчёта по новым статусам.' : '';
+    if(data.needs_replanning && data.planning_settings?.mode==='autopilot')$('fact-next-step').textContent+=' Автопилот обрабатывает новые заявки; текущие изменения можно рассчитать сейчас.';
     populateSelect('fact-location', data.locations || [], item => item.label || item.id, 'Без уточнения места');
     const versions = data.versions && data.versions.length ? data.versions : [{version: data.version, time: data.time, label: 'Текущий план'}];
     $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', '№ ' + item.version + ' · ' + time(item.time) + ' · ' + (item.label || 'План') + (item.version === data.version ? ' · текущий' : '')); option.value = item.version; return option; }));
@@ -724,7 +735,7 @@
     $('plan-frame').src = appUrl('/dispatcher?version=' + encodeURIComponent(version) +
       (state.demo_run_id?'&demo_run_id='+encodeURIComponent(state.demo_run_id):''));
     const unresolved = (state.replanning_pool || []).filter(item => item.status === 'unassigned').length;
-    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его на вкладке «Перепланирование».' : unresolved ? `Текущий план · версия ${version}. Без исполнителя: ${unresolved}; проверьте вкладку «Перепланирование».` : 'Текущий утверждённый план · версия ' + version + '.';
+    $('plan-context').textContent = historical ? 'История · версия ' + version + '. Только просмотр; текущий план не изменён.' : state.needs_replanning ? 'Есть новые факты. Показан последний утверждённый план; пересчитайте его в разделе «Заявки и изменения».' : unresolved ? `Текущий план · версия ${version}. Без исполнителя: ${unresolved}; откройте «Заявки и изменения».` : 'Текущий утверждённый план · версия ' + version + '.';
     $('plan-context').classList.toggle('attention', !historical && (!!state.needs_replanning || unresolved > 0));
   }
   function factRequests() {
@@ -999,9 +1010,7 @@
     if (data.insertion_policy) notes.push('Новая заявка добавляется без изменения прежних назначений и времени начала.');
     if (merged) notes.push(ordered.length === 1 ? 'Один уникальный план: все стратегии нашли одинаковые маршруты и время.' : 'Совпавшие планы объединены в одну карточку.');
     if (!newEmergency && !responseTargets && merged) notes.push('Аварий в остатке дня нет: «Быстрее к аварии» совпадает с «Меньше изменений».');
-    if (riskReady) notes.push('Риски: Монте-Карло · ' + (data.risk_model?.iterations || '—') + ' прогонов'
-      + (durationFacts ? ' · доступно ' + durationFacts + ' подтверждённых фактов длительности' : ' · априорные длительности')
-      + ' · калибровка вероятностей не подтверждена · потери в условных единицах.');
+    if (riskReady) notes.push('Прогнозные риски — оценка, а не гарантия.');
     if (data.local_scope?.engineer_ids?.length) notes.push('Локальный приоритет: сначала минимизируются изменения вокруг ' + data.local_scope.engineer_ids.map(engineerName).join(', ') + '; изменения вне контура явно посчитаны.');
     $('variants-note').textContent = notes.join(' ');
     const table = element('table'), head = element('tr');
@@ -1050,17 +1059,16 @@
       const badge = element('span', 'Рекомендуем', 'recommendation-badge'); badge.hidden = true;
       card.append(badge, element('h3', strategyName(candidate)), element('p', strategies[candidate.id] || '', 'strategy'));
       const aliases = (candidate.strategy_ids || data.candidates.filter(c => c.duplicate_of === candidate.id).map(c => c.id)).filter(id => id !== candidate.id);
-      if (aliases.length) card.append(element('p', 'Совпадает с ' + aliases.map(id => '«' + strategyName({id}) + '»').join(', '), 'duplicate'));
+      card.append(element('p', aliases.length ? 'Совпадает с ' + aliases.map(id => '«' + strategyName({id}) + '»').join(', ') : '', 'duplicate'));
       const f = candidate.facts || {}, dl = element('dl');
       card.append(element('p', 'Назначено: аварии ' + f.emergency_assigned + '/' + f.emergency_total + ' · подключения ' + f.connection_assigned + '/' + f.connection_total, 'priority-coverage'));
       const metrics = [['Без назначения', f.unassigned], ['Смена исполнителя', f.reassigned], ['Дорога, мин', f.travel_minutes]];
       const extraMetrics = [['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
       const risk = candidate.risk?.status === 'ready' && candidate.risk.summary ? candidate.risk : null;
       if (risk) metrics.unshift(
-        ['P(SLA)', (risk.summary.p_sla_breach * 100).toFixed(1) + '%'],
-        ['Ожидаемые потери', risk.summary.expected_loss.toFixed(2) + ' усл. ед.'],
+        ['Риск нарушения срока', (risk.summary.p_sla_breach * 100).toFixed(0) + '%'],
         ['Изменено обещаний', risk.affected_clients]);
-      if (risk) extraMetrics.unshift(['Ожидаемо под SLA-риском', risk.summary.expected_affected_customers.toFixed(2)]);
+
       if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
       if (candidate.emergency) {
         const e = candidate.emergency;
@@ -1077,10 +1085,6 @@
       const moreList = element('dl');
       extraMetrics.forEach(([label, value]) => { const row = element('div'); row.append(element('dt', label), element('dd', value ?? '—')); moreList.append(row); });
       more.append(element('summary', 'Ещё показатели'), moreList); card.append(more);
-      if (risk) card.append(element('p', 'Risk Engine · ' + risk.iterations + ' прогонов'
-        + (durationFacts ? ' · доступно фактов: ' + durationFacts : ''), 'risk-candidate-note'));
-      const explanation = element('details', null, 'candidate-details'); explanation.append(element('summary', 'Почему этот вариант'), element('p', candidate.explanation || 'Пояснение недоступно.', 'explanation')); card.append(explanation);
-
       const button = element('button', 'Посмотреть изменения', 'secondary'); button.type = 'button'; button.setAttribute('aria-pressed', 'false'); button.addEventListener('click', () => select(candidate)); card.append(button);
       return card;
     });
@@ -1147,8 +1151,38 @@
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   });
-  const tabs = ['plan', 'risk', 'events', 'notifications', 'facts', 'gps'];
-  function activateTab(name) {
+  const tabs = ['plan','events','facts','gps','risk','notifications','settings','demo','technical'];
+  const pageNames={plan:'План дня',events:'Заявки и изменения',facts:'Бригады',gps:'Карта и связь',risk:'Контроль дня',notifications:'История',settings:'Настройки района',demo:'Демонстрация',technical:'Технические сведения'};
+  const mobileMenu=window.matchMedia?.('(max-width:900px)');
+  function syncMenuAccess(){ $('sidebar').inert=!!mobileMenu?.matches&&!$('sidebar').classList.contains('is-open'); }
+  mobileMenu?.addEventListener('change',syncMenuAccess);syncMenuAccess();
+  function closeMenu() {
+    $('sidebar').classList.toggle('is-open',false);$('menu-backdrop').hidden=true;
+    $('menu-toggle').setAttribute('aria-expanded','false');syncMenuAccess();
+  }
+  $('menu-toggle').addEventListener('click',()=>{
+    const open=!$('sidebar').classList.contains('is-open');
+    $('sidebar').classList.toggle('is-open',open);$('menu-backdrop').hidden=!open;
+    $('menu-toggle').setAttribute('aria-expanded',String(open));syncMenuAccess();
+    if(open)$('tab-plan').focus();
+  });
+  $('menu-backdrop').addEventListener('click',closeMenu);
+  window.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('sidebar').classList.contains('is-open')){closeMenu();$('menu-toggle').focus();}});
+  $('open-settings').addEventListener('click',()=>activateTab('settings'));
+  $('record-fact-action').addEventListener('click',()=>{activateTab('facts');$('fact-engineer').focus();});
+  $('new-request-action').addEventListener('click',()=>{
+    if(busy||!state)return;activateTab('events');$('event-type').value='new_request';
+    targets();defaultDuration();resetCandidates();$('manual-event-panel').open=true;$('event-target').focus();
+  });
+  $('crew-map-action').addEventListener('click',()=>activateTab('gps'));
+  $('demo-gps-action').addEventListener('click',()=>activateTab('gps'));
+  function activateTab(name, keepMenu=false) {
+    if(!tabs.includes(name))return;
+    const fromDrawer=$('sidebar').classList.contains('is-open');
+    if(!keepMenu){closeMenu();window.scrollTo?.({top:0,behavior:'instant'});}$('page-title').textContent=pageNames[name];
+    for(const id of ['record-fact-action','new-request-action'])$(id).hidden=['settings','demo','technical'].includes(name);
+    if(fromDrawer&&!keepMenu){$('page-title').tabIndex=-1;$('page-title').focus();}
+    $('page-caption').textContent=['settings','demo','technical'].includes(name)?'УПРАВЛЕНИЕ':'РАБОЧИЙ ДЕНЬ';
     tabs.forEach(tab => { const active = tab === name; $('tab-' + tab).setAttribute('aria-selected', String(active)); $('tab-' + tab).tabIndex = active ? 0 : -1; $('panel-' + tab).hidden = !active; });
     if (name === 'notifications' && inboxSnapshot) {
       const notices=inboxSnapshot.dispatch_notifications || [];
@@ -1209,13 +1243,21 @@
   });
   window.addEventListener('risk-intent', event => {
     if (!state || busy) return;
+    if(event.detail?.planVersion != null && event.detail.planVersion!==state.version){
+      $('error').textContent='Показатели относятся к другой версии плана. Обновите контроль дня.';$('error').hidden=false;return;
+    }
     clearGpsDelay();
     if (event.detail?.action === 'facts') {
-      activateTab('facts');
-      if (event.detail.engineerId && [...$('fact-engineer').options].some(option=>option.value===event.detail.engineerId)) {
-        $('fact-engineer').value=event.detail.engineerId; factRequests(); factFields();
-      }
-      $('fact-engineer').focus();
+      activateTab('facts');$('fact-edit').value='';$('fact-late').checked=false;$('correction-reason').value='';
+      for(const id of ['fact-remaining','fact-router','fact-tv'])$(id).value='';
+      $('fact-time').value=time(state.time);$('fact-request').value='';
+      if(event.detail.engineerId && [...$('fact-engineer').options].some(o=>o.value===event.detail.engineerId))$('fact-engineer').value=event.detail.engineerId;
+      const current=(state.statuses || []).find(f=>f.engineer_id===$('fact-engineer').value);
+      $('fact-status').value=current?.status==='working'?'working':event.detail.requestId?'traveling':'available';
+      factRequests();
+      const requested=[...$('fact-request').options].find(o=>o.value===event.detail.requestId);
+      if(requested && (current?.status!=='working'||current.request_id===event.detail.requestId))$('fact-request').value=requested.value;
+      factFields();$('fact-status').focus();
     }
     if (event.detail?.action === 'replan') {activateTab('events');$('manual-event-panel').open=true;$('event-type').focus();}
     if (event.detail?.action === 'preview') {
@@ -1234,11 +1276,11 @@
   tabs.forEach((name, index) => {
     $('tab-' + name).addEventListener('click', () => activateTab(name));
     $('tab-' + name).addEventListener('keydown', event => {
-      const offset = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      const offset = ['ArrowRight','ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft','ArrowUp'].includes(event.key) ? -1 : 0;
       if (!offset && !['Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[tabs.length - 1] : tabs[(index + offset + tabs.length) % tabs.length];
-      activateTab(next); $('tab-' + next).focus();
+      activateTab(next,true); $('tab-' + next).focus();
     });
   });
   $('plan-version').addEventListener('change', showPlan);
@@ -1307,7 +1349,7 @@
   $('replan-primary').addEventListener('click', runQueueReplan);
   $('fact-status').addEventListener('change', () => { factRequests(); factFields(); });
   $('fact-engineer').addEventListener('change', () => { factRequests(); factFields(); });
-  $('go-replan').addEventListener('click', () => { $('event-type').value='replan'; targets(); resetCandidates(); $('status').textContent=''; activateTab('events'); $('manual-event-panel').open=true; $('preview').focus(); });
+  $('go-replan').addEventListener('click', () => {activateTab('events');runQueueReplan();});
   $('fact-late').addEventListener('change',()=>{factRequests();factFields();});
   $('fact-edit').addEventListener('change',()=>{
     const f=(state.fact_journal || []).find(f=>f.id===$('fact-edit').value);

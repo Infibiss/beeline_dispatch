@@ -32,3 +32,18 @@
   .timeline{min-width:760px}.schedule-panel .panel-heading::after{content:"Прокрутите расписание вправо, чтобы увидеть весь день";font-size:11px;color:#777}
   .scroll table{min-width:480px}.plan-control{min-width:0}
 }
+
+/* The enclosing dispatcher already presents the plan totals. */
+.embedded .metrics{display:none}
+.embedded .toolbar{padding:14px;background:#fff;border:1px solid var(--line);border-radius:12px;gap:12px}
+.embedded .panel{border-radius:12px}
+.embedded .quiet-button{border-radius:8px}
+.embedded #notice{padding:10px 14px;border:1px solid #eee1a6;border-radius:8px;font-size:12px;line-height:1.5}
+.embedded .toolbar .muted{margin-bottom:10px}
+.embedded .request-item{padding:12px}
+.embedded .panel-heading h2{font-size:14px}
+@media(max-width:720px){.embedded .toolbar{padding:12px}.embedded .toolbar .muted{margin-bottom:0}}
+
+/* The workspace displays the same plan version and stale-state warning above the frame. */
+.embedded section[aria-label="Состояние версии"]{display:none}
+.embedded #notice{background:transparent;border:0;padding:4px 0 12px;color:#737373;font-size:11px}

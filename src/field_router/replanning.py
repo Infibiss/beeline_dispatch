@@ -801,7 +801,7 @@ class ScenarioSession:
                             route['engineer_id'] in absent_now and
                             (route['engineer_id'],visit['request_id']) in actual_started):
                         name=self.initial_engineers[route['engineer_id']].name
-                        raise ValueError(name+': выполняет закрепленную работу. Сначала отметьте завершение или прерывание во вкладке «Статусы инженеров».')
+                        raise ValueError(name+': выполняет закрепленную работу. Сначала отметьте завершение или прерывание в разделе «Бригады».')
         routes={r.engineer_id:r for r in self.plan.routes if self.execution_mode!='manual' or r.engineer_id in self.statuses}
         prior_frozen=deepcopy(self.frozen)
         if self.statuses:s,routes,prior_frozen=apply_observations(self,s,routes,prior_frozen,now,
@@ -879,12 +879,12 @@ class ScenarioSession:
                 if ((e.id,v.request_id) in declined or
                         (block is not None and v.end>block[0])):
                     if (e.id,v.request_id) in actual_started:
-                        if in_work:raise ValueError(self.initial_engineers[e.id].name+': выполняет работу. Сначала отметьте завершение или прерывание во вкладке «Статусы инженеров».')
+                        if in_work:raise ValueError(self.initial_engineers[e.id].name+': выполняет работу. Сначала отметьте завершение или прерывание в разделе «Бригады».')
                     else:freeze=False
                 # A failed engineer cannot finish the trip. Work already started
                 # needs an explicit actual-state update, not a fictional finish.
                 if e.id in unavailable:
-                    if in_work:raise ValueError(self.initial_engineers[e.id].name+': выполняет работу. Сначала отметьте завершение или прерывание во вкладке «Статусы инженеров».')
+                    if in_work:raise ValueError(self.initial_engineers[e.id].name+': выполняет работу. Сначала отметьте завершение или прерывание в разделе «Бригады».')
                     if v.end>now:freeze=False
                 if freeze:
                     origins[v.request_id]={'location':location,'departure':departure}

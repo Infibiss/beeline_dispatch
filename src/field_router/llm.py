@@ -199,9 +199,9 @@ def settings(path=Path('.env')):
     if path.exists():
         for line in path.read_text().splitlines():
             key, sep, value=line.removeprefix('export ').partition('=')
-            if sep and key.strip() in ('YANDEX_FOLDER_ID','YANDEX_API_KEY','YANDEX_MODEL','YANDEX_LLM_MAX_CALLS'):
+            if sep and key.strip() in ('YANDEX_FOLDER_ID','YANDEX_API_KEY','YANDEX_MODEL','YANDEX_LLM_MAX_CALLS','YANDEX_ASSIGNMENT_PROSE_ENABLED'):
                 values[key.strip()]=value.strip().strip('"').strip("'")
-    for key in ('YANDEX_FOLDER_ID','YANDEX_API_KEY','YANDEX_MODEL','YANDEX_LLM_MAX_CALLS'):
+    for key in ('YANDEX_FOLDER_ID','YANDEX_API_KEY','YANDEX_MODEL','YANDEX_LLM_MAX_CALLS','YANDEX_ASSIGNMENT_PROSE_ENABLED'):
         if key in os.environ:values[key]=os.environ[key]
     return values
 
@@ -217,13 +217,15 @@ def configured(path=Path('.env')):
             headers={'Authorization':'Api-Key '+cfg['YANDEX_API_KEY'],'Content-Type':'application/json','x-folder-id':folder})
         with urlopen(request,timeout=25) as response:
             return json.loads(response.read(262144))
-    return Explainer(send=send,max_calls=int(cfg.get('YANDEX_LLM_MAX_CALLS','20')))
+    return Explainer(send=send,max_calls=int(cfg.get('YANDEX_LLM_MAX_CALLS','20')),
+                     assignment_prose_enabled=cfg.get('YANDEX_ASSIGNMENT_PROSE_ENABLED','0').lower() in ('1','true'))
 
 
 class Explainer:
-    def __init__(self,*,send,max_calls=20):
+    def __init__(self,*,send,max_calls=20,assignment_prose_enabled=False):
         if not 0<=max_calls<=1000:raise ValueError('YANDEX_LLM_MAX_CALLS должен быть от 0 до 1000')
         self.send=send;self.max_calls=max_calls;self.calls=0;self.cache={};self.lock=threading.Lock()
+        self.assignment_prose_enabled=assignment_prose_enabled
 
     def recommend(self,batch):
         return self.explain(batch,None)
@@ -231,6 +233,10 @@ class Explainer:
     def summarize_day(self,snapshot):
         from .risk_summary import summarize
         return summarize(self,snapshot)
+
+    def explain_assignment(self,snapshot,request_id):
+        from .assignment_narrative import narrative
+        return narrative(self,snapshot,request_id)
 
     def explain(self,batch,candidate_id):
         recommend=candidate_id is None

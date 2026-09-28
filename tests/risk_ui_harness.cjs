@@ -13,6 +13,7 @@ class Element {
   querySelector(selector) { return this.querySelectorAll(selector)[0]||null; }
 }
 const ids={};
+for(const id of ['risk-attention-filters','risk-attention-list','risk-attention-all','risk-attention-search','risk-attention-count','risk-attention-more','risk-data-notices'])ids[id]=new Element();
 for(const id of ['risk-summary','risk-summary-button','risk-raw-details','risk-raw-payload','panel-risk','risk-indicators','risk-engine-meta','risk-route-details','risk-routes','risk-assumption-details','risk-assumptions','risk-advisory-section','risk-advisories','risk-demo','risk-demo-notice','risk-forecasts','risk-model-status','risk-refresh','risk-error','risk-context','risk-stale','risk-facts','risk-replan'])ids[id]=new Element();
 ids['risk-route-details'].append(new Element('summary'));
 global.document={getElementById:id=>ids[id]||null,createElement:tag=>new Element(tag),createElementNS:(_,tag)=>new Element(tag),querySelectorAll:selector=>Object.values(ids).flatMap(el=>el.querySelectorAll(selector))};

@@ -1,4 +1,29 @@
 #panel-risk{max-width:1400px;margin:0 auto;min-width:0}
+#panel-risk>.risk-heading{float:none;margin:4px 0 12px}
+.risk-issue-reason{font-size:12px;line-height:1.6;color:#5f6875;margin:8px 0 0;overflow-wrap:anywhere}
+.risk-attention-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:22px 0 18px}
+.risk-filter{display:grid;grid-template-columns:1fr auto;gap:5px 10px;align-items:center;text-align:left;padding:16px;border:1px solid var(--line,#e3e3e3);border-radius:12px;background:#fff;color:#222;min-width:0}
+.risk-filter span{font-size:13px;font-weight:600}.risk-filter strong{font-size:26px;grid-column:2;grid-row:1/3}.risk-filter small{font-weight:400;font-size:11px;color:#6b7280}
+.risk-filter[aria-pressed=true]{border-color:#b29b00;background:#fff9d9;box-shadow:inset 0 0 0 1px #b29b00}
+.risk-attention-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.risk-attention-toolbar input{max-width:300px;min-width:140px;flex:1}.risk-attention-toolbar span{margin-left:auto;font-size:12px;color:#68717d}
+#risk-attention-all[aria-pressed=true]{background:#eef1f4;color:#202631}
+.risk-attention-list{background:#fff;border:1px solid var(--line,#e3e3e3);border-radius:12px;overflow:hidden}
+.risk-issue{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:24px;padding:20px;border-bottom:1px solid #e9ecef;border-left:3px solid transparent}
+.risk-issue:last-child{border-bottom:0}.risk-issue[data-severity=high]{border-left-color:#ce793a}
+.risk-issue-body{min-width:0}.risk-issue-heading{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.risk-issue-heading h3{margin:0;font-size:14px;line-height:1.45}
+.risk-evidence{font-size:10px;font-weight:600;padding:3px 7px;border-radius:4px;white-space:nowrap;background:#edf0f3;color:#56606e}
+.risk-evidence[data-evidence=fact]{background:#e9f2ef;color:#35614f}.risk-evidence[data-evidence=forecast]{background:#eef0fa;color:#536285}.risk-evidence[data-evidence=unknown]{background:#fff3d8;color:#84600b}
+.risk-issue-subject{margin:9px 0 5px;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.risk-issue-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;font-size:12px;color:#68717d}
+.risk-issue-action{display:flex;flex-direction:column;align-items:flex-end;gap:7px;text-align:right}.risk-issue-action strong{font-size:13px}.risk-issue-action .hint{margin:0;font-size:11px}.risk-issue-action button{margin-top:auto;min-height:36px;white-space:normal}
+.risk-issue-details{margin-top:10px;font-size:12px;line-height:1.6}.risk-issue-details summary{cursor:pointer;color:#5d6673;width:fit-content}.risk-issue-details p{max-width:800px;color:#434b55;margin:8px 0}.risk-issue-details ul{padding-left:18px;max-height:240px;overflow:auto}.risk-issue-details li{margin:7px 0;overflow-wrap:anywhere}
+.risk-resource-link{font-size:12px;color:#3d5869;display:inline-block;padding:8px 0;text-decoration:underline}
+.risk-count-note{font-size:11px;color:#717987;line-height:1.5;margin:12px 0 24px}.risk-empty{padding:24px;color:#68717d;font-size:13px}
+#risk-attention-more{display:block;margin:12px auto}#risk-attention-more[hidden]{display:none}
+.risk-resources{border:1px solid var(--line,#e3e3e3);border-radius:12px;padding:18px;background:#fafbfc}.risk-resources>summary{font-size:14px;font-weight:600;cursor:pointer}.risk-resources>summary span{font-size:12px;font-weight:400;color:#717987;margin-left:12px}.risk-resources>.hint{margin:16px 0}
+.risk-resources .risk-forecast{margin-top:16px}.risk-resources .risk-card{padding:14px}.risk-resources .risk-indicator-value{font-size:23px}
+@media(max-width:1100px){.risk-attention-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.risk-issue{grid-template-columns:1fr;gap:12px;padding:16px}.risk-issue-action{align-items:flex-start;text-align:left;flex-direction:row;flex-wrap:wrap}.risk-issue-action button{width:100%;min-height:44px}.risk-filter{padding:12px}.risk-filter span{font-size:12px}.risk-filter strong{font-size:23px}.risk-resources>summary span{display:block;margin:6px 0 0}.risk-attention-toolbar input{max-width:none}.risk-attention-toolbar span{width:100%;margin:0}}
 .risk-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:4px 0 12px}
 .risk-heading h2{font-size:22px;letter-spacing:-.4px;margin:0}
 .risk-heading h3{font-size:17px;margin:0}

@@ -146,3 +146,11 @@ def test_foreign_frame_cannot_mark_crew_dirty():
       const region=new Event('region-change',{cancelable:true});window.dispatchEvent(region);
       assert.equal(region.defaultPrevented,false);
     ''')
+
+
+def test_day_control_completion_action_opens_confirmation_without_recording_a_fact():
+    client('''
+      window.dispatchEvent(new CustomEvent('risk-intent',{detail:{action:'completions',planVersion:7}}));
+      assert.equal($('panel-facts').hidden,false);
+      assert.equal(requests.filter(r=>r.payload).length,0);
+    ''')

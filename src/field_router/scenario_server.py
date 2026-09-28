@@ -413,6 +413,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         if run_ids is not None:check_demo_run(self.region_key,{'demo_run_id':run_ids[0]})
                         session=holder['session']
                         payload=session.workbench(version)
+                        payload['operations'].update(assignment_explanation_enabled=bool(getattr(explainer,'assignment_prose_enabled',False)),
+                            demo_run_id=demo_fields(self.region_key).get('demo_run_id'))
                         selected_version=version if version is not None else session.version
                     if route.path=='/dispatcher':
                         document=render_dispatcher(payload).replace('href="report.html"',f'href="/report?version={selected_version}"',1)
@@ -510,6 +512,21 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     return self.reply(403,{'error':'Можно отправлять только свои статусы и координаты'})
                 # Telemetry has its own lock; the solver may be busy for seconds.
                 if is_gps and gps_route.path!='/api/gps/confirm-delay':return self.reply(*gps.request('POST',gps_route.path,gps_route.query,payload))
+                if self.path=='/api/assignment-explanation':
+                    if set(payload)!={'version','request_id'} or type(payload['version']) is not int or not isinstance(payload['request_id'],str):
+                        return self.reply(400,{'error':'Нужны только номер плана и идентификатор заявки'})
+                    with lock:
+                        check_demo_run(self.region_key,demo_payload)
+                        session=holder['session'];run_id=demo_fields(self.region_key).get('demo_run_id')
+                        if payload['version']!=session.version:return self.reply(409,{'error':'Версия плана изменилась'})
+                        snapshot=session.workbench()
+                    from .assignment_narrative import narrative
+                    result=narrative(explainer if getattr(explainer,'assignment_prose_enabled',False) else None,snapshot,payload['request_id'])
+                    with lock:
+                        current=holder['session']
+                        if current.version!=payload['version'] or current.needs_replanning or demo_fields(self.region_key).get('demo_run_id')!=run_id:
+                            return self.reply(409,{'error':'План изменился. Обновите карточку.'})
+                    return self.reply(200,{**result,'version':payload['version'],'request_id':payload['request_id'],'demo_run_id':run_id})
                 if self.path=='/api/risk/summary':
                     with lock:
                         check_demo_run(self.region_key,demo_payload)

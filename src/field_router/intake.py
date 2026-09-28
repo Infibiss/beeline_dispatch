@@ -47,13 +47,15 @@ def normalize(session, raw, *, allow_past=False):
             raw.get('date', session.scenario.date) != session.scenario.date):
         raise ValueError('Заявка относится к другому району или дате плана')
     allowed = {'id', 'type', 'time', 'anchor_id', 'location_id', 'address', 'region', 'date',
-               'duration_minutes', 'router', 'tv_box', 'work_kind', 'window_start', 'window_end'}
+               'duration_minutes', 'router', 'tv_box', 'work_kind', 'window_start', 'window_end',
+               'required_transport'}
     if set(raw) - allowed:
         raise ValueError('Неизвестные поля заявки: ' + ', '.join(sorted(set(raw) - allowed)))
     kind = raw.get('type', 'new_request')
     if kind not in ('new_request', 'emergency'):
         raise ValueError('Приём JSON поддерживает обычную или аварийную заявку')
-    event = {key: raw[key] for key in ('id', 'duration_minutes', 'router', 'tv_box', 'work_kind') if key in raw}
+    event = {key: raw[key] for key in ('id', 'duration_minutes', 'router', 'tv_box', 'work_kind',
+                                     'required_transport') if key in raw}
     event.update(type=kind, time=_minute(raw.get('time', session.time), 'Время поступления'),
                  anchor_id=_anchor(session, raw))
     if kind == 'new_request':
@@ -61,13 +63,15 @@ def normalize(session, raw, *, allow_past=False):
             if key not in raw:
                 raise ValueError('Для обычной заявки нужны обе границы временного окна')
             event[key] = _minute(raw[key], key)
-    elif 'window_start' in raw or 'window_end' in raw or 'work_kind' in raw:
-        raise ValueError('Аварийная заявка использует окно реакции от времени поступления')
+    else:
+        if 'work_kind' in raw:
+            raise ValueError('Для аварийной заявки вид работ определяется автоматически')
+        for key in ('window_start', 'window_end'):
+            if key in raw and raw[key] is not None:
+                event[key] = _minute(raw[key], key)
     parsed = Event.model_validate(event)
     if parsed.time < session.time and not allow_past:
         raise ValueError('Время поступления не может быть раньше текущего времени плана')
-    if parsed.type == 'new_request' and parsed.window_end < parsed.time:
-        raise ValueError('Окно клиента уже закончилось до поступления заявки')
     address = raw.get('address')
     if address is not None and (not isinstance(address, str) or not 6 <= len(address.strip()) <= 300):
         raise ValueError('Адрес должен содержать от 6 до 300 символов')
@@ -89,7 +93,11 @@ def normalize(session, raw, *, allow_past=False):
         address = session.catalog[anchor].address if anchor in session.catalog else (
             session.geo_locations[anchor].original_address or session.geo_locations[anchor].label
             if anchor in session.geo_locations else session.scenario.office_address)
-    return {'id': parsed.id, 'event': parsed.model_dump(mode='json'),
+    serialized = parsed.model_dump(mode='json')
+    # Keep legacy intake idempotency: absent constraints were not persisted.
+    if parsed.required_transport is None:
+        serialized.pop('required_transport', None)
+    return {'id': parsed.id, 'event': serialized,
             'address': address.strip(), 'status': 'new',
             'received_at': datetime.now(timezone.utc).isoformat()}
 

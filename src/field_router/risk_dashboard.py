@@ -10,6 +10,7 @@ from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_confi
                           application_risk_seed)
 from .service_observations import confirmed_service_observations
 from .availability import shift_blocks
+from .day_control import attention
 
 SCHEMA_VERSION = '1.0'
 WINDOW_BUFFER_MINUTES = 15
@@ -255,9 +256,11 @@ def dashboard(session, gps_snapshot=None):
     context = {'region': session.scenario.region, 'date': session.scenario.date, 'plan_version': session.version,
                'time': now, 'needs_replanning': session.needs_replanning, 'mode': session.mode()}
     fleet = fleet_snapshot(session.scenario)
+    forecast = _forecast(session, context, fleet)
+    control = attention(session, forecast, fleet, gps_snapshot)
     return {'schema_version': SCHEMA_VERSION, 'context': context,
             'summary': {'engineers': len(eligible), 'roster': len(session.initial_engineers),
-                        'unassigned': len({u.request_id for u in session.plan.unassigned} | pending)},
+                        'unassigned': control['counts']['unassigned']},
             'indicators': [
                 {'id': 'capacity', 'title': 'Загрузка бригад', 'value': ratio(occupied, capacity),
                  'caption': 'оставшегося времени смен занято',
@@ -277,6 +280,6 @@ def dashboard(session, gps_snapshot=None):
                  'explanation': 'Потребность оставшихся визитов относительно физического остатка у доступных бригад. Показан наиболее занятый тип устройств. Сумма по району не означает, что оборудование можно передать между инженерами.',
                  'recommendation': 'Проверьте запас нужного типа у конкретного исполнителя. Пополнение или передача требуют отдельного подтверждения; пересчёт сам не создаёт оборудование.',
                  'facts': {'equipment': equipment}}],
-            'forecast': _forecast(session, context, fleet),
+            'forecast': forecast, 'attention': control,
             'fleet': fleet,
             'advisories': build_advisories(session, gps_snapshot)}

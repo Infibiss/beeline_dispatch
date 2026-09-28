@@ -58,6 +58,8 @@ def _calculate(scenario, output, time_limit, solver=None, geography=None, shape_
         plans.append(get_solver(solver).solve(scenario,travel,time_limit_seconds=time_limit))
     for plan in plans:
         require_valid(scenario,travel,plan)
+    from .assignment_diagnostics import annotate_unassigned
+    plans = [annotate_unassigned(scenario,travel,plan) for plan in plans]
     if geography is not None and shape_client is not None:
         geography = route_shapes(geography,scenario,plans,shape_client)
     output = Path(output)

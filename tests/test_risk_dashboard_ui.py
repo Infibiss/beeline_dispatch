@@ -76,12 +76,13 @@ def test_markup_retains_advisories_and_technical_contract_sections():
     assert 'id="risk-replan"' in html
 
 
-def client(expression):
+def client(expression, before=''):
     executable = shutil.which('node')
     if not executable:
         pytest.skip('Node.js is required for client checks')
     harness = Path(__file__).with_name('risk_ui_harness.cjs')
     script = 'const {assert,$,snapshot,intents,fire,settle,refresh,setResponse}=require(' + json.dumps(str(harness)) + ');'
+    script += '\n' + before
     script += '\nrequire(' + json.dumps(str(STATIC / 'risk-dashboard.js')) + ');'
     script += '\n(async()=>{await refresh();' + expression + '})().catch(error=>{console.error(error);process.exitCode=1;});'
     result = subprocess.run([executable, '-e', script], capture_output=True, text=True)
@@ -222,4 +223,88 @@ fire('planning-state',{version:7,demoRunId:'new-run'});
 resolve({ok:true,json:async()=>({snapshot_id:'snapshot-7',title:'Old',items:[{title:'Old',detail:'Old'}],action:'Old'})});
 await pending;
 assert.equal($('risk-summary').hidden,true);assert.equal($('risk-summary').textContent,'');
+''')
+
+
+def test_background_refresh_preserves_summary_only_while_facts_are_unchanged():
+    client(r'''
+snapshot.snapshot_id='snapshot-7';snapshot.llm_enabled=true;await refresh();
+fire('workbench-tab',{name:'risk'});await settle();
+let resolve,calls=0;
+const original=global.fetch;
+global.fetch=(url,opts)=>{
+ if(url.endsWith('/summary'))return new Promise(r=>resolve=r);
+ calls++;return original(url,opts);
+};
+const pending=$('risk-summary-button').onclick();
+window.refreshTick();await settle();assert.equal(calls,0,'Do not interrupt a pending summary');
+resolve({ok:true,json:async()=>({snapshot_id:'snapshot-7',title:'Сводка',items:[{title:'Без исполнителя',detail:'2 заявки'}],action:'Проверьте очередь.'})});
+await pending;
+const same=structuredClone(snapshot);same.snapshot_id='snapshot-8';setResponse(same);window.refreshTick();await settle();
+assert.equal(calls,1);assert.equal($('risk-summary').hidden,false);
+assert.match($('risk-summary').textContent,/Проверьте очередь/);
+const changed=structuredClone(same);changed.summary.unassigned=3;setResponse(changed);window.refreshTick();await settle();
+assert.equal($('risk-summary').hidden,true);assert.equal($('risk-summary').textContent,'');
+''', before="window.setInterval=cb=>{window.refreshTick=cb;};")
+
+
+ATTENTION = r'''
+snapshot.attention={plan_version:7,time:600,counts:{unassigned:8,tight:1,verify:0,overtime:0},notices:['Нет свежих GPS-данных.'],items:
+Array.from({length:8},(_,i)=>({id:'issue-'+i,kind:'unassigned',categories:['unassigned'],evidence:'fact',title:'Нет исполнителя',
+ detail:'Назначение не найдено. Проверьте ограничения.',request_ids:['R-'+i],requests:[{request_id:'R-'+i,address:'Адрес '+i,priority_label:'Обычная',windows:[{start:600,end:700}],deadline:700}],
+ engineer_id:null,engineer_name:null,deadline:700,minutes_to_deadline:100,plan_version:7,severity:'medium',action:'preview'}))};
+snapshot.attention.items[1].categories.push('tight');
+await refresh();
+'''
+
+
+def test_attention_filters_search_pagination_and_resource_notes():
+    client(ATTENTION + r'''
+assert.equal($('risk-attention-list').children.length,6);
+assert.equal($('risk-attention-more').hidden,false);$('risk-attention-more').click();
+assert.equal($('risk-attention-list').children.length,8);
+$('risk-attention-filters').children[1].click();
+assert.equal($('risk-attention-list').children.length,1);
+assert.match($('risk-attention-list').textContent,/Адрес 1/);
+$('risk-attention-all').click();$('risk-attention-search').value='R-7';
+for(const h of $('risk-attention-search').events.input)h();
+assert.equal($('risk-attention-list').children.length,1);
+assert.match($('risk-attention-list').textContent,/Адрес 7/);
+assert.match($('risk-data-notices').textContent,/GPS/);
+assert.equal($('risk-advisories').children.length,0,'No duplicate legacy incidents');
+''')
+
+
+def test_attention_updates_counters_does_not_apply_and_preserves_busy_guard():
+    client(ATTENTION + r'''
+const action=$('risk-attention-list').querySelector('button');
+fire('planning-busy',{busy:true});assert.equal(action.disabled,true);action.click();assert.equal(intents.length,0);
+fire('planning-busy',{busy:false});action.click();
+assert.equal(intents.at(-1).action,'preview');assert.equal(intents.at(-1).planVersion,7);
+snapshot.attention.items=[];snapshot.attention.counts={unassigned:0,tight:0,verify:0,overtime:0};await refresh();
+assert.match($('risk-attention-list').textContent,/не найдено/);
+assert.equal($('risk-attention-filters').children[0].querySelector('strong').textContent,'0');
+''')
+
+
+def test_attention_is_invalidated_on_time_change_even_without_new_version():
+    client(ATTENTION + r'''
+fire('planning-state',{version:7,time:610,demoRunId:'same'});
+assert.equal($('risk-attention-list').children.length,0);
+await refresh();assert.equal($('risk-error').hidden,false);
+snapshot.context.time=610;snapshot.attention.time=610;await refresh();
+assert.equal($('risk-error').hidden,true);assert.equal($('risk-attention-list').children.length,6);
+snapshot.attention.plan_version=6;await refresh();
+assert.match($('risk-attention-list').textContent,/недоступен/);
+assert.equal($('risk-attention-filters').children[0].querySelector('strong').textContent,'—');
+''')
+
+
+def test_demo_forecast_never_replaces_real_incidents_and_strings_are_not_html():
+    client(ATTENTION + r'''
+snapshot.attention.items[0].requests[0].address='<img src=x onerror=alert(1)>';
+await refresh();$('risk-demo').click();
+assert.equal($('risk-attention-list').children.length,6);
+assert.match($('risk-attention-list').textContent,/<img/);
+assert.equal($('risk-attention-list').querySelectorAll('img').length,0);
 ''')

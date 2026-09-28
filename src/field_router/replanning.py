@@ -7,7 +7,7 @@ from typing import Literal
 from uuid import uuid4
 
 from pydantic import Field, model_validator
-from .models import Model, Scenario, Plan, Request, Point, Equipment, TimeWindow, Skill, Visit, Route, Metrics
+from .models import Model, Scenario, Plan, Request, Point, Equipment, TimeWindow, Skill, Transport, Visit, Route, Metrics
 from .travel import synthetic_travel
 from .geo_models import GeographyBundle
 from .geography import attach_geography
@@ -18,6 +18,7 @@ from .objectives import objective_key, reference_visits, response_targets
 from .recommendation import LABELS, STRATEGY_ORDER, eligible_candidates
 from .solvers.selection import get_solver
 from .ordinary_insertion import PRESERVATION_ERROR, insertion_candidates
+from .assignment_diagnostics import annotate_unassigned
 from .completion import pending_completions
 from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
                           application_risk_seed)
@@ -42,6 +43,7 @@ class Event(Model):
     router: int = Field(default=0,ge=0,le=100,strict=True)
     tv_box: int = Field(default=0,ge=0,le=100,strict=True)
     work_kind: Literal['connection','local','addon'] | None = None
+    required_transport: Transport | None = None
     window_start: int | None = Field(default=None,ge=0,le=1440,strict=True)
     window_end: int | None = Field(default=None,ge=0,le=1440,strict=True)
 
@@ -50,7 +52,15 @@ class Event(Model):
         if self.type=='new_request':
             if self.work_kind is None or self.window_start is None or self.window_end is None:
                 raise ValueError('Для обычной заявки нужны вид работы и обе границы окна')
-            TimeWindow(start=self.window_start,end=self.window_end)
+        if self.type in ('new_request','emergency'):
+            if (self.window_start is None) != (self.window_end is None):
+                raise ValueError('Укажите обе границы клиентского окна')
+            if self.window_start is not None:
+                TimeWindow(start=self.window_start,end=self.window_end)
+                if self.window_end < self.time:
+                    raise ValueError('Окно клиента уже закончилось до поступления заявки')
+            if self.type=='emergency' and self.work_kind is not None:
+                raise ValueError('Для аварийной заявки вид работ определяется автоматически')
         return self
 
 
@@ -238,6 +248,10 @@ class ScenarioSession:
             self.geo_locations[alias]=self.geo_locations[source]
 
     def _save_view(self,label):
+        context=(id(self.scenario),id(self.plan),id(self.geography))
+        if not self.needs_replanning and getattr(self,'_diagnosis_context',None)!=context:
+            self.plan=annotate_unassigned(self.scenario,self._travel(self.scenario),self.plan)
+            self._diagnosis_context=(id(self.scenario),id(self.plan),id(self.geography))
         payload={'scenario':self.scenario.model_dump(mode='json'),'plans':[self.plan.model_dump(mode='json')],
             'operations':{'version':self.version,'time':self.time,'label':label,'frozen':deepcopy(self.frozen),
                 'needs_replanning':self.needs_replanning,'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values())),
@@ -969,7 +983,8 @@ class ScenarioSession:
             self._alias_location(key,arrival.anchor_id)
             if arrival.type=='emergency':
                 kind,skill,priority='Глобальная проблема',Skill.EMERGENCY,'urgent'
-                windows=[TimeWindow(start=arrival.time,end=1440)]
+                windows=[TimeWindow(start=arrival.window_start if arrival.window_start is not None else arrival.time,
+                                    end=arrival.window_end if arrival.window_end is not None else 1440)]
             else:
                 kind,skill,priority=WORK_KINDS[arrival.work_kind]
                 windows=[TimeWindow(start=arrival.window_start,end=arrival.window_end)]
@@ -977,6 +992,7 @@ class ScenarioSession:
                 locality=self.catalog[arrival.anchor_id].locality if arrival.anchor_id in self.catalog else '',
                 bk_type=kind,hd_type='Новая аварийная заявка' if arrival.type=='emergency' else 'Новая обычная заявка',windows=windows,
                 duration_minutes=arrival.duration_minutes,skill=skill,priority=priority,
+                required_transport=arrival.required_transport,
                 equipment=Equipment(router=arrival.router,tv_box=arrival.tv_box),
                 provenance={'event':arrival.id,'received_at':str(arrival.time),
                     **({'work_kind':arrival.work_kind} if arrival.type=='new_request' else {}),
@@ -1152,6 +1168,7 @@ class ScenarioSession:
                     pool=[plan for plan in pool if len(emergencies & set(_assignments(plan)))==most]
                 fewest=min(lost_promises(plan) for plan in pool)
                 pool=[plan for plan in pool if lost_promises(plan)==fewest]
+        diagnosed={}
         for profile in ('sla','stable','cost'):
             profile_pool=pool
             if profile=='stable' and protected:
@@ -1159,6 +1176,9 @@ class ScenarioSession:
                 profile_pool=[plan for plan in pool if lost_promises(plan)==fewest]
             plan=min(profile_pool,key=lambda candidate:objective_key(candidate,s,profile=profile,reference=reference,focus_request_id=focus))
             require_valid(s,travel,plan)
+            key=id(plan)
+            if key not in diagnosed:diagnosed[key]=annotate_unassigned(s,travel,plan)
+            plan=diagnosed[key]
             diff_ids={r.id for r in s.requests}
             if event.type=='cancel':diff_ids.add(event.request_id)
             diff=differences(reference,plan,diff_ids)
@@ -1437,6 +1457,11 @@ class ScenarioSession:
         from .fact_journal import migrate
         migrate(obj)
         obj.needs_replanning=payload.get('needs_replanning',False)
-        obj.views={int(k):v for k,v in payload.get('views',{}).items()}
+        obj.views=deepcopy({int(k):v for k,v in payload.get('views',{}).items()})
         if not obj.views:obj._save_view('Восстановленный план')
+        elif not obj.needs_replanning:
+            obj.plan=annotate_unassigned(obj.scenario,obj._travel(obj.scenario),obj.plan)
+            obj._diagnosis_context=(id(obj.scenario),id(obj.plan),id(obj.geography))
+            # Enrich only current reasons, preserving historical views verbatim.
+            if obj.version in obj.views:obj.views[obj.version]['plans']=[obj.plan.model_dump(mode='json')]
         return obj

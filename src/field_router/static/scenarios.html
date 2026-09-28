@@ -32,16 +32,24 @@
 <section class="panel decision-feed"><div class="section-heading"><h3>Почему распределили так</h3><span id="decision-count" class="hint"></span></div><div class="decision-filters"><div><label for="decision-search">Найти заявку</label><input id="decision-search" type="search" placeholder="Номер или адрес"></div><div><label for="decision-filter">Показать</label><select id="decision-filter"><option value="all">Все решения</option><option value="unassigned">Сейчас без исполнителя</option><option value="assigned">Сейчас назначены</option><option value="cancelled">Отменённые</option></select></div></div><div id="decision-log"></div></section></div>
 </section>
 <section id="panel-risk" role="tabpanel" aria-labelledby="tab-risk" hidden>
-  <div class="risk-heading risk-toolbar"><button id="risk-summary-button" type="button" class="secondary" disabled>Объяснить с ИИ</button><button id="risk-refresh" type="button" class="secondary">Обновить</button></div>
+  <div class="risk-heading"><div><h2>Что требует внимания</h2><p class="hint">Сначала срочные ситуации. Проверяйте причины и выбирайте действие — назначения здесь не меняются.</p></div><div class="risk-actions"><button id="risk-summary-button" type="button" class="secondary" disabled>Объяснить с ИИ</button><button id="risk-refresh" type="button" class="secondary">Обновить</button></div></div>
   <p id="risk-context" class="hint" role="status">Показатели появятся при открытии вкладки.</p>
   <p id="risk-error" class="error" role="alert" hidden></p>
   <p id="risk-stale" class="notice" role="status" hidden></p>
   <section id="risk-summary" class="risk-summary" aria-live="polite" hidden></section>
-  <div class="risk-section-label"><h3>По утверждённому плану</h3></div>
+  <div id="risk-attention-filters" class="risk-attention-filters" aria-label="Фильтры ситуаций"></div>
+  <div class="risk-attention-toolbar"><button id="risk-attention-all" class="secondary" type="button" aria-pressed="true">Все ситуации</button><label for="risk-attention-search" class="sr-only">Найти заявку или инженера</label><input id="risk-attention-search" type="search" placeholder="Заявка, адрес или инженер"><span id="risk-attention-count" role="status"></span></div>
+  <p id="risk-model-status" role="status">Ситуации появятся после загрузки плана.</p>
+  <div id="risk-attention-list" class="risk-attention-list" aria-label="Ситуации, требующие внимания"></div>
+  <button id="risk-attention-more" type="button" class="secondary" hidden>Показать ещё</button>
+  <p class="risk-count-note">Категории пересекаются: одна заявка может быть в нескольких фильтрах. Счётчики не складываются.</p>
+  <details id="risk-resources" class="risk-resources"><summary>Ресурсы и расчёт <span>Загрузка, оборудование и подробности прогноза</span></summary>
+  <p class="hint">Сводные показатели не гарантируют возможность назначения: важны квалификация, местоположение и доступность конкретного инженера.</p>
   <div id="risk-indicators" class="risk-grid" aria-label="Показатели плана"></div>
+  <div id="risk-data-notices" class="hint"></div>
   <section class="risk-forecast" aria-labelledby="risk-forecast-title">
-    <div class="risk-heading"><div><h3 id="risk-forecast-title">Прогноз по плану</h3></div></div>
-    <p id="risk-model-status" role="status">Оценка появится после загрузки плана.</p>
+    <div class="risk-heading"><div><h3 id="risk-forecast-title">Сводный прогноз</h3></div></div>
+    <p class="hint">Обзор визитов и бригад с оценкой риска от 20%. Это более широкий отбор, чем список ситуаций выше, а не число подтверждённых опозданий. Для переработки в основном списке также учитывается ожидаемое время сверх смены.</p>
 
 
     <div id="risk-forecasts" class="risk-grid" aria-label="Прогноз и объяснения"></div>
@@ -49,10 +57,11 @@
       <div class="risk-section-label"><h3 id="risk-advisory-title">Что проверить</h3></div>
       <div id="risk-advisories" class="risk-advisories"></div>
     </section>
-    <details id="risk-route-details" class="risk-route-details" hidden open><summary>Маршруты и визиты</summary><div id="risk-routes"></div></details>
+    <details id="risk-route-details" class="risk-route-details" hidden><summary>Маршруты и визиты</summary><div id="risk-routes"></div></details>
 
 
   </section>
+  </details>
   <div class="risk-next"><div><strong>Уточнить данные и пересчитать</strong></div><div class="risk-actions"><button id="risk-facts" type="button" class="secondary">Уточнить статусы</button><button id="risk-replan" type="button" class="primary">Открыть перепланирование</button></div></div>
 </section>
 <section id="panel-gps" role="tabpanel" aria-labelledby="tab-gps" hidden>
@@ -117,6 +126,10 @@
 <div id="emergency-fields" class="event-wide"><details id="new-address-panel"><summary>Адреса нет в списке</summary><label for="new-address">Город, улица, дом</label><input id="new-address" type="text" maxlength="300" placeholder="Москва, улица …, дом …"><button id="address-search" type="button" class="secondary">Найти точку</button><label for="address-candidates">Результаты поиска</label><select id="address-candidates"><option value="">Сначала найдите адрес</option></select><p id="address-context" class="hint"></p><iframe id="address-map" title="Проверка нового адреса на карте" hidden></iframe><button id="address-confirm" type="button" class="secondary" disabled>Использовать точку и рассчитать дороги</button></details><div class="input-pair"><div><label for="duration">Работа на объекте, мин</label><input id="duration" type="number" min="1" max="1440" value="80" required></div><div><label for="router">Роутеры, шт.</label><input id="router" type="number" min="0" value="0" required></div></div><label class="check"><input id="redirect" type="checkbox"><span>Разрешить перенаправление в пути</span></label>
 <div id="call-off-duty-panel" hidden><label for="call-off-duty-engineer">Форс-мажор: дополнительно привлечь сотрудника с выходного</label><select id="call-off-duty-engineer"><option value="">Никого не привлекать</option></select><div id="call-off-duty-confirmation" hidden><label class="check"><input id="call-off-duty-confirmed" type="checkbox"><span>Сотрудник согласился выйти</span></label><label for="call-off-duty-reason">Причина эскалации</label><textarea id="call-off-duty-reason" rows="2" minlength="3" maxlength="1000" placeholder="Почему требуется дополнительный сотрудник"></textarea><p id="call-off-duty-window-hint" class="hint"></p><div class="input-pair"><div><label for="call-off-duty-window-start">Сможет выйти с (необязательно)</label><input id="call-off-duty-window-start" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" autocomplete="off"></div><div><label for="call-off-duty-window-end">До (необязательно)</label><input id="call-off-duty-window-end" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" autocomplete="off"></div></div></div><p class="hint">Для аварии это отдельное решение диспетчера. Если часы не указаны, используется исходный график сотрудника. Без подтверждения сотрудник с выходного в расчёт не добавляется.</p></div></div>
 <div id="ordinary-fields" class="event-wide" hidden><div><label for="work-kind">Вид работ</label><select id="work-kind"><option value="connection">Подключение</option><option value="local">Локальная заявка</option><option value="addon">Дозаказ</option></select></div><div class="input-pair"><div><label for="window-start">Окно с</label><input id="window-start" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" value="10:00" required></div><div><label for="window-end">Окно до</label><input id="window-end" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" value="12:00" required></div></div><div><label for="new-tv">ТВ-приставки, шт.</label><input id="new-tv" type="number" min="0" max="100" value="0"></div></div>
+<div id="new-request-constraints" class="event-wide" hidden>
+<label for="required-transport">Требуемый транспорт</label><select id="required-transport"><option value="">Любой — ограничения нет</option><option value="car">Автомобиль</option><option value="walk">Пешком</option><option value="bicycle">Велосипед</option><option value="public">Общественный транспорт</option></select>
+<div id="emergency-window-panel" hidden><label class="check"><input id="emergency-window-enabled" type="checkbox"><span>Клиент задал окно для аварийной заявки</span></label><p class="hint">Без клиентского окна — от поступления до конца дня. Ориентир реакции 2 часа не заменяет окно клиента.</p>
+<div id="emergency-window-inputs" class="input-pair" hidden><div><label for="emergency-window-start">Окно с</label><input id="emergency-window-start" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" disabled></div><div><label for="emergency-window-end">Окно до</label><input id="emergency-window-end" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" disabled></div></div></div></div>
 <input id="preserve" type="checkbox" checked disabled hidden><p id="event-policy" class="hint">Начатые работы сохраняются до завершения.</p>
 <button id="preview" class="primary" type="submit">Рассчитать варианты</button>
 </fieldset></form></section>

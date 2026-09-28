@@ -11,6 +11,9 @@ import pytest
 from conftest import engineer, job
 from field_router.intake import apply_autopilot
 from field_router.models import Point, Skill
+from field_router.models import Transport
+from field_router.intake import normalize
+from field_router.replanning import Event
 from field_router.planning import make_plan
 from field_router.replanning import ScenarioSession
 from field_router.travel import synthetic_travel
@@ -38,6 +41,98 @@ def incoming(key):
             'time': '09:00',
             'window_start': '12:00', 'window_end': '15:00',
             'work_kind': 'local', 'duration_minutes': 20, 'router': 0, 'tv_box': 0}
+
+
+@pytest.mark.parametrize('kind', ['new_request','emergency'])
+def test_new_request_constraints_survive_intake_autopilot_and_restore(make_scenario,kind):
+    session=session_with_plan(make_scenario)
+    if kind=='emergency':
+        session.scenario=session.scenario.model_copy(update={'engineers':[
+            e.model_copy(update={'skills':[Skill.LOCAL,Skill.EMERGENCY]}) for e in session.scenario.engineers]})
+        session.initial_engineers={e.id:e for e in session.scenario.engineers}
+    row={**incoming('constrained'),'type':kind,'required_transport':'car','window_start':'12:00','window_end':'12:30'}
+    if kind=='emergency':row.pop('work_kind')
+    session.set_planning_settings({'version':session.version,'mode':'autopilot','every_n_requests':1,'every_n_minutes':None})
+    session.receive_requests({'requests':[row]})
+    assert apply_autopilot(session,time_limit=.05) is not None
+    key=('emergency:' if kind=='emergency' else 'request:')+'constrained'
+    request=session.catalog[key]
+    assert request.required_transport==Transport.CAR
+    assert [(w.start,w.end) for w in request.windows]==[(720,750)]
+    visit=next(v for route in session.plan.routes for v in route.visits if v.request_id==key)
+    assert 720<=visit.start<=750
+    restored=ScenarioSession.restore(session.dump())
+    assert restored.catalog[key]==request
+    assert restored.incoming_requests[0]['event']['required_transport']=='car'
+
+
+def test_manual_emergency_uses_explicit_customer_window_and_transport(make_scenario):
+    session=session_with_plan(make_scenario)
+    batch=session.preview({'version':session.version,'event':{'id':'manual-window','type':'emergency',
+        'time':540,'anchor_id':'a','duration_minutes':20,'window_start':800,'window_end':850,
+        'required_transport':'bicycle'}},time_limit=.03)
+    session.approve({'version':session.version,'batch_id':batch['id'],'candidate_id':batch['recommended_candidate_id']})
+    request=session.catalog['emergency:manual-window']
+    assert request.required_transport==Transport.BICYCLE
+    assert [(w.start,w.end) for w in request.windows]==[(800,850)]
+
+
+@pytest.mark.parametrize('fields', [
+    {'window_start':'12:00'}, {'window_end':'12:00'},
+    {'window_start':'12:00','window_end':'11:00'},
+    {'window_start':'07:00','window_end':'08:00'}, {'required_transport':'helicopter'}])
+def test_invalid_emergency_constraints_are_atomic(make_scenario,fields):
+    session=session_with_plan(make_scenario)
+    before=session.dump()
+    with pytest.raises(ValueError):
+        session.receive_requests({'requests':[{'id':'bad','type':'emergency','anchor_id':'a','time':'09:00',**fields}]})
+    assert session.dump()==before
+
+
+def test_legacy_emergency_default_window_and_idempotency(make_scenario):
+    session=session_with_plan(make_scenario)
+    row={'id':'legacy','type':'emergency','anchor_id':'a','time':'09:00'}
+    item=normalize(session,row)
+    assert 'required_transport' not in item['event']
+    session.receive_requests({'requests':[row]})
+    restored=ScenarioSession.restore(session.dump())
+    assert restored.receive_requests({'requests':[row]})['duplicates']==1
+    assert Event.model_validate(item['event']).window_start is None
+    batch=restored.preview({'version':restored.version,'event':{'id':'legacy-preview','type':'replan','time':540}},time_limit=.03)
+    restored.approve({'version':restored.version,'batch_id':batch['id'],'candidate_id':batch['recommended_candidate_id']})
+    assert [(w.start,w.end) for w in restored.catalog['emergency:legacy'].windows]==[(540,1440)]
+
+
+def test_transport_requirement_is_not_ignored_when_no_engineer_has_it(make_scenario):
+    session=session_with_plan(make_scenario)
+    session.receive_requests({'requests':[{**incoming('walk-only'),'required_transport':'walk'}]})
+    batch=session.preview({'version':session.version,'event':{'id':'transport-preview','type':'replan','time':540}},time_limit=.03)
+    session.approve({'version':session.version,'batch_id':batch['id'],'candidate_id':batch['recommended_candidate_id']})
+    row=next(u for u in session.plan.unassigned if u.request_id=='request:walk-only')
+    assert row.code=='NO_TRANSPORT'
+
+
+def test_restore_enriches_legacy_reasons_without_mutating_input_or_history(make_scenario):
+    from copy import deepcopy
+    session=session_with_plan(make_scenario)
+    scenario=session.scenario.model_copy(update={'requests':[*session.scenario.requests,
+        job('not-chosen',start=720,end=800,duration=20)],'points':{
+            **session.scenario.points,'not-chosen':Point(x_km=1,y_km=0)}})
+    plan=make_plan(scenario,synthetic_travel(scenario),{'e1':['a']},'test','valid')
+    session=ScenarioSession(scenario,plan)
+    saved=session.dump()
+    for view in saved['views'].values():
+        view['plans'][0]['diagnostics'].pop('unassigned_diagnostics',None)
+        view['plans'][0]['unassigned'][0]['reason']='Старая общая причина'
+    saved['plan']['diagnostics'].pop('unassigned_diagnostics',None)
+    saved['plan']['unassigned'][0]['reason']='Старая общая причина'
+    saved['views'][0]=deepcopy(saved['views'][1])
+    before=deepcopy(saved)
+    restored=ScenarioSession.restore(saved)
+    assert saved==before
+    assert restored.views[0]==before['views'][0]
+    assert restored.version==saved['version']
+    assert 'допустимые места' in restored.plan.unassigned[0].reason
 
 
 def test_json_intake_stays_visible_until_manual_approval(make_scenario):

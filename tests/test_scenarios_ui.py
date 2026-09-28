@@ -40,6 +40,20 @@ def test_event_time_rejects_invalid_values_before_request():
     assert result == [True, True, True, True]
 
 
+def test_emergency_form_encodes_optional_transport_and_customer_window():
+    result=client("console.log(JSON.stringify(core.eventPayload(4,{id:'evt',type:'emergency',time:'10:35',target:'R-1',duration:'80',router:'0',requiredTransport:'public',emergencyWindowEnabled:true,emergencyWindowStart:'12:00',emergencyWindowEnd:'14:00'})))")
+    assert result['event']['required_transport']=='public'
+    assert (result['event']['window_start'],result['event']['window_end'])==(720,840)
+    rejected=client("console.log(JSON.stringify(['bad','past','half'].map(kind=>{try{core.eventPayload(1,{id:'evt',type:'emergency',time:'10:00',target:'a',duration:20,router:0,requiredTransport:kind==='bad'?'spaceship':'car',emergencyWindowEnabled:true,emergencyWindowStart:'08:00',emergencyWindowEnd:kind==='half'?'':'09:00'});return false}catch{return true}})))")
+    assert rejected==[True,True,True]
+
+
+def test_hidden_emergency_window_is_not_sent_for_ordinary_request():
+    result=client("console.log(JSON.stringify(core.eventPayload(4,{id:'ordinary',type:'new_request',time:'10:00',target:'R-1',duration:30,router:0,workKind:'local',windowStart:'11:00',windowEnd:'12:00',requiredTransport:'walk',emergencyWindowEnabled:true,emergencyWindowStart:'15:00',emergencyWindowEnd:'16:00'})))")
+    assert result['event']['required_transport']=='walk'
+    assert result['event']['window_start']==660
+
+
 def test_screen_has_local_assets_and_explicit_disabled_approval():
     html = (STATIC / 'scenarios.html').read_text()
     assert '<html lang="ru">' in html

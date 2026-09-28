@@ -53,6 +53,31 @@ def run_js(expression):
     return subprocess.run([node, '-e', code], capture_output=True, text=True, check=True)
 
 
+def test_assignment_explanation_describes_verified_skill_and_route_order():
+    result=run_js('''
+const scenario={requests:[{id:'a',address:'Первый адрес',skill:'local',windows:[{start:600,end:650}]},
+ {id:'b',address:'Второй адрес'}],engineers:[{id:'e1',name:'Иван',skills:['local'],transport:'car',shift:{start:540,end:1080}}]};
+const plan={routes:[{engineer_id:'e1',visits:[{request_id:'a',arrival:590,start:600,end:630,travel_minutes:10,explanation:'Сохранённое <b>объяснение</b>'},
+ {request_id:'b',arrival:640,start:650,end:680}]}]};
+const record=core.buildRecords(scenario,plan)[0];
+console.log(JSON.stringify({current:core.assignmentExplanation(record,scenario),
+ stale:core.assignmentExplanation({...record,pendingReassignment:true},scenario)}));
+''')
+    payload=json.loads(result.stdout)
+    assert payload['current']['stale'] is False
+    assert payload['stale']['stale'] is True
+    text=' '.join(payload['current']['lines'])
+    assert 'Локальные работы' in text and 'Место 1 из 2' in text
+    assert 'Второй адрес' in text and 'ожидание 10 мин' in text
+    assert payload['current']['stored']=='Сохранённое <b>объяснение</b>'
+    assert 'оптимального' in payload['current']['notice']
+
+
+def test_assignment_explanation_does_not_invent_missing_qualifications():
+    result=run_js("console.log(JSON.stringify(core.assignmentExplanation({request:{id:'a'},visit:{request_id:'a'},route:{visits:[{request_id:'a'}]}},{requests:[]}))); ")
+    assert 'нужно подтвердить' in json.loads(result.stdout)['lines'][0]
+
+
 def test_timeline_separates_travel_wait_and_service_in_order():
     result = run_js('console.log(JSON.stringify(core.timelineSegments({arrival:570,start:600,end:640,travel_minutes:20})));')
     assert json.loads(result.stdout) == [

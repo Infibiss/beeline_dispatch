@@ -101,8 +101,10 @@
 
   const $ = id => document.getElementById(id);
   if (!$('panel-risk')) return;
-  let snapshot = null, active = false, demo = false, version = null, demoRunId = null, sequence = 0, controller = null, planningBusy = false;
+  let snapshot = null, active = false, demo = false, version = null, demoRunId = null, sequence = 0, controller = null, planningBusy = false, planTime = null;
   let summarySequence=0,summaryController=null;
+  let attentionFilter = 'all', attentionLimit = 6;
+  const expandedIssues = new Set();
   const text = (tag, value, cls) => { const el = document.createElement(tag); if (value != null) el.textContent = value; if (cls) el.className = cls; return el; };
   const percent = value => value == null ? '—' : new Intl.NumberFormat('ru-RU', {maximumFractionDigits:1}).format(value) + '%';
   const number = value => isFiniteNumber(value) ? new Intl.NumberFormat('ru-RU', {maximumFractionDigits:2}).format(value) : '—';
@@ -125,13 +127,99 @@
         const equipment = Array.isArray(facts.equipment) ? facts.equipment : [];
         const known = equipment.length && equipment.every(row => Number.isInteger(row.needed) && Number.isInteger(row.on_hand));
         const missing = known ? equipment.reduce((total, row) => total + Math.max(0, row.needed - row.on_hand), 0) : null;
-        value = missing === null ? '—' : missing ? number(missing) : 'Хватает';
-        label = missing ? 'устройств не хватает' : 'оборудование по району';
+        value = missing === null ? '—' : missing ? number(missing) : 'Есть запас';
+        label = missing ? 'устройств не хватает по району' : 'суммарно по району';
+        detail += '. Только назначенные визиты; передача между инженерами не подтверждена.';
       }
       card.append(text('h3', item.title), text('strong', value, 'risk-indicator-value'),
         text('span', label, 'risk-caption'), text('p', detail, 'risk-detail'));
       return card;
     }));
+  }
+
+  const attentionFilters = [
+    ['unassigned','Без исполнителя','заявок'], ['tight','Малый запас окна','визитов'],
+    ['verify','Проверить факты','инженеров'], ['overtime','Риск переработки','инженеров']
+  ];
+  const evidenceLabels = {fact:'Факт', plan:'По плану', forecast:'Прогноз', unknown:'Нужно уточнить'};
+  function currentAttention() {
+    const control = snapshot?.attention;
+    return control && control.plan_version === snapshot.context.plan_version && control.time === snapshot.context.time
+      && Array.isArray(control.items) && control.counts ? control : null;
+  }
+  function remainingLabel(minutes) {
+    if (!isFiniteNumber(minutes)) return 'Срок не указан';
+    if (minutes < 0) return 'Срок прошёл ' + Math.ceil(-minutes) + ' мин назад';
+    if (minutes === 0) return 'Срок сейчас';
+    return 'До срока ' + (minutes < 60 ? Math.floor(minutes) + ' мин' : Math.floor(minutes / 60) + ' ч ' + Math.floor(minutes % 60) + ' мин');
+  }
+  function attentionAction(item) {
+    if (item.action === 'resources') {
+      const link = text('a', 'Уточнить ресурсы', 'risk-resource-link');
+      link.href = window.FieldRouter ? window.FieldRouter.url('/crew') : '/crew';
+      return link;
+    }
+    const button = previewButton({id:item.id, action:['preview','completions'].includes(item.action) ? item.action : 'facts',
+      planVersion:item.plan_version, riskId:item.kind, engineerId:item.engineer_id,
+      requestId:item.requests?.[0]?.request_id || null});
+    button.textContent = item.action === 'preview' ? 'Рассмотреть варианты' : item.action === 'completions' ? 'Проверить результат' : item.kind === 'data' ? 'Связаться / уточнить' : 'Уточнить факт';
+    return button;
+  }
+  function renderAttention() {
+    const control = currentAttention(), list = $('risk-attention-list');
+    if (!list) return;
+    $('risk-attention-filters').replaceChildren(...attentionFilters.map(([key,label,unit]) => {
+      const count = control?.counts[key];
+      const button = text('button', null, 'risk-filter'); button.type = 'button'; button.dataset.filter = key;
+      button.setAttribute('aria-pressed', String(attentionFilter === key));
+      button.disabled = !control;
+      button.append(text('span', label), text('strong', Number.isInteger(count) ? count : '—'), text('small', unit));
+      button.onclick = () => {attentionFilter = attentionFilter === key ? 'all' : key; attentionLimit = 6; renderAttention();};
+      return button;
+    }));
+    $('risk-attention-all').setAttribute('aria-pressed', String(attentionFilter === 'all'));
+    const query = ($('risk-attention-search').value || '').trim().toLocaleLowerCase('ru');
+    const items = (control?.items || []).filter(item => (attentionFilter === 'all' || item.categories.includes(attentionFilter))
+      && (!query || [item.title,item.engineer_name,item.engineer_id,...(item.requests || []).flatMap(r => [r.request_id,r.address])].join(' ').toLocaleLowerCase('ru').includes(query)));
+    $('risk-attention-count').textContent = control ? 'Ситуаций: ' + items.length : '';
+    $('risk-attention-more').hidden = items.length <= attentionLimit;
+    $('risk-attention-more').textContent = 'Показать ещё · осталось ' + Math.max(0, items.length - attentionLimit);
+    if (!items.length) {
+      list.replaceChildren(text('p', !control ? 'Список ситуаций пока недоступен. Обновите данные; отсутствие списка не означает отсутствие рисков.'
+        : query || attentionFilter !== 'all' ? 'По этому фильтру ситуаций нет. Посмотрите остальные категории.'
+        : 'По доступным данным ситуаций для вмешательства не найдено. Это не гарантирует отсутствие рисков при неполных данных.', 'risk-empty'));
+    } else list.replaceChildren(...items.slice(0, attentionLimit).map(item => {
+      const card = text('article', null, 'risk-issue'); card.dataset.issue = item.id; card.dataset.severity = item.severity;
+      const body = text('div', null, 'risk-issue-body'), top = text('div', null, 'risk-issue-heading');
+      const badge = text('span', evidenceLabels[item.evidence] || 'Нужно уточнить', 'risk-evidence'); badge.dataset.evidence = item.evidence;
+      top.append(badge, text('h3', item.title)); body.append(top);
+      const requests = Array.isArray(item.requests) ? item.requests : [], single = requests.length === 1 ? requests[0] : null;
+      if (single) body.append(text('p', single.priority_label + ' · ' + single.request_id + ' · ' + single.address, 'risk-issue-subject'));
+      else if (requests.length) body.append(text('p', 'Затронуто заявок: ' + requests.length, 'risk-issue-subject'));
+      const meta = text('p', null, 'risk-issue-meta');
+      if (single && item.engineer_name) meta.append(text('span', item.engineer_name));
+      if (single) meta.append(text('span', 'Окна: ' + single.windows.map(w => clock(w.start) + '–' + clock(w.end)).join(' / ')));
+      if (isFiniteNumber(item.buffer_minutes)) meta.append(text('span', 'Запас по плану: ' + item.buffer_minutes + ' мин'));
+      body.append(meta);
+      body.append(text('p', item.detail.split('. ')[0] + (item.detail.includes('. ') ? '.' : ''), 'risk-issue-reason'));
+      const details = text('details', null, 'risk-issue-details'); details.open = expandedIssues.has(item.id);
+      details.append(text('summary', requests.length > 1 ? 'Причина и затронутые заявки' : 'Почему и что проверить'), text('p', item.detail));
+      if (requests.length > 1) {
+        const ul = text('ul');
+        requests.forEach(request => ul.append(text('li', request.priority_label + ' · ' + request.request_id + ' · ' + request.address
+          + (request.planned_start != null ? ' · по плану ' + clock(request.planned_start) : '') + ' · срок ' + clock(request.deadline)
+          + (item.kind === 'late' && isFiniteNumber(request.expected_late_minutes) ? ' · ожидаемое отклонение ≈ ' + Math.round(request.expected_late_minutes) + ' мин' : '')
+          + (item.kind === 'late' && probability(request.p_sla_breach) ? ' · оценка нарушения срока ' + percent(request.p_sla_breach * 100) : ''))));
+        details.append(ul);
+      }
+      details.addEventListener('toggle', () => {if (details.open) expandedIssues.add(item.id); else expandedIssues.delete(item.id);});
+      body.append(details);
+      const aside = text('div', null, 'risk-issue-action');
+      aside.append(text('strong', item.kind === 'overtime' ? 'К концу смены ' + clock(item.deadline) : remainingLabel(item.minutes_to_deadline)),
+        text('span', item.kind === 'overtime' ? '≈ ' + Math.round(item.expected_overtime_minutes) + ' мин сверх смены' : item.deadline != null ? 'Срок ' + clock(item.deadline) : '', 'hint'), attentionAction(item));
+      card.append(body, aside); return card;
+    }));
+    $('risk-data-notices').replaceChildren(...(control?.notices || []).map(notice => text('p', notice)));
   }
 
   function example() {
@@ -228,7 +316,6 @@
       : usable && modern && collectVisits(forecast).length ? [{visits:collectVisits(forecast)}] : [];
     detailsNode.hidden = !routes.length; container.replaceChildren();
     if (!routes.length) return;
-    detailsNode.open = true;
     const visitCount = routes.reduce((total, route) => total + (Array.isArray(route.visits) ? route.visits.filter(visit => visit && typeof visit === 'object').slice(0, 200).length : 0), 0);
     detailsNode.querySelector('summary').textContent = 'Визиты в плане · ' + visitCount;
     container.replaceChildren(...routes.map(route => {
@@ -311,6 +398,11 @@
   }
 
   function clearForecastDetails() {
+    if ($('risk-attention-list')) {
+      $('risk-attention-list').replaceChildren(); $('risk-attention-filters').replaceChildren();
+      $('risk-attention-count').textContent = ''; $('risk-attention-more').hidden = true;
+      $('risk-data-notices').replaceChildren();
+    }
     $('risk-raw-details').hidden=true;$('risk-raw-payload').textContent='';
     $('risk-engine-meta').hidden = true; $('risk-engine-meta').replaceChildren();
     $('risk-advisory-section').hidden = true; $('risk-advisories').replaceChildren();
@@ -334,8 +426,9 @@
       pending:'Обновляем оценку текущего плана…',
       stale:'Прогноз устарел. Нужна оценка текущей версии плана.'};
     $('risk-model-status').textContent = usable
-      ? (demo ? 'Учебный пример. ' : '') + 'Оценки помогают выбрать, что проверить. Фактические отклонения уточняйте у инженера.'
+      ? (demo ? 'Учебный пример — только в разделе «Ресурсы и расчёт». Список ситуаций относится к вашему плану. ' : '') + 'Прогнозы не откалиброваны на фактических исходах. Факты, расчёт по плану и прогнозы отмечены отдельно.'
       : forecast.status === 'ready' ? notices.stale : notices[forecast.status] || notices.error;
+    if (currentAttention()?.gps_available === false) $('risk-model-status').textContent += ' GPS-сигналы для плана недоступны.';
     const risks = modern ? engineRisks(forecast) : legacyResults(forecast, usable);
     $('risk-forecasts').replaceChildren(...(usable ? risks.filter(validRisk).map(result => renderRiskCard(result, demo, forecastCounts(forecast))) : []));
     const advisoryForecast = Array.isArray(snapshot.advisories) && !Array.isArray(forecast.advisories)
@@ -343,8 +436,10 @@
     const explicitAdvisories = Array.isArray(advisoryForecast.advisories);
     const advisoryUsable = explicitAdvisories ? matches : usable;
     $('risk-raw-details').hidden=!usable;
-    $('risk-raw-payload').textContent=usable?JSON.stringify({demo,context:snapshot.context,forecast},null,2):'';
+    $('risk-raw-payload').textContent=usable?JSON.stringify({demo,context:snapshot.context,forecast,attention:currentAttention()},null,2):'';
     renderMeta(forecast, usable, modern); renderAdvisories(advisoryForecast, risks, advisoryUsable, modern, demo);
+    // Operational incidents already include GPS and facts; avoid a duplicate feed.
+    if (currentAttention()) {$('risk-advisory-section').hidden = true; $('risk-advisories').replaceChildren();}
     renderRoutes(forecast, usable, modern, demo); renderAssumptions(forecast, usable, modern);
   }
 
@@ -398,8 +493,9 @@
     }
   }
 
-  async function load() {
-    clearSummary();
+  const summaryContext = data => JSON.stringify(data, (key, value) => key === 'snapshot_id' ? undefined : value);
+  async function load(background = false) {
+    if (!background) clearSummary();
     const current = ++sequence; controller?.abort(); controller = new AbortController();
     const requestController = controller;
     const signal = controller.signal, timeout = setTimeout(() => requestController.abort(), 6000);
@@ -415,15 +511,20 @@
       if (current !== sequence) return;
       if (!validSnapshot(data)) throw Error('Не удалось прочитать показатели. Проверьте совместимость модуля риска.');
       if (version !== null && data.context.plan_version !== version) throw Error('Версия плана изменилась. Нажмите «Обновить» в шапке и откройте показатели снова.');
+      if (planTime !== null && data.context.time !== planTime) throw Error('Время плана изменилось. Обновите данные в шапке; прежние ситуации скрыты.');
+      // A background refresh gets a new snapshot ID even when the underlying
+      // facts are unchanged. Keep its completed explanation until facts change.
+      if (background && summaryContext(snapshot) !== summaryContext(data)) clearSummary();
       snapshot = data;
       const c = data.context, m = data.summary;
       $('risk-context').textContent = c.region + ' · ' + c.date + ' · на ' + clock(c.time)
-        + ' · бригад в расчёте ' + m.engineers + ' из ' + m.roster + ' · без назначения ' + m.unassigned;
+        + ' · план №' + c.plan_version + (c.mode === 'simulation' ? ' · исполнение моделируется' : '');
       $('risk-stale').hidden = !c.needs_replanning;
       $('risk-stale').textContent = 'Есть новые факты. Уточните статусы и пересчитайте оставшиеся визиты.';
-      renderIndicators(); renderForecast();
+      renderIndicators(); renderForecast(); renderAttention();
     } catch (error) {
       if (current !== sequence) return;
+      clearSummary();
       snapshot = null; demo = false;
       $('risk-demo').setAttribute('aria-pressed', 'false'); $('risk-demo').textContent = 'Показать учебный пример';
       $('risk-indicators').replaceChildren(); $('risk-forecasts').replaceChildren(); clearForecastDetails();
@@ -437,9 +538,20 @@
     }
   }
 
-  $('risk-refresh').onclick = load;
+  $('risk-refresh').onclick = () => load();
   $('risk-summary-button').onclick=summarizeDay;
-  $('risk-demo').onclick = () => {if (snapshot) {demo = !demo; clearSummary();summaryControls();renderForecast();}};
+  if ($('risk-attention-all')) {
+    $('risk-attention-all').onclick = () => {attentionFilter = 'all'; attentionLimit = 6; $('risk-attention-search').value = ''; renderAttention();};
+    $('risk-attention-search').addEventListener('input', () => {attentionLimit = 6; renderAttention();});
+    $('risk-attention-more').onclick = () => {attentionLimit += 6; renderAttention();};
+  }
+  $('risk-demo').onclick = () => {if (snapshot) {
+    demo = !demo; clearSummary(); summaryControls(); renderForecast();
+    if (demo && $('risk-resources')) {
+      $('risk-resources').open = true;
+      $('risk-resources').scrollIntoView?.({block:'start'});
+    }
+  }};
   $('risk-facts').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'facts'}}));
   $('risk-replan').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'replan'}}));
   window.addEventListener('workbench-tab', event => {active = ['risk','demo'].includes(event.detail.name); if (active) load();});
@@ -449,13 +561,16 @@
   });
   window.addEventListener('planning-state', event => {
     const runChanged = demoRunId !== (event.detail.demoRunId || null);
-    const changed = version !== event.detail.version || runChanged;
+    const timeChanged = Number.isFinite(event.detail.time) && planTime !== event.detail.time;
+    const changed = version !== event.detail.version || runChanged || timeChanged;
+    if (Number.isFinite(event.detail.time)) planTime = event.detail.time;
     version = event.detail.version; demoRunId = event.detail.demoRunId || null;
     if (changed) {
       clearSummary();
       // A reset can reuse version 1; invalidate outstanding responses as well
       // as the snapshot so a previous run cannot reappear on another tab.
       sequence++; controller?.abort(); snapshot = null; demo = false;
+      if (runChanged) {attentionFilter = 'all'; attentionLimit = 6; expandedIssues.clear();}
       $('risk-indicators').replaceChildren(); $('risk-forecasts').replaceChildren(); clearForecastDetails();
       $('risk-demo').disabled = true; $('risk-refresh').disabled = false;
       $('risk-demo').setAttribute('aria-pressed', 'false');
@@ -466,4 +581,8 @@
     }
   });
   window.addEventListener('focus', () => {if (active) load();});
+  // GPS freshness may change without a new plan version. Never advance simulated time here.
+  if (typeof window.setInterval === 'function') window.setInterval(() => {
+    if (active && !planningBusy && !summaryController && !document.hidden && !$('risk-refresh').disabled) load(true);
+  }, 30000);
 })();

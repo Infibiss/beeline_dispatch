@@ -32,7 +32,12 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
       if(await menu.isVisible() && await menu.getAttribute('aria-expanded')!=='true')await menu.click();
       await page.locator('#tab-'+name).click();
       await page.locator('#panel-'+name).waitFor({state:'visible'});
-      if(name==='risk')await page.waitForFunction(()=>!document.querySelector('#risk-refresh').disabled);
+      if(name==='risk'){
+        await page.waitForFunction(()=>!document.querySelector('#risk-refresh').disabled);
+        // This suite exercises the retained diagnostic contract. The operational
+        // list and collapsed-by-default layout are covered by browser_day_control.
+        if(await page.locator('#risk-resources').getAttribute('open')===null)await page.locator('#risk-resources>summary').click();
+      }
     }
     const before=await get('/api/state');
     await page.goto(base);await tab('risk');
@@ -68,6 +73,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     await tab('demo');await page.click('#risk-demo');await tab('risk');
     // Future model payload: valid, stale, and invalid values must be distinguished.
     const snapshot=await get('/api/risk');
+    delete snapshot.attention; // legacy/future forecast compatibility, no operational projection
     let forecast={status:'ready',region:snapshot.context.region,plan_version:snapshot.context.plan_version,
       model_version:'test-model',horizon_minutes:120,risks:[{id:'windows',measure:'probability',value:.41,
         reasons:['<img src=x onerror=alert(1)>'],recommendation:'Проверить окно'}]};
@@ -105,9 +111,11 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.equal(await page.locator('.risk-prediction').count(),4);
     assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'1 из 1');
     assert.equal(await page.locator('[data-risk="vehicle"] .risk-probability').textContent(),'64 / 100');
-    assert.doesNotMatch(await page.locator('#risk-model-status').textContent(),/калибр|risk-engine|600/i);
+    assert.doesNotMatch(await page.locator('#risk-model-status').textContent(),/risk-engine|600/i);
+    assert.match(await page.locator('#risk-model-status').textContent(),/не откалиброваны/);
     assert.match(await page.locator('[data-risk="sla"] .risk-prediction-label').textContent(),/визитов/);
     assert.equal(await page.locator('#risk-engine-meta').isVisible(),false);
+    await page.locator('#risk-route-details>summary').click();
     assert.equal(await page.locator('#risk-routes').isVisible(),true);
     assert.match(await page.locator('#risk-routes').textContent(),/10:20/);
     assert.match(await page.locator('#risk-routes').textContent(),/11:30/);
@@ -151,7 +159,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     await tab('risk');await page.waitForSelector('.risk-card');
     await page.click('#risk-replan');assert.equal(await page.locator('#panel-events').isVisible(),true);
     assert.deepEqual(posts,[]);
-    await page.selectOption('#region-select','south-east');await page.waitForURL(base+'/r/south-east/');
+    await page.selectOption('#region-select','south-east');await page.waitForURL(url=>url.origin===base && url.pathname==='/r/south-east/');
     await tab('risk');await page.waitForSelector('.risk-card');
     assert.match(await page.locator('#risk-context').textContent(),/^Юго-восток/);
     await page.goto(base+'/regions/east/');await tab('risk');await page.waitForSelector('.risk-card');

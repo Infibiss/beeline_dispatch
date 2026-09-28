@@ -63,8 +63,32 @@
     for(const key of operations?.assignment_summary?.pending_request_ids || [])assigned.delete(key);
     return {served:top.filter(request=>assigned.has(request.id)).length,total:top.length};
   }
+  function assignmentExplanation(record, scenario, operations = {}) {
+    if (!record.visit || !record.route) return null;
+    const {request,visit,engineer,route}=record, lines=[];
+    const stale=Boolean(record.pendingReassignment || operations.needs_replanning);
+    const clock=value=>Number.isFinite(value)?String(Math.floor(value/60)).padStart(2,'0')+':'+String(value%60).padStart(2,'0'):'—';
+    if ((engineer?.skills || []).includes(request.skill)) {
+      lines.push('Квалификация: у инженера есть навык «'+(SKILL[request.skill] || request.skill)+'». '+
+        (request.required_transport ? (engineer.transport===request.required_transport?'Требуемый транспорт совпадает.':'Транспорт требует проверки.') : 'Ограничения по типу транспорта в заявке нет.'));
+    } else lines.push('Квалификацию инженера нужно подтвердить: в доступных данных нет совпадающего навыка.');
+    const window=(request.windows || []).find(w=>w.start<=visit.start && visit.start<=w.end);
+    const inShift=engineer?.shift && engineer.shift.start<=visit.arrival-visit.travel_minutes && visit.end<=engineer.shift.end;
+    lines.push(window && inShift ? 'По расчёту начало в окне клиента, дорога и работа укладываются в смену.' : 'Окно клиента и границы смены требуют проверки по актуальным данным.');
+    const index=route.visits.findIndex(v=>v.request_id===request.id), previous=route.visits[index-1], next=route.visits[index+1];
+    const name=key=>(scenario.requests || []).find(r=>r.id===key)?.address || key;
+    const origin=previous?name(previous.request_id):'стартовая точка инженера';
+    lines.push('Место '+(index+1)+' из '+route.visits.length+': '+origin+' → '+(visit.travel_minutes ?? '—')+' мин в пути → начало '+clock(visit.start)+
+      (visit.start>visit.arrival?' (ожидание '+(visit.start-visit.arrival)+' мин до окна).':'.')+
+      (next?' Далее: '+name(next.request_id)+' в '+clock(next.start)+'.':' Это последний визит маршрута.'));
+    const loadout=route.loadout, stock=engineer?.stock;
+    if(loadout && stock) lines.push(loadout.router<=stock.router && loadout.tv_box<=stock.tv_box ?
+      'Оборудования хватает на весь этот маршрут с учётом остальных заявок.' : 'Оборудование для всего маршрута требует повторной проверки.');
+    else if(request.equipment?.router || request.equipment?.tv_box) lines.push('Потребность в оборудовании учтена в плане; фактическую выдачу нужно подтвердить.');
+    return {stale,lines,stored:visit.explanation || '',notice:'Объяснение допустимости выбранного порядка, а не доказательство единственного или оптимального маршрута.'};
+  }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {timelineSegments,buildRecords,filterRecords,validLocation,routeCoordinates,nearestPointId,priorityLabel,prioritySummary};
+    module.exports = {timelineSegments,buildRecords,filterRecords,validLocation,routeCoordinates,nearestPointId,priorityLabel,prioritySummary,assignmentExplanation};
     return;
   }
   const $ = id => document.getElementById(id);
@@ -97,6 +121,54 @@
   const markers = new Map();
   let tileState = '';
   let geoStatus = '';
+  const narrativeCache=new Map();
+  let narrativeAccount;
+  function canExplain(record) {
+    return Boolean(payload.operations?.assignment_explanation_enabled && !payload.operations.historical &&
+      !payload.operations.preview && !payload.operations.needs_replanning && !record.pendingReassignment);
+  }
+  async function loadNarrative(record) {
+    const data={version:payload.operations.version,request_id:record.request.id};
+    if(payload.operations.demo_run_id)data.demo_run_id=payload.operations.demo_run_id;
+    const url=new URL('./api/assignment-explanation',location.href).pathname;
+    const options={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};
+    let client;
+    try {if(window.parent!==window)client=window.parent.FieldRouter;} catch (_) {}
+    let response;
+    if(client)response=await client.fetch(url,options);
+    else {
+      narrativeAccount ||= fetch('/api/auth/me',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json();});
+      const account=await narrativeAccount;
+      options.headers['X-CSRF-Token']=account.csrf || '';
+      response=await fetch(url,options);
+    }
+    if(!response.ok)throw Error(response.status===409?'План изменился — обновите карточку.':'Пояснение ИИ недоступно — ниже проверенные основания.');
+    const result=await response.json();
+    if(result.version!==data.version || result.request_id!==data.request_id || result.demo_run_id!== (data.demo_run_id || null))throw Error('Пояснение относится к другой версии плана.');
+    return result;
+  }
+  function renderNarrative(record, container, verifiedSections) {
+    if(!canExplain(record))return;
+    const section=node('section',null,'assignment-ai');section.dataset.requestId=record.request.id;
+    const heading=node('div',null,'assignment-ai-heading');heading.append(node('h4','Смысл решения'),node('span','YandexGPT','assignment-ai-badge'));
+    const content=node('div');content.append(node('p','Готовлю короткое пояснение…','assignment-ai-status'));
+    section.append(heading,content);container.append(section);
+    const key=payload.operations.version+':'+record.request.id;
+    if(!narrativeCache.has(key))narrativeCache.set(key,loadNarrative(record).catch(error=>({source:'verified',paragraphs:[],notice:error.message || 'Пояснение ИИ недоступно — ниже проверенные основания.'})));
+    narrativeCache.get(key).then(result=>{
+      if(selected!==record.request.id || !section.isConnected)return;
+      content.replaceChildren();
+      if(result.source==='yandexgpt' && Array.isArray(result.paragraphs) && result.paragraphs.length) {
+        result.paragraphs.forEach(text=>content.append(node('p',text)));
+        content.append(node('small','ИИ поясняет расчёт, но не выбирает инженера и не меняет план.','assignment-ai-note'));
+        verifiedSections.forEach(details=>{details.open=false;});
+      } else {
+        heading.lastChild.textContent='По расчёту';
+        section.classList.add('assignment-ai-fallback');
+        content.append(node('p',result.notice || 'Ниже — проверенные основания расчёта.','assignment-ai-status'));
+      }
+    });
+  }
   const usingLeaflet = realGeography && Boolean(window.L);
 
   $('scenario-date').textContent = scenario.date || 'Дата не указана';
@@ -171,6 +243,8 @@
     container.append(node('div',requestName(request.id),'card-id'),node('h3',request.address || 'Адрес не указан','card-address'),
       node('div',record.pendingReassignment?'Требует переназначения':visit?'Назначена · '+(record.engineer?.name || record.route.engineer_id):'Без назначения','card-state'+(visit && !record.pendingReassignment?'':' unassigned')));
     if(record.pendingReassignment)container.append(node('p','Прежний исполнитель недоступен или отказался от выезда. Ниже сохранено старое расписание для сравнения; назначение больше не считается действующим.','notice'));
+    const verifiedSections=[];
+    renderNarrative(record,container,verifiedSections);
     const list=node('dl',null,'facts');
     fact(list,'Окно клиента',windows(request));
     fact(list,'Работа на объекте',number(request.duration_minutes)+' мин · '+(SKILL[request.skill] || request.skill || '—'));
@@ -197,6 +271,40 @@
     const location=locations[request.id];
     if (location?.quality === 'approximate') fact(list,'Уточнить адрес',location.label || request.address,'reason');
     container.append(list);
+    const explanation=assignmentExplanation(record,scenario,payload.operations);
+    if(explanation) {
+      const section=node(canExplain(record)?'details':'section',null,'assignment-explanation');
+      if(canExplain(record)) {
+        section.open=true;section.append(node('summary','Проверенные основания расчёта'));verifiedSections.push(section);
+      } else section.append(node('h4',explanation.stale?'Почему назначали в прежнем плане':'Почему этот инженер и порядок визитов'));
+      if(explanation.stale)section.append(node('p','Это объяснение сохранённого расписания. После новых фактов назначение нужно перепроверить.','reason'));
+      explanation.lines.forEach(line=>section.append(node('p',line)));
+      if(explanation.stored) {
+        const details=node('details');details.append(node('summary','Сохранённое объяснение расчёта'),node('p',explanation.stored));section.append(details);
+      }
+      section.append(node('p',explanation.notice,'muted'));container.append(section);
+    }
+    const diagnosis=plan.diagnostics?.unassigned_diagnostics?.[request.id];
+    if(!visit && diagnosis) {
+      const details=node('details',null,'assignment-explanation');details.append(node('summary','Проверка инженеров и мест в маршрутах'));
+      if(payload.operations?.needs_replanning)details.append(node('p','Проверка относится к прежнему плану; новые факты требуют пересчёта.','reason'));
+      const labels={region:'Другой район',skill:'Нет нужного навыка',transport:'Не тот транспорт',off_duty:'Не работает',declined:'Отказ от заявки',shift_capacity:'Работа не помещается в доступную смену',stock:'Не хватает свободного оборудования',fixed_slot:'Есть вставка без переноса прежних визитов',retimed_slot:'Есть вставка с переносом времени',no_slot:'Нет вставки в текущий порядок'};
+      (diagnosis.engineers || []).forEach(item=>{
+        let text=(item.engineer_name || item.engineer_id)+': '+(labels[item.status] || item.status);
+        if(item.checked_positions)text+=' · проверено мест: '+item.checked_positions;
+        if(item.obstacles?.window)text+=' · окно не соблюдается: '+item.obstacles.window;
+        if(item.obstacles?.shift)text+=' · выход за смену: '+item.obstacles.shift;
+        if(item.remaining_stock)text+=' · свободно роутеров / приставок: '+item.remaining_stock.router+' / '+item.remaining_stock.tv_box;
+        details.append(node('p',text));
+        for(const example of item.obstacle_examples || []) {
+          const address=(scenario.requests || []).find(r=>r.id===example.request_id)?.address || example.request_id;
+          if(example.type==='window')details.append(node('p','Место '+example.position+': к заявке «'+address+'» прибытие '+time(example.arrival)+', начало нужно не позднее '+time(example.latest_start)+'.','muted'));
+          if(example.type==='shift')details.append(node('p','Место '+example.position+': заявка «'+address+'» закончилась бы в '+time(example.end)+', смена до '+time(example.shift_end)+'.','muted'));
+        }
+      });
+      details.append(node('p','Проверены вставки в текущий порядок и выданный запас. Другая перестановка или обмен заявками может дать результат.','muted'));
+      container.append(details);
+    }
   }
   function renderSchedule() {
     const target=$('schedule');target.replaceChildren();

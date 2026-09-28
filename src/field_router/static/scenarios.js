@@ -25,6 +25,15 @@
       const duration = Number(input.duration), router = Number(input.router);
       if (!Number.isInteger(duration) || duration < 1 || duration > 1440 || !Number.isInteger(router) || router < 0) throw new Error('Проверьте длительность и количество роутеров.');
       Object.assign(event, {anchor_id: input.target, duration_minutes: duration, router});
+      if (input.requiredTransport) {
+        if (!['car','walk','bicycle','public'].includes(input.requiredTransport)) throw new Error('Выберите допустимый тип транспорта.');
+        event.required_transport = input.requiredTransport;
+      }
+      if (input.type === 'emergency' && input.emergencyWindowEnabled) {
+        const start = minute(input.emergencyWindowStart), end = minute(input.emergencyWindowEnd);
+        if (start > end || end < event.time) throw new Error('Проверьте клиентское окно аварийной заявки.');
+        Object.assign(event, {window_start: start, window_end: end});
+      }
       if (input.type === 'new_request') {
         const tv = Number(input.tvBox || 0), start = minute(input.windowStart), end = minute(input.windowEnd);
         if (!['connection','local','addon'].includes(input.workKind) || !Number.isInteger(tv) || tv < 0 || tv > 100 || start > end || end < event.time) throw new Error('Проверьте тип, окно клиента и оборудование новой заявки.');
@@ -307,6 +316,11 @@
     $('emergency-fields').hidden = !newJob;
     $('duration').disabled = !newJob; $('router').disabled = !newJob;
     $('ordinary-fields').hidden = !ordinary;
+    $('new-request-constraints').hidden = !newJob;
+    $('required-transport').disabled = !newJob;
+    $('emergency-window-panel').hidden = !emergency;
+    $('emergency-window-enabled').disabled = !emergency;
+    emergencyWindowFields();
     for (const id of ['work-kind','window-start','window-end','new-tv']) $(id).disabled = !ordinary;
     $('redirect').closest('label').hidden = !emergency; $('redirect').disabled = !emergency;
     const offDuty = state.engineers.filter(item => item.off_duty === true);
@@ -337,6 +351,13 @@
     const engineer = (state?.engineers || []).find(item => item.id === $('call-off-duty-engineer').value);
     $('call-off-duty-window-hint').textContent = engineer ?
       'Исходный график: ' + time(engineer.shift_start) + '–' + time(engineer.shift_end) + '. Для выхода в другое время укажите обе границы.' : '';
+  }
+  function emergencyWindowFields() {
+    const enabled=$('event-type').value==='emergency' && $('emergency-window-enabled').checked;
+    $('emergency-window-inputs').hidden=!enabled;
+    for(const id of ['emergency-window-start','emergency-window-end']) {
+      $(id).disabled=!enabled;$(id).required=enabled;
+    }
   }
   function renderReplanningPool() {
     const pool = Array.isArray(state?.replanning_pool) ? state.replanning_pool : [];
@@ -656,8 +677,9 @@
       const status = {new:'Ожидает',assigned:'Назначена',unassigned:'Без исполнителя',cancelled:'Отменена'}[item.status] || item.status;
       card.append(element('strong', `${kind} · ${item.id} · ${status}`));
       card.append(element('p', item.address));
-      const window = item.event.type === 'new_request' ? ` · окно ${time(item.event.window_start)}–${time(item.event.window_end)}` : '';
-      card.append(element('p', `Поступила ${time(item.event.time)}${window} · работа ${item.event.duration_minutes} мин`,'hint'));
+      const window = item.event.window_start != null ? ` · окно ${time(item.event.window_start)}–${time(item.event.window_end)}` : '';
+      const transport = item.event.required_transport ? ' · транспорт: '+({car:'автомобиль',walk:'пешком',bicycle:'велосипед',public:'общественный транспорт'}[item.event.required_transport] || item.event.required_transport) : '';
+      card.append(element('p', `Поступила ${time(item.event.time)}${window} · работа ${item.event.duration_minutes} мин${transport}`,'hint'));
       return card;
     };
     $('incoming-list').replaceChildren(...(pending.length ? [...pending].reverse().map(incomingCard) : [element('p','Сейчас нет новых заявок.','hint')]));
@@ -1125,6 +1147,7 @@
   $('event-form').addEventListener('input', () => { localScopeEngineerIds=[]; const hadBatch = !!batch; resetCandidates('Параметры изменены. Рассчитайте варианты.'); if (hadBatch) $('status').textContent = 'Параметры изменены — предыдущий расчёт сброшен.'; });
   function defaultDuration() { $('duration').value = $('event-type').value === 'new_request' ? ({connection:70,local:30,addon:20}[$('work-kind').value]) : 80; }
   $('event-type').addEventListener('change', () => { targets(); defaultDuration(); });
+  $('emergency-window-enabled').addEventListener('change', emergencyWindowFields);
   $('call-off-duty-engineer').addEventListener('change', () => {
     $('call-off-duty-confirmed').checked = false; $('call-off-duty-reason').value = '';
     $('call-off-duty-window-start').value = ''; $('call-off-duty-window-end').value = '';
@@ -1137,6 +1160,8 @@
     try { payload = eventPayload(state.version, {id: uniqueEventId(), type: $('event-type').value, time: $('event-time').value, target: $('event-target').value,
       engineerIds:[...$('event-engineers').querySelectorAll('input:checked:not(:disabled)')].map(input=>input.value),
       duration: $('duration').value, router: $('router').value, tvBox:$('new-tv').value, workKind:$('work-kind').value, windowStart:$('window-start').value, windowEnd:$('window-end').value, redirect: $('redirect').checked, preserve: true,
+      requiredTransport:$('required-transport').value, emergencyWindowEnabled:$('emergency-window-enabled').checked,
+      emergencyWindowStart:$('emergency-window-start').value, emergencyWindowEnd:$('emergency-window-end').value,
       offDutyEngineerId:$('call-off-duty-engineer').value, offDutyConfirmed:$('call-off-duty-confirmed').checked, offDutyReason:$('call-off-duty-reason').value,
       offDutyWindowStart:$('call-off-duty-window-start').value, offDutyWindowEnd:$('call-off-duty-window-end').value,
       localScopeEngineerIds}); }
@@ -1284,6 +1309,9 @@
       $('error').textContent='Показатели относятся к другой версии плана. Обновите контроль дня.';$('error').hidden=false;return;
     }
     clearGpsDelay();
+    if (event.detail?.action === 'completions') {
+      activateTab('facts'); $('completion-panel').scrollIntoView({block:'center'}); return;
+    }
     if (event.detail?.action === 'facts') {
       activateTab('facts');$('fact-edit').value='';$('fact-late').checked=false;$('correction-reason').value='';
       for(const id of ['fact-remaining','fact-router','fact-tv'])$(id).value='';

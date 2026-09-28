@@ -7,6 +7,13 @@ from urllib.parse import urlsplit, parse_qs
 from .auth import AuthError
 
 
+_BRAND_FILES = {
+    '/brand.css': ('brand.css', 'text/css; charset=utf-8'),
+    '/assets/beeline-logo.png': ('brand/beeline-logo.png', 'image/png'),
+    '/assets/beeline-symbol.svg': ('brand/beeline-symbol.svg', 'image/svg+xml'),
+}
+
+
 class AuthHttp:
     def __init__(self, store, regions, static, secure):
         self.store, self.regions, self.static, self.secure = store, regions, static, secure
@@ -61,6 +68,12 @@ class AuthHttp:
         region = parts[2] if regional else self.regions.default_key
         route = '/'+'/'.join(parts[3:]) if regional else raw.path
         handler.identity = None
+        # Only these public brand resources are needed before login. No
+        # directory traversal, arbitrary static files or API access is exposed.
+        if handler.command == 'GET' and route in _BRAND_FILES:
+            name, kind = _BRAND_FILES[route]
+            handler.reply(200, (self.static/name).read_bytes(), kind)
+            return True
         if not self.store:
             if route=='/api/auth/me':
                 handler.reply(200, {'role':'demo', 'username':'Демонстрация', 'csrf':''})
@@ -118,6 +131,8 @@ class AuthHttp:
                     raise AuthError('Раздел доступен только диспетчеру', 403)
                 if handler.command=='POST' and route not in {'/api/gps/telemetry','/api/engineer/facts',
                                                                '/api/engineer/unavailability','/api/engineer/decline',
+                                                               '/api/engineer/unavailability/update','/api/engineer/unavailability/cancel',
+                                                               '/api/engineer/return',
                                                                '/api/gps/mobile'}:
                     raise AuthError('Действие доступно только диспетчеру', 403)
                 if route=='/api/engineer' and parse_qs(raw.query).get('engineer_id') != [identity['engineer_id']]:

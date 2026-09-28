@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffdc00">
+  <meta name="theme-color" content="#ffc800">
   <title>Мой день · Выездной инженер</title>
   <link rel="stylesheet" href="/assets/leaflet.css">
   <link rel="stylesheet" href="/engineer.css">
@@ -14,11 +14,13 @@
   <script src="/gps-android.js" defer></script>
   <script src="/apk-download.js" defer></script>
 <script src="/time-input.js" defer></script>
+<link rel="stylesheet" href="/brand.css">
+<link rel="icon" type="image/svg+xml" href="/assets/beeline-symbol.svg">
 </head>
 <body>
   <a href="#main" class="skip-link">К заданиям</a>
   <header class="app-header">
-    <a class="brand" href="/engineer" aria-label="Мой день инженера"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span>Инженер</span></a>
+    <a class="brand" href="/engineer" aria-label="Мой день инженера"><img class="brand-logo" src="/assets/beeline-logo.png" alt="билайн" width="132" height="26"><span>Инженер</span></a>
     <a class="dispatcher-link" href="/">Диспетчер ↗</a>
   </header>
   <main id="main">
@@ -26,10 +28,10 @@
       <div class="identity-select"><label for="engineer-select">Инженер</label><select id="engineer-select" disabled><option>Загрузка инженеров…</option></select></div>
       <button type="button" class="icon-button" id="refresh" aria-label="Обновить задания">↻</button>
     </section>
-    <div class="sync-line"><span id="connection" role="status">Подключение…</span><span id="plan-version">—</span></div>
+    <div class="sync-line"><span id="connection" role="status">Подключение…</span><span id="plan-version" hidden>—</span></div>
     <p id="error" class="notice error" role="alert" hidden></p>
     <p id="updates" class="notice" role="status" hidden></p>
-    <p id="replan-note" class="notice" hidden>Диспетчер обновляет план. Пока действуют последние утверждённые назначения.</p>
+    <p id="replan-note" class="notice" hidden>Ожидаем обновления заданий.</p>
     <section id="panel-tasks" class="tab-panel" aria-labelledby="tab-tasks">
       <div class="page-heading"><div><p id="work-date" class="eyebrow">РАБОЧИЙ ДЕНЬ</p><h1>Мои задачи</h1></div><span id="region" class="region"></span></div>
       <div class="stats" aria-label="Итоги дня"><div><strong id="pending-count">—</strong><span>осталось</span></div><div><strong id="done-count">—</strong><span>выполнено</span></div><div><strong id="distance">—</strong><span>км по плану</span></div></div>
@@ -42,74 +44,69 @@
       <div class="page-heading"><div><p class="eyebrow">ТОЧКИ ВЫЕЗДОВ</p><h1>Мой маршрут</h1></div><button type="button" id="fit-map" class="secondary">Все точки</button></div>
       <div id="engineer-map" aria-label="Карта назначенных заявок"></div>
       <p id="map-note" class="muted"></p>
-      <p class="muted">На карте — адреса заявок, не GPS-позиция телефона. Нажмите на точку, чтобы открыть задание.</p>
+      <p class="muted">Адреса ваших заявок.</p>
       <div id="map-tasks" class="map-tasks"></div>
     </section>
     <section id="panel-shift" class="tab-panel" aria-labelledby="tab-shift" hidden>
-      <div class="page-heading"><div><p class="eyebrow">РАБОЧИЙ ПРОФИЛЬ</p><h1>Моя смена</h1></div></div>
-      <article class="surface"><div class="section-top"><h2 id="engineer-name">Инженер</h2><span id="engineer-status" class="pill">Нет отметки</span></div><dl id="shift-details" class="detail-grid"></dl><div class="button-row"><button type="button" class="primary" id="shift-start">На смене / свободен</button><button type="button" class="secondary" id="shift-problem">Сообщить о недоступности</button></div></article>
-      <article class="surface" aria-labelledby="unavailability-title">
-        <h2 id="unavailability-title">Период недоступности</h2>
-        <p class="muted">Укажите, когда не сможете работать. Диспетчер проверит период и переназначит заявки. В выходной новые заявки автоматически не назначаются.</p>
-        <form id="unavailability-form"><fieldset id="unavailability-fields" disabled>
-          <div class="input-pair"><div><label for="unavailability-start-date">С даты</label><input id="unavailability-start-date" type="date" required></div><div><label for="unavailability-start-time">С времени</label><input id="unavailability-start-time" type="time" required></div></div>
-          <div class="input-pair"><div><label for="unavailability-end-date">По дату</label><input id="unavailability-end-date" type="date" required></div><div><label for="unavailability-end-time">До времени</label><input id="unavailability-end-time" type="time" required></div></div>
-          <label for="unavailability-reason">Причина</label><select id="unavailability-reason" required><option value="">Выберите причину</option><option value="sick">Болезнь</option><option value="transport">Проблема с транспортом</option><option value="personal">Личные обстоятельства</option><option value="other">Другое</option></select>
-          <label for="unavailability-comment">Пояснение диспетчеру</label><textarea id="unavailability-comment" rows="2" minlength="3" maxlength="1000" placeholder="Кратко опишите ситуацию" required></textarea>
-          <div id="unavailability-location-group" hidden><label for="unavailability-location">Где вы сейчас</label><select id="unavailability-location"></select><p class="muted">Для периода, который уже начался, укажите известную точку.</p></div>
-          <p id="unavailability-error" class="notice error" role="alert" hidden></p>
-          <button id="unavailability-submit" class="primary" type="submit">Сообщить о периоде</button>
-        </fieldset></form>
-        <div id="unavailability-list" aria-live="polite"></div>
+      <div class="page-heading"><h1>Профиль</h1></div>
+      <article class="surface shift-card">
+        <div class="section-top"><h2>Рабочий день</h2><span id="engineer-status" class="pill">Не на смене</span></div>
+        <p id="shift-plan-context" class="muted"></p>
+        <dl id="shift-details" class="day-strip"></dl>
+        <div id="shift-activity" class="shift-activity" hidden></div>
+        <button type="button" class="primary" id="shift-start">Начать смену</button>
       </article>
-      <article id="android-app" class="surface app-install" aria-labelledby="android-app-title">
-        <h2 id="android-app-title">Приложение для Android</h2>
-        <p id="android-apk-help" class="muted">Установите приложение инженера или скачайте обновление. В приложении доступны ваши задания и встроенный GPS.</p>
-        <p><a id="android-apk-download" class="primary app-install-download" href="/engineer-app.apk" download>Скачать APK для Android</a></p>
-        <p id="android-apk-status" role="status" class="gps-message"></p>
+      <article class="surface availability-card" aria-labelledby="availability-title">
+        <div class="section-top"><h2 id="availability-title">Доступность для заявок</h2></div>
+        <div id="availability-summary" class="availability-summary" aria-live="polite" hidden></div>
+        <div class="button-row availability-actions"><button type="button" class="primary" id="shift-return" hidden>Я снова доступен</button><button type="button" class="secondary" id="shift-problem">Сообщить об отсутствии</button></div>
       </article>
       <article class="surface gps-box" aria-labelledby="gps-title">
         <div class="section-top"><h2 id="gps-title">Геолокация</h2><span id="gps-state" class="pill">Выключена</span></div>
-        <p id="gps-explanation">Передавайте координаты диспетчеру во время смены. История хранится до 7 дней; срок может изменить администратор.</p>
+        <p id="gps-explanation" class="muted">Передача координат диспетчеру.</p>
+        <dl class="detail-grid gps-summary"><div><dt>Точность и время</dt><dd id="gps-fix">Нет координаты</dd></div><div><dt>Последняя отправка</dt><dd id="gps-sent">Ещё не передавали</dd></div></dl>
         <div class="button-row"><button id="gps-start" class="primary" type="button" disabled>Включить GPS</button><button id="gps-stop" class="secondary" type="button" disabled>Выключить</button></div>
-        <p id="gps-feedback" role="status" class="gps-message">Передача начинается только с вашего разрешения.</p>
-        <label><input id="gps-keep-awake" type="checkbox"> Не выключать экран во время передачи из браузера</label>
-        <dl class="detail-grid"><dt>Последняя точка</dt><dd id="gps-fix">Ещё нет</dd><dt>Передано серверу</dt><dd id="gps-sent">Ещё нет</dd></dl>
-        <p class="muted">± метры — погрешность измерения, не расстояние до заявки. Для высокой точности разрешите точное местоположение в настройках телефона и выйдите на открытое место. Браузер не гарантирует передачу при блокировке экрана.</p>
-        <details id="gps-native-panel"><summary>Передача при закрытом экране</summary>
-          <p>Traccar Client — дополнительный вариант фоновой передачи. В нашем Android-приложении GPS уже встроен; скачать приложение можно отдельной кнопкой выше.</p>
-          <p>Заявки и рабочие отметки остаются в этом кабинете. Настройка ниже сама по себе не включает передачу.</p>
-          <ol class="gps-setup-steps">
-            <li><a href="https://www.traccar.org/client/" target="_blank" rel="noopener noreferrer">Установите Traccar Client для Android или iPhone</a>.</li>
-            <li>Подготовьте подключение и нажмите «Открыть приложение и настроить». Адрес сервера и личный ключ передадутся автоматически.</li>
-            <li>В приложении разрешите точное местоположение и работу в фоне, включите передачу (Service status). Вернитесь сюда, чтобы проверить получение первой точки.</li>
-          </ol>
-          <div class="button-row"><button id="gps-native-connect" class="primary" type="button">Подготовить подключение</button><button id="gps-native-revoke" class="secondary" type="button">Отключить телефон</button></div>
-          <p id="gps-native-status" role="status" class="gps-message">Проверяем подключение телефона…</p>
-          <button id="gps-native-refresh" class="secondary" type="button">Проверить получение координаты</button>
-          <div id="gps-native-credentials" hidden>
-            <a id="gps-native-open" class="primary gps-open-app">Открыть приложение и настроить</a>
-            <p class="muted">Если приложение не открылось, установите его по ссылке выше и нажмите ещё раз. После обновления страницы для повторной настройки понадобится подготовить новое подключение.</p>
-            <details id="gps-native-manual"><summary>Ручная настройка, если приложение не открылось</summary>
-              <p>Эти поля нужны только для ручной настройки Traccar Client. Личный ключ не пересылайте.</p>
-              <label for="gps-native-url">Адрес сервера (Server URL)</label><input id="gps-native-url" readonly autocomplete="off">
-              <label for="gps-native-id">Личный ключ (Device identifier)</label><input id="gps-native-id" readonly autocomplete="off" type="password"><button id="gps-native-reveal" class="secondary" type="button">Показать ключ</button>
-              <p>Точность: Highest; интервал: 15 сек; расстояние: 0; при остановке: 30 сек; сохранение без сети: Offline buffering. Затем включите Service status.</p>
-            </details>
-          </div>
-          <p class="muted">Подключение действует 12 часов. Пока фоновая передача не подтверждена, можно пользоваться кнопкой «Включить GPS» выше и держать страницу открытой. Выход из кабинета не останавливает отдельное приложение: в конце смены нажмите «Выключить» и остановите передачу в Traccar Client.</p>
-        </details>
+        <p id="gps-feedback" role="status" class="gps-message"></p>
+        <label class="checkbox-row"><input id="gps-keep-awake" type="checkbox"><span>Не выключать экран при передаче GPS</span></label>
       </article>
-      <article class="surface"><h2>Оборудование</h2><p class="muted">Выдано утром, использовано и доступно с учётом резерва текущей работы.</p><div id="equipment" class="equipment"></div></article>
-      <article class="surface"><h2>Мои отметки</h2><p class="muted">Отправленные статусы и комментарии видны диспетчеру.</p><div id="fact-list"></div></article>
-      <p class="demo-note">Проверьте дату смены и время перед отправкой отметок. Push-уведомления пока недоступны.</p>
+      <article class="surface equipment-card"><div class="section-top"><h2>Оборудование</h2><span class="muted">Доступно</span></div><div id="equipment" class="equipment"></div></article>
+      <details id="android-app" class="app-install">
+        <summary>Приложение для Android</summary>
+        <a id="android-apk-download" class="secondary app-install-download" href="/engineer-app.apk" download>Скачать APK</a>
+        <span id="android-apk-help" class="muted">Для передачи GPS при выключенном экране.</span>
+        <p id="android-apk-status" role="status" class="gps-message"></p>
+      </details>
     </section>
   </main>
   <nav class="bottom-nav" aria-label="Разделы инженера">
     <button id="tab-tasks" type="button" aria-current="page" aria-controls="panel-tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M3 6h1M3 12h1M3 18h1"/></svg>Задачи</button>
     <button id="tab-map" type="button" aria-controls="panel-map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/></svg>Карта</button>
-    <button id="tab-shift" type="button" aria-controls="panel-shift"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Смена</button>
+    <button id="tab-shift" type="button" aria-controls="panel-shift"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Профиль</button>
   </nav>
+  <dialog id="availability-dialog" aria-labelledby="unavailability-title">
+    <div class="dialog-top"><h2 id="unavailability-title">Период отсутствия</h2><button id="close-availability" class="icon-button" type="button" aria-label="Закрыть">×</button></div>
+    <p id="absence-day" class="muted"></p>
+    <form id="unavailability-form"><fieldset id="unavailability-fields" disabled>
+      <label for="unavailability-start-mode">Начало отсутствия</label><select id="unavailability-start-mode"><option value="now">Сейчас</option><option value="later">Указать дату и время</option></select>
+      <div id="unavailability-start-fields" class="input-pair" hidden><div><label for="unavailability-start-date">С даты</label><input id="unavailability-start-date" type="date" required></div><div><label for="unavailability-start-time">Со времени</label><input id="unavailability-start-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required></div></div>
+      <label for="unavailability-duration">Окончание отсутствия</label><select id="unavailability-duration"><option value="fixed">Указать время</option><option value="unknown">Пока не знаю</option></select>
+      <div id="unavailability-end-fields" class="input-pair"><div><label for="unavailability-end-date">До даты</label><input id="unavailability-end-date" type="date" required></div><div><label for="unavailability-end-time">До времени</label><input id="unavailability-end-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required></div></div>
+      <label for="unavailability-reason">Причина</label><select id="unavailability-reason" required><option value="">Выберите причину</option><option value="sick">Болезнь</option><option value="transport">Транспорт</option><option value="personal">Личные обстоятельства</option><option value="other">Другое</option></select>
+      <label for="unavailability-comment">Комментарий <span class="optional">· необязательно</span></label><textarea id="unavailability-comment" rows="2" maxlength="1000" placeholder="Что нужно знать диспетчеру"></textarea>
+      <p id="unavailability-error" class="notice error" role="alert" hidden></p>
+      <button id="unavailability-submit" class="primary" type="submit">Сообщить диспетчеру</button>
+    </fieldset></form>
+  </dialog>
+  <dialog id="absence-cancel-dialog" aria-labelledby="absence-cancel-title">
+    <div class="dialog-top"><h2 id="absence-cancel-title">Отменить отсутствие</h2><button id="close-absence-cancel" class="icon-button" type="button" aria-label="Закрыть отмену">×</button></div>
+    <p id="absence-cancel-period"></p>
+    <p class="muted">Диспетчер получит исправление.</p>
+    <form id="absence-cancel-form"><fieldset id="absence-cancel-fields">
+      <label for="absence-cancel-reason">Причина отмены</label><select id="absence-cancel-reason"><option>Отправлено по ошибке</option><option>Планы изменились</option></select>
+      <p id="absence-cancel-error" class="notice error" role="alert" hidden></p>
+      <button id="confirm-absence-cancel" class="primary" type="submit">Отменить отсутствие</button>
+    </fieldset></form>
+  </dialog>
   <dialog id="task-dialog" aria-labelledby="dialog-title">
     <div class="dialog-top"><span id="dialog-kicker" class="eyebrow">ЗАДАНИЕ</span><button id="close-dialog" class="icon-button" type="button" aria-label="Закрыть карточку">×</button></div>
     <h2 id="dialog-title"></h2>
@@ -120,7 +117,7 @@
         <h3 id="action-title"></h3>
         <p id="action-day" class="muted"></p>
         <label for="action-time">Время факта</label><input id="action-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" title="Время в формате ЧЧ:ММ, от 00:00 до 23:59" autocomplete="off" required>
-        <p class="muted">Укажите время события в текущем рабочем дне.</p>
+
         <div id="location-field"><label for="action-location">Где вы сейчас</label><select id="action-location"></select></div>
         <div id="remaining-field"><label for="action-remaining" id="remaining-label">Осталось работы, мин</label><input id="action-remaining" type="number" inputmode="numeric" min="1" max="1440" step="1"></div>
         <div id="consumed-fields"><p class="field-label">Фактически использовано</p><div class="input-pair"><div><label for="action-router">Роутеров</label><input id="action-router" type="number" inputmode="numeric" min="0" step="1"></div><div><label for="action-tv">ТВ-приставок</label><input id="action-tv" type="number" inputmode="numeric" min="0" step="1"></div></div></div>
@@ -131,10 +128,10 @@
     </form>
     <form id="decline-form" hidden>
       <fieldset id="decline-fields">
-        <h3>Не могу выехать на заявку</h3>
-        <p class="muted">Диспетчер получит сообщение и проверит новое назначение.</p>
+        <h3>Проблема с заявкой</h3>
+
         <label for="decline-time">Время сообщения</label><input id="decline-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required>
-        <label for="decline-comment">Почему не можете выехать</label><textarea id="decline-comment" rows="3" minlength="3" maxlength="1000" placeholder="Причина для диспетчера" required></textarea>
+        <label for="decline-comment">Что мешает выполнить заявку</label><textarea id="decline-comment" rows="3" minlength="3" maxlength="1000" placeholder="Причина для диспетчера" required></textarea>
         <p id="decline-error" role="alert" class="notice error" hidden></p>
         <div class="button-row"><button id="send-decline" type="submit" class="primary">Отправить диспетчеру</button><button id="cancel-decline" type="button" class="secondary">Назад к заявке</button></div>
       </fieldset>

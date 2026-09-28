@@ -23,7 +23,8 @@ from .completion import pending_completions
 from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
                           application_risk_seed)
 from .service_observations import confirmed_service_observations
-from .availability import day_blocks, day_interval, make_period, shift_blocks
+from .availability import (day_blocks, day_interval, make_period, shift_blocks, stamp,
+                           project_availability, availability_at)
 
 
 WORK_KINDS = {'connection': ('Подключение', Skill.CONNECTION, 'high'),
@@ -228,6 +229,8 @@ class ScenarioSession:
         self.dispatch_notifications=[]
         self.decision_log=[]
         self.autopilot_last_failure_at=None
+        self.gps_travel_estimates={}
+        self.gps_autopilot_history=[]
         self.execution_mode='simulation'
         self.needs_replanning=False
         self.views={}
@@ -301,6 +304,16 @@ class ScenarioSession:
     def _record_fact(self,payload):
         from .fact_journal import record
         fact=record(self,payload)
+        # Check the newly submitted fact, not historical facts replayed by the
+        # journal. A correction must not silently override a declared absence.
+        blocks=shift_blocks(self.unavailability,fact['engineer_id'],self.scenario.date,
+                            self._availability_shift(fact['engineer_id']))
+        availability=availability_at(
+            project_availability(blocks,self.fact_log,fact['engineer_id']),fact['time'])
+        if fact['status'] in ('available','traveling','working') and availability=='absent':
+            raise ValueError('Действует период недоступности. Для досрочного возвращения нажмите «Я снова доступен».')
+        if fact['status'] in ('traveling','working') and availability=='awaiting_return':
+            raise ValueError('После периода недоступности сначала подтвердите возвращение и текущую точку.')
         from .completion import refresh_frozen_report
         refresh_frozen_report(self, fact)
         self.version+=1;self.needs_replanning=True
@@ -310,9 +323,9 @@ class ScenarioSession:
         self._save_view('Фактический статус; требуется пересчет')
         return self.state()
 
-    def report_unavailability(self,payload):
+    def report_unavailability(self,payload,*,current_minute=None):
         candidate=deepcopy(self)
-        result=candidate._report_unavailability(payload)
+        result=candidate._report_unavailability(payload,current_minute=current_minute)
         self.__dict__.update(candidate.__dict__)
         return result
 
@@ -324,46 +337,296 @@ class ScenarioSession:
             return self.activated_off_duty_windows.get(engineer_id,current.shift)
         return initial.shift
 
-    def _report_unavailability(self,payload):
+    def _report_unavailability(self,payload,*,current_minute=None):
+        now=self.time if current_minute is None else current_minute
         if type(payload.get('version')) is not int or payload['version']!=self.version:
             raise ValueError('Устаревшая версия плана')
         locations=set(self.scenario.points)|set(self.geo_locations)
         engineer_roster={eid:e.model_copy(update={'shift':self._availability_shift(eid)})
                          for eid,e in self.initial_engineers.items()}
-        period=make_period(payload,self.scenario.date,self.time,engineer_roster,locations,self.unavailability)
+        period=make_period(payload,self.scenario.date,now,engineer_roster,locations,self.unavailability)
         engineer_id=period['engineer_id']
         block=day_interval(period,self.scenario.date)
         shift=self._availability_shift(engineer_id)
         if block and block[0]<shift.end and shift.start<block[1]:
             # Reporting an absence must not silently complete or interrupt work.
             current=self.statuses.get(engineer_id,{})
-            if current.get('status')=='working' and block[0]<self.time+current['remaining_minutes']:
+            if current.get('status')=='working' and block[0]<now+current['remaining_minutes']:
                 raise ValueError('Сначала прервите или завершите начатую работу')
             for route in self.plan.routes:
                 if route.engineer_id!=engineer_id:continue
-                if any(v.start<=self.time<v.end and block[0]<v.end for v in route.visits):
-                    if current.get('status') not in ('completed','completion_pending','interrupted'):
+                if any(v.start<=now<v.end and block[0]<v.end for v in route.visits):
+                    if not current and self.execution_mode!='manual':
                         raise ValueError('Сначала прервите или завершите начатую работу')
         self.unavailability.append(period)
         self.version+=1
         if block and block[0]<shift.end and shift.start<block[1]:
             self.needs_replanning=True
             self.pending_report_ids.append(period['id'])
-            affected=self.pending_reassignment_ids(engineer_id)
-            if affected:
-                self.dispatch_notifications.append({'id':uuid4().hex,'kind':'replan_required',
-                    'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
-                    'title':f'Инженер недоступен: визитов для пересчёта {len(affected)}',
-                    'text':'Проверьте заявки, требующие внимания, и подтвердите новый план после расчёта.',
-                    'request_ids':affected})
+        affected=self.pending_reassignment_ids(engineer_id)
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'replan_required',
+            'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+            'engineer_id':engineer_id,'report_id':period['id'],
+            'title':self.initial_engineers[engineer_id].name+' сообщил об отсутствии',
+            'text':period['start_date']+' '+period['start_time']+' — '+period['end_date']+' '+period['end_time']+
+                   '. '+period['reason_label']+'.'+(' Пересчитайте затронутые назначения.' if affected else ''),
+            'request_ids':affected})
         self.batches.clear()
         self.history.append({'version':self.version,'event':{'id':period['id'],'type':'unavailability_report',
-            'time':self.time,'engineer_id':engineer_id,'start_date':period['start_date'],
+            'time':now,'engineer_id':engineer_id,'start_date':period['start_date'],
             'start_time':period['start_time'],'end_date':period['end_date'],
             'end_time':period['end_time'],'reason':period['reason']}})
         self._refresh_fact_inventory()
         self._save_view('Инженер сообщил период недоступности')
         return self.state()
+
+    def _editable_absence(self,payload,*,current_minute=None):
+        current_minute=self.time if current_minute is None else current_minute
+        if type(payload.get('version')) is not int or payload['version']!=self.version:
+            raise ValueError('Устаревшая версия плана')
+        eid=payload.get('engineer_id')
+        if not isinstance(eid,str) or eid not in self.initial_engineers:
+            raise ValueError('Неизвестный инженер')
+        period=next((item for item in self.unavailability if item['id']==payload.get('report_id')
+                     and item['engineer_id']==eid and item.get('source')=='engineer'),None)
+        if period is None:raise ValueError('Ваше сообщение об отсутствии не найдено')
+        if any(period.get(key) for key in ('revoked','early_return','return_confirmation')):
+            raise ValueError('Отсутствие уже завершено или отменено')
+        now=stamp(self.scenario.date,'00:00')+current_minute
+        if stamp(period['end_date'],period['end_time'])<=now:
+            raise ValueError('Прошедшее отсутствие нельзя изменить; обратитесь к диспетчеру')
+        return period,stamp(period['start_date'],period['start_time'])<=now
+
+    def update_unavailability(self,payload,*,current_minute=None):
+        candidate=deepcopy(self)
+        result=candidate._update_unavailability(payload,current_minute=current_minute)
+        self.__dict__.update(candidate.__dict__)
+        return result
+
+    def _update_unavailability(self,payload,*,current_minute=None):
+        now=self.time if current_minute is None else current_minute
+        allowed={'version','engineer_id','report_id','start_date','start_time','end_date',
+                 'end_time','reason','comment','location_id','start_mode'}
+        if set(payload)-allowed:raise ValueError('Неизвестные поля изменения отсутствия')
+        period,started=self._editable_absence(payload,current_minute=now)
+        old=deepcopy(period);eid=period['engineer_id']
+        data={key:value for key,value in payload.items() if key!='report_id'}
+        validation_time=now
+        if started:
+            if (data.get('start_date'),data.get('start_time'))!=(period['start_date'],period['start_time']):
+                raise ValueError('Начало текущего отсутствия уже зафиксировано')
+            if data.get('start_mode') not in (None,'now','later'):
+                raise ValueError('Выберите начало отсутствия')
+            data.pop('start_mode',None)
+            validation_time=stamp(period['start_date'],period['start_time'])-stamp(self.scenario.date,'00:00')
+            if stamp(data.get('end_date'),data.get('end_time'))<=stamp(self.scenario.date,'00:00')+now:
+                raise ValueError('Для возвращения сейчас нажмите «Я снова доступен»')
+            # An edit does not move the place where the original absence began.
+            if data.get('location_id',period.get('location_id'))!=period.get('location_id'):
+                raise ValueError('Место начала текущего отсутствия уже зафиксировано')
+            data['location_id']=period.get('location_id')
+        roster={key:e.model_copy(update={'shift':self._availability_shift(key)})
+                for key,e in self.initial_engineers.items()}
+        updated=make_period(data,self.scenario.date,validation_time,roster,
+                            set(self.scenario.points)|set(self.geo_locations),
+                            [item for item in self.unavailability if item['id']!=period['id']],
+                            # A later edit cannot invent where a scheduled
+                            # absence began after its start has elapsed.
+                            preserve_unknown_location=started and period.get('location_id') is None)
+        block=day_interval(updated,self.scenario.date)
+        shift=self._availability_shift(eid)
+        current=self.statuses.get(eid,{})
+        if block and block[0]<shift.end and shift.start<block[1] and current.get('status')=='working' and block[0]<now+current['remaining_minutes']:
+            raise ValueError('Сначала прервите или завершите начатую работу')
+        if not started and block and block[0]<shift.end and shift.start<block[1] and not current and self.execution_mode!='manual':
+            if any(v.start<=now<v.end and block[0]<v.end for route in self.plan.routes
+                   if route.engineer_id==eid for v in route.visits):
+                raise ValueError('Сначала прервите или завершите начатую работу')
+        changed={key:updated[key] for key in ('start_date','start_time','end_date','end_time',
+                                            'reason','reason_label','comment','location_id')}
+        if all(period.get(key)==value for key,value in changed.items()):
+            raise ValueError('Нет изменений для сохранения')
+        period.update(changed)
+        period.setdefault('revisions',[]).append({'previous':{key:old.get(key) for key in changed},
+            'recorded_at':datetime.now(timezone.utc).isoformat(),'source':'engineer'})
+        if period['id'] not in self.pending_report_ids:self.pending_report_ids.append(period['id'])
+        self.version+=1;self.needs_replanning=True;self.batches.clear()
+        self.history.append({'version':self.version,'event':{'id':'update:'+period['id'],
+            'type':'unavailability_updated','time':now,'engineer_id':eid,
+            'report_id':period['id'],'previous':old,'updated':deepcopy(period)}})
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'replan_required',
+            'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+            'engineer_id':eid,'report_id':period['id'],
+            'title':self.initial_engineers[eid].name+' изменил отсутствие',
+            'text':'Проверьте новый период и пересчитайте план.',
+            'request_ids':self.pending_reassignment_ids(eid)})
+        self._refresh_fact_inventory();self._save_view('Изменено отсутствие; требуется пересчёт')
+        return self.state()
+
+    def cancel_unavailability(self,payload,*,current_minute=None):
+        candidate=deepcopy(self)
+        result=candidate._cancel_unavailability(payload,current_minute=current_minute)
+        self.__dict__.update(candidate.__dict__)
+        return result
+
+    def _record_absence_correction(self,eid,location,comment,source,*,current_minute=None):
+        """Correct a dated report without clearing an independent current fact."""
+        now=self.time if current_minute is None else current_minute
+        latest=self.statuses.get(eid,{})
+        if latest.get('status') in ('unavailable','working'):
+            return None
+        if latest.get('time')==now and location is not None and latest.get('location_id')==location:
+            return None
+        from .fact_journal import record
+        return record(self,{'version':self.version,'engineer_id':eid,'status':'available',
+            'time':now,'location_id':location,'source':source,'comment':comment})
+
+    def _cancel_unavailability(self,payload,*,current_minute=None):
+        now=self.time if current_minute is None else current_minute
+        if set(payload)-{'version','engineer_id','report_id','correction_reason','location_id'}:
+            raise ValueError('Неизвестные поля отмены отсутствия')
+        period,started=self._editable_absence(payload,current_minute=now)
+        reason=payload.get('correction_reason')
+        if not isinstance(reason,str) or not 3<=len(reason.strip())<=1000:
+            raise ValueError('Укажите причину отмены для журнала')
+        eid=period['engineer_id'];location=payload.get('location_id')
+        if location is not None and (not isinstance(location,str) or location not in (
+                set(self.scenario.points)|set(self.geo_locations))):
+            raise ValueError('Укажите подтверждённую текущую точку')
+        period.update(revoked=True,revoked_reason=reason.strip(),revoked_by='engineer',
+                      revoked_at=datetime.now(timezone.utc).isoformat())
+        self.pending_report_ids=[key for key in self.pending_report_ids if key!=period['id']]
+        event={'id':'cancel:'+period['id'],'type':'unavailability_cancelled','time':now,
+               'engineer_id':eid,'report_id':period['id'],'reason':reason.strip()}
+        history={'event':event}
+        if started:
+            # Cancelling a dated report cannot clear a separate open-ended
+            # unavailable fact. Same-minute declarations retain journal order.
+            fact=self._record_absence_correction(eid,location,
+                'Отмена ошибочного отсутствия: '+reason.strip(),'engineer',current_minute=now)
+            if fact is not None:history['fact']=fact
+            marker='cancel:'+period['id']
+            self.pending_report_ids.append(marker)
+            event['pending_report_id']=marker
+        self.version+=1;self.needs_replanning=True;self.batches.clear()
+        history['version']=self.version;self.history.append(history)
+        self.dispatch_notifications.append({'id':uuid4().hex,'kind':'replan_required',
+            'time':datetime.now(timezone.utc).isoformat(),'version':self.version,
+            'engineer_id':eid,'report_id':period['id'],
+            'title':self.initial_engineers[eid].name+' отменил отсутствие',
+            'text':'Причина: '+reason.strip()+'. '+(
+                'Уточните место начала маршрута и пересчитайте план.'
+                if started and location is None else 'Проверьте назначения и пересчитайте план.'),
+            'request_ids':self.pending_reassignment_ids(eid)})
+        self._refresh_fact_inventory();self._save_view('Отменено отсутствие; требуется пересчёт')
+        return self.state()
+
+    def return_from_absence(self,payload):
+        candidate=deepcopy(self)
+        result=candidate._return_from_absence(payload)
+        self.__dict__.update(candidate.__dict__)
+        return result
+
+    def _return_from_absence(self,payload):
+        allowed={'version','engineer_id','report_id','unavailable_fact_id','time','location_id'}
+        if set(payload)-allowed:raise ValueError('Неизвестные поля возвращения')
+        if type(payload.get('version')) is not int or payload['version']!=self.version:
+            raise ValueError('Устаревшая версия плана')
+        eid=payload.get('engineer_id')
+        if not isinstance(eid,str) or eid not in self.initial_engineers:
+            raise ValueError('Неизвестный инженер')
+        now=payload.get('time')
+        if type(now) is not int or not self.time<=now<1440:
+            raise ValueError('Укажите время возвращения не раньше текущего времени плана')
+        location=payload.get('location_id')
+        if location is not None and (not isinstance(location,str) or location not in (set(self.scenario.points)|set(self.geo_locations))):
+            raise ValueError('Укажите подтверждённую текущую точку')
+        clock=f'{now//60:02}:{now%60:02}'
+        instant=stamp(self.scenario.date,clock)
+        report_id=payload.get('report_id')
+        period=None
+        unavailable_fact_id=None
+        return_info={'date':self.scenario.date,'time':clock,'location_id':location,
+                     'recorded_at':datetime.now(timezone.utc).isoformat(),'source':'engineer'}
+        if report_id is not None:
+            if payload.get('unavailable_fact_id') is not None:
+                raise ValueError('Укажите один источник недоступности')
+            period=next((item for item in self.unavailability if item['id']==report_id
+                         and item['engineer_id']==eid),None)
+            if period is None:raise ValueError('Период недоступности не найден')
+            if period.get('revoked') or period.get('early_return') or period.get('return_confirmation'):
+                raise ValueError('Период уже завершён или отменён')
+            start=stamp(period['start_date'],period['start_time'])
+            end=stamp(period['end_date'],period['end_time'])
+            if instant<start:
+                raise ValueError('Время возвращения должно попадать в действующий период')
+            if instant<end:
+                # Preserve the elapsed absence and the originally promised end.
+                period['early_return']={**return_info,
+                    'original_end_date':period['end_date'],'original_end_time':period['end_time']}
+                period.update(end_date=self.scenario.date,end_time=clock)
+            else:
+                blocks=shift_blocks([period],eid,self.scenario.date,self._availability_shift(eid))
+                if availability_at(project_availability(blocks,self.fact_log,eid),now)!='awaiting_return':
+                    raise ValueError('Период уже завершён; подтверждение возвращения не требуется')
+                period['return_confirmation']=return_info
+            marker=period['id']
+        else:
+            unavailable=self.statuses.get(eid,{})
+            if unavailable.get('status')!='unavailable':
+                raise ValueError('Нет действующей недоступности; обновите смену')
+            unavailable_fact_id=unavailable.get('id') or next((fact['id'] for fact in reversed(self.fact_log)
+                if fact['engineer_id']==eid and fact['status']=='unavailable' and fact['time']==unavailable['time']),None)
+            if not unavailable_fact_id:raise ValueError('Сообщение о недоступности не найдено; обновите смену')
+            expected=payload.get('unavailable_fact_id')
+            if expected is not None and expected!=unavailable_fact_id:
+                raise ValueError('Сообщение о недоступности изменилось; обновите смену')
+            marker='return:'+unavailable_fact_id
+        # A return from one reason cannot silently override another active period.
+        blocks=shift_blocks(self.unavailability,eid,self.scenario.date,self._availability_shift(eid))
+        if availability_at(project_availability(blocks,self.fact_log,eid),now)=='absent':
+            raise ValueError('Действует другой период недоступности; обновите смену')
+        from .fact_journal import record
+        fact=record(self,{'version':self.version,'engineer_id':eid,'status':'available',
+                         'time':now,'location_id':location,'source':'engineer',
+                         'comment':'Возвращение после недоступности'})
+        if marker not in self.pending_report_ids:self.pending_report_ids.append(marker)
+        self.version+=1;self.needs_replanning=True;self.batches.clear()
+        event={'id':'return:'+marker,'type':'engineer_return','time':now,
+               'engineer_id':eid,'pending_report_id':marker}
+        if period:event['report_id']=period['id']
+        if unavailable_fact_id:event['unavailable_fact_id']=unavailable_fact_id
+        self.history.append({'version':self.version,'fact':fact,'event':event})
+        self.dispatch_notifications.append({
+            'id':uuid4().hex,'kind':'replan_required','version':self.version,
+            'time':datetime.now(timezone.utc).isoformat(),
+            'title':self.initial_engineers[eid].name+' снова доступен',
+            'text':'Возвращение в '+clock+'. '+(
+                'Уточните место начала маршрута и пересчитайте план.' if location is None
+                else 'Пересчитайте план.'),
+            'engineer_id':eid,'report_id':period['id'] if period else None,
+            'request_ids':self.pending_reassignment_ids(eid)})
+        self._refresh_fact_inventory()
+        self._save_view('Инженер вернулся; требуется пересчёт')
+        return self.state()
+
+    def location_confirmation_pending(self,engineer_id,*,current_minute=None):
+        """A declaration without a location cannot establish a route origin."""
+        from .availability import location_confirmation_pending
+        now=self.time if current_minute is None else current_minute
+        return location_confirmation_pending(
+            project_availability([],self.fact_log,engineer_id),now)
+
+    def return_pending_replan(self,engineer_id):
+        """Both dated and open-ended returns await a new approved assignment."""
+        pending=set(self.pending_report_ids)
+        if any(item['engineer_id']==engineer_id and item['id'] in pending and
+               (item.get('early_return') or item.get('return_confirmation')) and not item.get('revoked')
+               for item in self.unavailability):return True
+        return any(item.get('event',{}).get('type') in (
+                   'engineer_return','unavailability_cancelled','engineer_report_revoked') and
+                   item['event'].get('engineer_id')==engineer_id and
+                   item['event'].get('pending_report_id') in pending for item in self.history)
 
     def decline_assignment(self,payload):
         candidate=deepcopy(self)
@@ -414,6 +677,7 @@ class ScenarioSession:
         declines={(item['engineer_id'],item['request_id']) for item in self.declined_assignments
                   if item['id'] in pending and not item.get('revoked')}
         periods=[item for item in self.unavailability if item['id'] in pending and not item.get('revoked')]
+        returning={eid for eid in self.initial_engineers if self.return_pending_replan(eid)}
         done={f['request_id'] for f in self.fact_log if f['status'] in ('completed','completion_pending')}
         result=set()
         routes=[(r.engineer_id,[v.model_dump() for v in r.visits]) for r in self.plan.routes]
@@ -425,7 +689,7 @@ class ScenarioSession:
             for visit in visits:
                 key=visit['request_id']
                 if key in done:continue
-                if (eid,key) in declines or any(visit['end']>start for start,_ in blocks):
+                if eid in returning or (eid,key) in declines or any(visit['end']>start for start,_ in blocks):
                     result.add(key)
                 elif self.needs_replanning and self.statuses.get(eid,{}).get('status')=='unavailable':
                     result.add(key)
@@ -471,17 +735,20 @@ class ScenarioSession:
             eid=owners.get(key)
             report=declines.get((eid,key))
             visit=visits.get(key)
-            period=next((item for item in periods.get(eid,[]) if visit and any(
+            period=next((item for item in periods.get(eid,[]) if item.get('early_return') or item.get('return_confirmation') or (visit and any(
                 visit['end']>block[0] for block,_ in shift_blocks(
-                    [item],eid,self.scenario.date,self._availability_shift(eid)))),None)
+                    [item],eid,self.scenario.date,self._availability_shift(eid))))),None)
             detail={'report_type':'decline','reason':'Отказ от выезда',
                     'report_id':report['id'],'comment':report['comment']} if report else (
-                {'report_type':'unavailability','reason':period['reason_label'],
+                {'report_type':'unavailability','reason':('Досрочное возвращение' if period.get('early_return') else 'Инженер вернулся')
+                 if period.get('early_return') or period.get('return_confirmation') else period['reason_label'],
                  'report_id':period['id'],'comment':period['comment'],'start_date':period['start_date'],
                  'start_time':period['start_time'],'end_date':period['end_date'],
                  'end_time':period['end_time']} if period and key in pending else
                 {'report_type':'fact' if key in pending else None,
-                 'reason':unassigned[key].reason if key in unassigned else 'Инженер сообщил недоступность через статус'})
+                 'reason':unassigned[key].reason if key in unassigned else (
+                     'Инженер вернулся; требуется пересчёт' if eid in self.initial_engineers and self.return_pending_replan(eid)
+                     else 'Инженер сообщил недоступность через статус')})
             rows.append({'request_id':key,'address':self.catalog[key].address,
                 'engineer_id':eid,'status':'awaiting_replan' if key in pending else 'unassigned',
                 'previous_engineer_id':previous_owners.get(key) if eid is None else None,
@@ -529,12 +796,14 @@ class ScenarioSession:
         item.update(revoked=True,revoked_reason=reason.strip(),
                     revoked_at=datetime.now(timezone.utc).isoformat(),revoked_by='dispatcher')
         self.pending_report_ids=[key for key in self.pending_report_ids if key!=report_id]
+        correction_fact=None
+        marker=None
         if period:
             if started:
-                from .fact_journal import record
-                record(self,{'version':self.version,'engineer_id':eid,'status':'available',
-                    'time':now,'location_id':payload['location_id'],
-                    'comment':'Исправление периода: '+reason.strip()})
+                correction_fact=self._record_absence_correction(eid,payload['location_id'],
+                    'Исправление периода: '+reason.strip(),'dispatcher')
+                marker='revoke:'+report_id
+                self.pending_report_ids.append(marker)
         elif decline['exclusion_added'] and not any(other is not decline and
                 not other.get('revoked') and other['engineer_id']==eid and
                 other['request_id']==decline['request_id'] for other in self.declined_assignments):
@@ -547,14 +816,34 @@ class ScenarioSession:
                 restore_request(request) if request.id==key else request
                 for request in self.scenario.requests]})
         self.version+=1;self.needs_replanning=True;self.batches.clear()
-        self.history.append({'version':self.version,'event':{'id':'revoke:'+report_id,
+        history={'version':self.version,'event':{'id':'revoke:'+report_id,
             'type':'engineer_report_revoked','time':now,'engineer_id':eid,
             'report_id':report_id,'report_type':'unavailability' if period else 'decline',
-            'reason':reason.strip()}})
+            'reason':reason.strip()}}
+        if marker:history['event']['pending_report_id']=marker
+        if correction_fact is not None:history['fact']=correction_fact
+        self.history.append(history)
         self._refresh_fact_inventory()
         self._save_view('Исправлено сообщение инженера; требуется пересчет')
         return self.state()
 
+
+    def _inventory_dispatchable(self,eid):
+        availability=availability_at(project_availability(shift_blocks(
+            self.unavailability,eid,self.scenario.date,self._availability_shift(eid)),
+            self.fact_log,eid),self.time)
+        current=next((e for e in self.scenario.engineers if e.id==eid),None)
+        return (availability=='available' and not self.return_pending_replan(eid) and
+                self.statuses.get(eid,{}).get('status')!='unavailable' and
+                current is not None and not current.off_duty and
+                (self.execution_mode!='manual' or eid in self.statuses) and
+                current.shift.end>self.time)
+
+    def _refresh_inventory_dispatchability(self):
+        # Preview inventory describes the future residual route. Live inventory
+        # follows the current plan clock, without changing its stock ledger.
+        for row in self.inventory:
+            row['dispatchable']=self._inventory_dispatchable(row['engineer_id'])
 
     def _refresh_fact_inventory(self):
         result=[]
@@ -577,13 +866,8 @@ class ScenarioSession:
                 for k in reserved:reserved[k]+=max(0,getattr(self.catalog[key].equipment,k)-sum(f['consumed'][k] for f in self.fact_log if f.get('request_id')==key))
             available={k:getattr(initial,k)-consumed[k]-reserved[k] for k in consumed}
             if any(v<0 for v in available.values()):raise ValueError('Фактический расход/резерв превышает запас')
-            active_absence=any(start<=self.time<end for (start,end),_ in shift_blocks(
-                self.unavailability,eid,self.scenario.date,self._availability_shift(eid)))
-            current_engineer=next((e for e in self.scenario.engineers if e.id==eid),None)
             result.append({'engineer_id':eid,'consumed':consumed,'reserved':reserved,'available':available,
-                'dispatchable':not active_absence and fact.get('status')!='unavailable' and
-                current_engineer is not None and not current_engineer.off_duty and
-                (self.execution_mode!='manual' or eid in self.statuses) and current_engineer.shift.end>self.time})
+                'dispatchable':self._inventory_dispatchable(eid)})
         self.inventory=result
 
     def mode(self):
@@ -624,6 +908,7 @@ class ScenarioSession:
                 'time':datetime.now(timezone.utc).isoformat(),'version':candidate.version,
                 'title':f'Поступило заявок: {len(added)}',
                 'text':'Новые заявки ожидают распределения.', 'request_ids':[item['id'] for item in added]})
+            candidate._refresh_inventory_dispatchability()
             candidate._save_view(f'Поступило заявок: {len(added)}')
         self.__dict__.update(candidate.__dict__)
         return {'added':len(added),'duplicates':len(rows)-len(added),'state':self.state()}
@@ -769,7 +1054,10 @@ class ScenarioSession:
                 'shift':self.activated_off_duty_windows[e.id]})
                 if e.id in self.activated_off_duty_windows and not e.off_duty
                 else e for e in s.engineers]})
-        revoked_workers={item['engineer_id'] for item in self.unavailability if item.get('revoked')}
+        # Previously approved absences may have narrowed the saved shift.
+        # Rebuild its bounds before applying edited/cancelled reports again.
+        revoked_workers={item['engineer_id'] for item in self.unavailability
+                         if item.get('revoked') or item.get('revisions')}
         if revoked_workers:
             s=s.model_copy(update={'engineers':[e.model_copy(update={'shift':TimeWindow(
                 start=min(e.shift.start,self.initial_engineers[e.id].shift.start),
@@ -930,13 +1218,12 @@ class ScenarioSession:
             block=current_blocks.get(e.id)
             engineer_blocks=blocks.get(e.id,[])
             shift_end=e.shift.end
-            unknown_ends=[end for (start,end),item in engineer_blocks
-                          if start<=now and not item.get('location_id')]
-            confirmed_return=(not unknown_ends or any(f['engineer_id']==e.id and
-                f['status']=='available' and f['time']>=max(unknown_ends) and
-                bool(f.get('location_id')) for f in self.fact_log))
+            scheduled_end=(activation_window.end if e.id in activation_ids and activation_window
+                           else self._availability_shift(e.id).end)
+            availability=availability_at(
+                project_availability(engineer_blocks,self.fact_log,e.id),now)
             if any(end<=now for (start,end),_ in engineer_blocks):
-                shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
+                shift_end=max(shift_end,scheduled_end)
             if block is not None:
                 start,end,item=block
                 if now<start:
@@ -945,25 +1232,30 @@ class ScenarioSession:
                     ready=max(ready,end)
                     # A current-location declaration prevents planning a
                     # fictional trip from the last published stop after an
-                    # active absence. It is deliberately required at intake.
+                    # active absence. Reporting itself may omit the location.
                     if item.get('location_id'):
                         location=item['location_id']
-                    shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
+                    shift_end=max(shift_end,scheduled_end)
                     following=next(((a,b) for (a,b),_ in engineer_blocks if a>=end),None)
                     if following:shift_end=min(shift_end,following[0])
             elif engineer_blocks and now>=engineer_blocks[-1][0][1]:
-                shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
-            if (block is not None and block[0]<=now and not block[2].get('location_id') and not confirmed_return) or (
-                    block is None and any(end<=now and not item.get('location_id') for
-                    (start,end),item in engineer_blocks) and not confirmed_return):
+                shift_end=max(shift_end,scheduled_end)
+            if (availability in ('awaiting_return','awaiting_location') or
+                    (block is not None and block[0]<=now and not block[2].get('location_id'))):
                 # A future leave was reported without a start/resume location.
                 # Returning to the route requires an explicit available fact;
                 # never invent a drive from a stale position.
                 shift_end=min(shift_end,now)
             ready=min(ready,shift_end)  # Retain identity for later release of a frozen trip.
-            alias=f'start:{self.version}:{e.id}:{now}'
-            points[alias]=points[location]
-            self._alias_location(alias,location)
+            if (availability in ('awaiting_return','awaiting_location') or
+                    (block is not None and block[0]<=now and not block[2].get('location_id'))):
+                # A zero-capacity slot keeps the engineer visible. Preserve the
+                # old anchor as-is, without claiming a new observed position.
+                alias=e.start_location
+            else:
+                alias=f'start:{self.version}:{e.id}:{now}'
+                points[alias]=points[location]
+                self._alias_location(alias,location)
             engineers.append(e.model_copy(update={'start_location':alias,'shift':TimeWindow(start=ready,end=shift_end),'stock':Equipment(**stock)}))
         if event.type=='cancel' and event.request_id in locked:
             raise ValueError('Нельзя отменить завершенную или закрепленную текущую заявку')
@@ -1246,6 +1538,12 @@ class ScenarioSession:
                 'loss_unit':'условные единицы','iterations':risk_engine.config.iterations,
                 'seed_fingerprint':risk_seed,'duration_evidence':duration_evidence.metadata()},
             'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам. Риски оценены Монте-Карло по априорным распределениям'+(f" и {duration_evidence.observation_count} подтверждённым длительностям" if duration_evidence.observation_count else '')+'; калибровка вероятностей на независимой истории исходов пока не подтверждена, потери — условные единицы.'}
+        from .gps.autopilot import travel_estimate
+        gps_estimates=[estimate for eid,fact in self.statuses.items()
+                       if (estimate:=travel_estimate(self,eid,fact,event.time)) is not None]
+        if gps_estimates:
+            batch['gps_estimates']=deepcopy(gps_estimates)
+            batch['notice']+=' Остаток подтверждённых поездок уточнён GPS-оценкой; это не подтверждение прибытия или выполнения работы.'
         plain_retry=(event.type=='replan' and not batch['incoming_ids'] and
                      not self.pending_report_ids and not self.needs_replanning and event.time==self.time)
         # A plain retry is an audit of the unchanged day. The shared selector
@@ -1411,6 +1709,7 @@ class ScenarioSession:
         self.batches.clear()
         self.pending_report_ids.clear()
         self.needs_replanning=False
+        self._refresh_inventory_dispatchability()
         self._save_view('Утвержден '+candidate['label'])
         return self.state()
 
@@ -1419,6 +1718,8 @@ class ScenarioSession:
             'planning_settings':self.planning_settings,'incoming_requests':self.incoming_requests,
             'dispatch_notifications':self.dispatch_notifications,'decision_log':self.decision_log,
             'autopilot_last_failure_at':self.autopilot_last_failure_at,
+            'gps_travel_estimates':self.gps_travel_estimates,
+            'gps_autopilot_history':self.gps_autopilot_history,
             'unavailability':self.unavailability,'declined_assignments':self.declined_assignments,
             'pending_report_ids':self.pending_report_ids,
             'activated_off_duty_windows':{eid:window.model_dump(mode='json') for eid,window in self.activated_off_duty_windows.items()},
@@ -1441,7 +1742,7 @@ class ScenarioSession:
         obj.initial_stock={k:Equipment.model_validate(v) for k,v in payload['initial_stock'].items()}
         from .models import Engineer
         obj.initial_engineers={k:Engineer.model_validate(v) for k,v in payload.get('initial_engineers',{}).items()} or {e.id:e for e in obj.scenario.engineers}
-        obj.inventory=payload['inventory']
+        obj.inventory=deepcopy(payload['inventory'])
         obj.statuses=payload.get('statuses',{});obj.fact_log=payload.get('fact_log',[])
         obj.unavailability=payload.get('unavailability',[])
         obj.declined_assignments=payload.get('declined_assignments',[])
@@ -1453,10 +1754,13 @@ class ScenarioSession:
         obj.dispatch_notifications=payload.get('dispatch_notifications',[])
         obj.decision_log=payload.get('decision_log',[])
         obj.autopilot_last_failure_at=payload.get('autopilot_last_failure_at')
+        obj.gps_travel_estimates=deepcopy(payload.get('gps_travel_estimates',{}))
+        obj.gps_autopilot_history=deepcopy(payload.get('gps_autopilot_history',[]))
         obj.execution_mode=payload.get('execution_mode','simulation');obj.fact_audit=payload.get('fact_audit',[])
         from .fact_journal import migrate
         migrate(obj)
         obj.needs_replanning=payload.get('needs_replanning',False)
+        obj._refresh_inventory_dispatchability()
         obj.views=deepcopy({int(k):v for k,v in payload.get('views',{}).items()})
         if not obj.views:obj._save_view('Восстановленный план')
         elif not obj.needs_replanning:

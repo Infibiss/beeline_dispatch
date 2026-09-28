@@ -38,6 +38,10 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   page.on('response',r=>{if(r.url().startsWith(base+'/') && /\.(?:js|css)(?:\?|$)/.test(r.url()) && r.status()>=400)badAssets.push([r.url(),r.status()]);});
   const get=async p=>(await context.request.get(base+p)).json();
   const before=await get('/api/state');
+  async function tab(id){
+    if(await page.locator('#menu-toggle').isVisible() && await page.locator('#menu-toggle').getAttribute('aria-expanded') !== 'true') await page.click('#menu-toggle');
+    await page.click(id);
+  }
   async function mapReady(frame,id,paths=true) {
     await frame.waitForFunction(({id,paths})=>{
       const el=document.getElementById(id);if(!el)return false;
@@ -58,14 +62,14 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   assert.ok(await frame.locator('#request-list [data-request-id]').count()<total);
   await frame.locator('#request-list [data-request-id]').first().click();
   assert.ok((await frame.locator('#request-card').textContent()).length>50);
-  await page.click('#tab-risk');await page.waitForSelector('.risk-card');
+  await tab('#tab-risk');await page.waitForSelector('.risk-card');
   for(const width of [390,768,1440]){
-    await page.setViewportSize({width,height:844});await page.click('#tab-plan');await mapReady(frame,'map');
+    await page.setViewportSize({width,height:844});await tab('#tab-plan');await mapReady(frame,'map');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-    await page.click('#tab-risk');
+    await tab('#tab-risk');
   }
-  await page.click('#tab-gps');await page.waitForSelector('.gps-person');await mapReady(page,'gps-map',false);
-  await page.selectOption('#gps-channel','demo');await page.selectOption('#gps-demo-case','near_site');await page.click('#gps-demo-run');
+  await tab('#tab-gps');await page.waitForSelector('.gps-person');await mapReady(page,'gps-map',false);
+  await tab('#tab-demo');await page.selectOption('#gps-channel','demo');await page.selectOption('#gps-demo-case','near_site');await page.click('#gps-demo-run');await tab('#tab-gps');
   await mapReady(page,'gps-map');
   await page.click('#gps-fit');
   await page.screenshot({path:path.join(output,'gps.png'),fullPage:true});
@@ -81,7 +85,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   }
   assertReferrers();
   assert.ok(tileRequests.some(r=>r.page.endsWith('/engineer')));
-  assert.ok(tileRequests.some(r=>r.page===base+'/'));
+  assert.ok(tileRequests.some(r=>r.page.split('#')[0]===base+'/'));
   assert.ok(tileRequests.some(r=>r.page.includes('/regions/south-center/dispatcher')));
   // A failing basemap must leave task points and the list usable.
   await context.route('https://tile.openstreetmap.org/**',r=>r.abort('failed'));

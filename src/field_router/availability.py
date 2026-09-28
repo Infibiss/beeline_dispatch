@@ -31,11 +31,19 @@ def stamp(day, clock):
         raise ValueError('Укажите корректные даты и время периода') from exc
 
 
-def make_period(payload, scenario_day, current_minute, engineer_ids, locations, existing):
+def make_period(payload, scenario_day, current_minute, engineer_ids, locations, existing,
+                *, preserve_unknown_location=False):
     allowed = {'version', 'engineer_id', 'start_date', 'start_time', 'end_date',
-               'end_time', 'reason', 'comment', 'location_id'}
+               'end_time', 'reason', 'comment', 'location_id', 'start_mode'}
     if set(payload) - allowed:
         raise ValueError('Неизвестные поля периода недоступности')
+    if payload.get('start_mode') not in (None, 'now', 'later'):
+        raise ValueError('Выберите начало отсутствия')
+    if payload.get('start_mode') == 'now':
+        if not 0 <= current_minute < 1440:
+            raise ValueError('Рабочий день уже завершён')
+        payload = {**payload, 'start_date': scenario_day,
+                   'start_time': f'{current_minute // 60:02}:{current_minute % 60:02}'}
     engineer_id = payload.get('engineer_id')
     if not isinstance(engineer_id, str) or engineer_id not in engineer_ids:
         raise ValueError('Неизвестный инженер')
@@ -53,11 +61,7 @@ def make_period(payload, scenario_day, current_minute, engineer_ids, locations, 
     if not isinstance(comment, str) or not 3 <= len(comment.strip()) <= 1000:
         raise ValueError('Опишите причину для диспетчера: от 3 до 1000 символов')
     location_id = payload.get('location_id')
-    shift = engineer_ids[engineer_id].shift
-    if start <= today + current_minute < end and shift.start <= current_minute < shift.end:
-        if location_id not in locations:
-            raise ValueError('Укажите подтверждённое текущее местоположение')
-    elif location_id is not None and location_id not in locations:
+    if location_id is not None and location_id not in locations:
         raise ValueError('Неизвестная текущая точка')
     if any(item['engineer_id'] == engineer_id and
            not item.get('revoked') and
@@ -90,3 +94,48 @@ def shift_blocks(periods, engineer_id, day, shift):
     """Only absences intersecting a scheduled shift can disrupt its route."""
     return [(block, item) for block, item in day_blocks(periods, engineer_id, day)
             if block[0] < shift.end and shift.start < block[1]]
+
+
+def project_availability(blocks, facts, engineer_id):
+    """Small date-specific projection, also safe to pass to the GPS worker."""
+    return {
+        'intervals': [{'start': start, 'end': end,
+                       'location_known': bool(item.get('location_id'))}
+                      for (start, end), item in blocks],
+        'return_confirmations': sorted(
+            fact['time'] for fact in facts if fact['engineer_id'] == engineer_id
+            and fact['status'] == 'available'),
+        # A return confirms availability independently from its route anchor.
+        'location_observations': [
+            {'time': fact['time'], 'known': bool(fact.get('location_id')), 'status': fact['status']}
+            for fact in facts if fact['engineer_id'] == engineer_id],
+    }
+
+
+def availability_at(projection, minute):
+    """Evaluate using the consumer's clock, never a cached 'absent now' flag."""
+    intervals = projection.get('intervals', [])
+    if any(item['start'] <= minute < item['end'] for item in intervals):
+        return 'absent'
+    confirmed = max((time for time in projection.get('return_confirmations', [])
+                     if time <= minute), default=-1)
+    if any(item['end'] <= minute and not item['location_known']
+           and not item['end'] <= confirmed <= minute for item in intervals):
+        return 'awaiting_return'
+    if location_confirmation_pending(projection, minute):
+        return 'awaiting_location'
+    return 'available'
+
+
+def location_confirmation_pending(projection, minute):
+    observations = [item for item in projection.get('location_observations', [])
+                    if item['time'] <= minute]
+    return bool(observations and observations[-1]['status']=='available'
+                and not observations[-1]['known'])
+
+
+def trip_stopped_by_absence(projection, fact, minute):
+    """An announced absence supersedes an older trip, without rewriting facts."""
+    return bool(fact and fact.get('status') == 'traveling' and
+                any(fact.get('time', -1) <= item['start'] <= minute
+                    for item in projection.get('intervals', [])))

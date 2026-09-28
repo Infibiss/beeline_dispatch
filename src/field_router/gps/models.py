@@ -7,6 +7,7 @@ import math
 
 from .contracts import distance, plan_clock, alert
 from .config import GpsConfig
+from ..availability import availability_at, trip_stopped_by_absence
 
 
 def smooth_track(points):
@@ -44,9 +45,13 @@ def smooth_track(points):
 
 
 def choose_target(engineer, minute):
+    if availability_at(engineer.get('availability', {}), minute) != 'available':
+        return None, 0, 'none'
     status = engineer.get('status') or {}
     tasks = sorted(engineer['tasks'], key=lambda t: (t['start'], t['id']))
     phase = status.get('status')
+    if trip_stopped_by_absence(engineer.get('availability', {}), status, minute):
+        phase = None  # A new journey requires confirmation; the plan is only an inference.
     if phase == 'traveling':
         return next((t for t in tasks if t['id'] == status.get('request_id')), None), 0, 'confirmed'
     if phase == 'working':
@@ -85,6 +90,8 @@ class BaselineGpsModel:
         engineer = job['engineer']
         minute = clock['minute']
         if not engineer['shift']['start'] <= minute < engineer['shift']['end']:
+            return result
+        if availability_at(engineer.get('availability', {}), minute) != 'available':
             return result
         status = engineer.get('status') or {}
         if status.get('status') == 'working':
@@ -151,8 +158,9 @@ class BaselineGpsModel:
                 'tight_window', 'Времени на дорогу может не хватить',
                 f"Ориентировочная дорога и остаток работы: {low}–{high} мин; медленная оценка выходит за окна заявки № {target['id']}.",
                 'Уточните обстановку и проверьте запас времени в плане.', 'info'))
-        phase = (engineer.get('status') or {}).get('status')
-        if phase != 'traveling':
+        # A trip recorded before an absence is no longer confirmed. Keep the
+        # inferred plan ETA, but do not revive movement/arrival alerts from it.
+        if basis != 'confirmed':
             return result
         recent = [p for p in points if latest['measured_at_ms'] - p['measured_at_ms'] <= 180000]
         span = (recent[-1]['measured_at_ms'] - recent[0]['measured_at_ms']) / 1000

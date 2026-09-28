@@ -4,7 +4,7 @@
   --muted: #6d6d6d;
   --line: #e3e3e3;
   --paper: #f7f7f8;
-  --yellow: #ffdc00;
+  --yellow: #ffc800;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -21,7 +21,7 @@ a { color: inherit; text-underline-offset: 3px; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 14px 28px; background: white; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 650; white-space: nowrap; }
 .brand strong { font-size: 23px; font-weight: 800; }
-.brand-mark { width: 30px; height: 30px; border-radius: 50%; background: repeating-linear-gradient(0deg, #191919 0 5px, #ffdc00 5px 11px); transform: rotate(-20deg); }
+.brand-mark { width: 30px; height: 30px; border-radius: 50%; background: repeating-linear-gradient(0deg, #191919 0 5px, #ffc800 5px 11px); transform: rotate(-20deg); }
 .brand-divider { height: 24px; border-left: 1px solid #ddd; margin: 0 6px; }
 .header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px; }
 .header-actions label { margin: 0; }
@@ -345,7 +345,7 @@ body{background:#f6f7f8;font-size:14px;color:#202124}
 .sidebar-tabs{display:flex;flex-direction:column;gap:5px;border:0;margin:0;overflow:visible}
 .sidebar-tabs button,.sidebar-tabs .nav-link{display:block;text-align:left;border:0;border-radius:8px;padding:12px 16px;font-size:13px;font-weight:550;white-space:normal;color:#62666b;text-decoration:none;background:none;line-height:1.4}
 .sidebar-tabs button:hover,.sidebar-tabs .nav-link:hover{background:#f6f7f8;color:#202124}
-.sidebar-tabs button[aria-selected=true]{background:#fff7bf;color:#202124;border:0;box-shadow:inset 3px 0 #ffdc00}
+.sidebar-tabs button[aria-selected=true]{background:#fff7bf;color:#202124;border:0;box-shadow:inset 3px 0 #ffc800}
 .sidebar-tabs .nav-subitem{margin-left:14px;padding:9px 16px;font-size:12px}
 .nav-separator{height:1px;background:var(--line);margin:16px 12px}
 .sidebar-tabs #tab-demo,.sidebar-tabs #tab-technical{font-size:12px;font-weight:400;color:#7d8288}

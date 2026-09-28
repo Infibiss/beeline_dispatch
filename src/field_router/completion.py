@@ -14,7 +14,8 @@ def refresh_frozen_report(session, fact):
     old_marker = f"fact:{previous['engineer_id']}:{previous['time']}:{previous['request_id']}:{previous['status']}"
     for route in session.frozen:
         for visit in list(route['visits']):
-            if visit.get('fact_record_id') != fact['id'] and visit.get('fact_id') != old_marker:
+            if visit.get('fact_record_id') != fact['id'] and not (
+                    not visit.get('fact_record_id') and visit.get('fact_id') == old_marker):
                 continue
             if fact['status'] not in ENDED:
                 route['visits'].remove(visit)
@@ -22,7 +23,7 @@ def refresh_frozen_report(session, fact):
             visit.update(request_id=fact['request_id'], arrival=fact['time'], start=fact['time'], end=fact['time'],
                 status=fact['status'], explanation=ENDED[fact['status']], consumed_equipment=dict(fact['consumed']),
                 fact_record_id=fact['id'],
-                fact_id=f"fact:{fact['engineer_id']}:{fact['time']}:{fact['request_id']}:{fact['status']}")
+                fact_id=f"fact:{fact['id']}")
     session.frozen=[route for route in session.frozen if route['visits']]
 
 

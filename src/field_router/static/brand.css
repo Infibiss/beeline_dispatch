@@ -1,0 +1,18 @@
+/* Official palette and assets: brand/SOURCE.txt. Shared by both workspaces. */
+:root{
+  --brand-yellow:#ffc800;
+  --brand-black:#141414;
+  --brand-white:#fff;
+  --brand-beige:#fff9e5;
+  --brand-light-grey:#f1f1f1;
+  --brand-grey:#a1a1a1;
+  --yellow:var(--brand-yellow);
+  --ink:var(--brand-black);
+  --paper:var(--brand-light-grey);
+}
+.brand-logo{display:block;width:132px;height:auto;max-width:100%;flex:none;object-fit:contain}
+.auth-brand .brand-logo{width:144px}
+.primary:hover{background:#e6b400}
+.filters button[aria-pressed=true],.bottom-nav button[aria-current=page]{background:var(--brand-beige)}
+.sidebar-tabs button[aria-selected=true]{background:var(--brand-beige);box-shadow:inset 3px 0 var(--brand-yellow)}
+@media(max-width:380px){.product-header .brand-logo{width:112px}}

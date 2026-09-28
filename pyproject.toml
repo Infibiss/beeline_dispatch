@@ -23,6 +23,6 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-field_router = ["data/*.json", "data/*.txt", "static/*.html", "static/*.js", "static/*.css", "static/vendor/*", "static/vendor/images/*"]
+field_router = ["data/*.json", "data/*.txt", "static/*.html", "static/*.js", "static/*.css", "static/brand/*", "static/vendor/*", "static/vendor/images/*"]
 
 "field_router._alns" = ["PROVENANCE.md"]

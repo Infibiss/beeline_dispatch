@@ -95,8 +95,8 @@ def main():
             </network-security-config>''')).write(resources/'xml'/'network_security_config.xml', encoding='utf-8')
     manifest = ET.parse(project/'android/app/src/main/AndroidManifest.xml')
     manifest.getroot().set('package', 'ru.fieldrouter.engineer')
-    manifest.getroot().set('{'+ANDROID+'}versionCode', '5')
-    manifest.getroot().set('{'+ANDROID+'}versionName', '0.1.4')
+    manifest.getroot().set('{'+ANDROID+'}versionCode', '6')
+    manifest.getroot().set('{'+ANDROID+'}versionName', '0.1.5')
     app = manifest.find('application'); app.set('{'+ANDROID+'}debuggable', 'true')
     app.set('{'+ANDROID+'}label', 'Выездной инженер · тест')
     ET.SubElement(manifest.getroot(), 'uses-sdk', {'{'+ANDROID+'}minSdkVersion':'26', '{'+ANDROID+'}targetSdkVersion':'35'})
@@ -150,7 +150,7 @@ def main():
     pending=output/'field-engineer-debug.apk.pending'
     shutil.copy2(signed_apk,pending)
     pending.replace(apk)
-    (output/'build-info.json').write_text(json.dumps({'version':'0.1.4','server':origin,'local_ca':bool(args.local_ca),
+    (output/'build-info.json').write_text(json.dumps({'version':'0.1.5','server':origin,'local_ca':bool(args.local_ca),
         'sha256':digest,'physical_phone_tested':False}, ensure_ascii=False, indent=2), encoding='utf-8')
     print('APK: '+str(apk))
     print('SHA256: '+digest)

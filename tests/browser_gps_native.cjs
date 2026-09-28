@@ -56,9 +56,12 @@ function upload(url,params) {
     const page=await employee.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.route('https://tile.openstreetmap.org/**',route=>route.fulfill({status:204}));
     await page.goto(url+identity.redirect);await page.click('#tab-shift');
+    assert.equal(await page.locator('#gps-stop').isVisible(),false);
     await page.click('#gps-start');
+    assert.equal(await page.locator('#gps-start').isVisible(),false);
+    assert.equal(await page.locator('#gps-stop').isVisible(),true);
     await page.waitForFunction(()=>document.querySelector('#gps-sent').textContent!=='Ещё нет');
-    await page.locator('#gps-native-panel > summary').click();
+    assert.equal(await page.locator('#gps-native-panel, #gps-native-credentials').count(),0);
     const apkUrl=url+'/engineer-app.apk';
     const head=await employee.request.head(apkUrl);
     assert.equal(head.status(),200);assert.equal(head.headers()['accept-ranges'],'bytes');
@@ -76,22 +79,16 @@ function upload(url,params) {
     await page.click('#android-apk-download');
     await page.waitForFunction(()=>document.querySelector('#android-apk-status').textContent.includes('APK ещё не собрана'));
     await page.unroute('**/engineer-app.apk');
-    await page.waitForFunction(()=>!document.getElementById('gps-native-connect').disabled);
-    await page.click('#gps-native-connect');await page.locator('#gps-native-credentials').waitFor({state:'visible'});
-    const token=await page.locator('#gps-native-id').inputValue();assert.ok(token.length>=40);
+    // The Android app obtains its scoped key internally; the engineer page never displays it.
+    const issued=await employee.request.post(url+'/api/gps/mobile',{
+      headers:{'X-CSRF-Token':identity.csrf},data:{action:'issue'}});
+    assert.equal(issued.status(),200);
+    const token=(await issued.json()).device_identifier;assert.ok(token.length>=40);
     assert.equal(await page.locator('#gps-start').isDisabled(),true); // Browser remains active.
-    assert.equal(await page.locator('#gps-native-id').isVisible(),false);
-    assert.equal(await page.locator('#gps-native-url').isVisible(),false);
-    const link=new URL(await page.locator('#gps-native-open').getAttribute('href'));
-    assert.equal(link.protocol,'org.traccar.client:');
-    assert.equal(link.searchParams.get('url'),url+'/api/gps/native');
-    assert.equal(link.searchParams.get('id'),token);
-    assert.equal(link.searchParams.get('accuracy'),'highest');
+    assert.equal(await page.locator('#gps-native-id, #gps-native-url, #gps-native-open').count(),0);
     let status=await(await employee.request.get(url+'/api/gps/mobile')).json();
     assert.equal(status.connection.state,'awaiting');
     assert.equal(status.tracking_state,'active');assert.equal(status.source,'browser');
-    await page.click('#gps-native-refresh');
-    await page.waitForFunction(()=>document.querySelector('#gps-native-status').textContent.includes('ещё не прислало'));
     assert.match(await page.locator('#gps-state').textContent(),/браузер/);
     const stamp=Date.now()/1000;
     const bad=await upload(url,{id:token,lat:55.75,lon:37.62,accuracy:20000,timestamp:stamp});
@@ -102,8 +99,9 @@ function upload(url,params) {
     await new Promise(r=>setTimeout(r,500));
     const good=await upload(url,{id:token,lat:55.75,lon:37.62,accuracy:9,timestamp:Date.now()/1000});
     assert.equal(good.status,200);assert.equal(good.body.accepted,true);
-    await page.click('#gps-native-refresh');
     await page.waitForFunction(()=>document.querySelector('#gps-state').textContent==='Передача в фоне');
+    assert.equal(await page.locator('#gps-start').isVisible(),false);
+    assert.equal(await page.locator('#gps-stop').isVisible(),true);
     status=await(await employee.request.get(url+'/api/gps/mobile')).json();
     assert.equal(status.connection.state,'active');assert.equal(status.source,'native');
     assert.equal(status.tracking_state,'active');
@@ -115,8 +113,6 @@ function upload(url,params) {
       await page.setViewportSize({width,height:844});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Native settings overflow '+width);
     }
-    // Hide credentials before any screenshot; do not persist random device keys.
-    await page.evaluate(()=>{document.getElementById('gps-native-id').value='';});
     await page.screenshot({path:path.join(directory,'native-settings.png'),fullPage:true});
     await stop(servers[0]);url=await start();await login(admin,url);
     const restored=await(await admin.request.get(url+'/api/gps/history?engineer_id='+encodeURIComponent(eid))).json();
@@ -129,6 +125,6 @@ function upload(url,params) {
     assert.equal(revoke.status(),200);
     assert.equal((await upload(url,{id:token,lat:55.75,lon:37.62,accuracy:8,timestamp:Date.now()/1000})).status,401);
     assert.deepEqual(errors,[]);
-    console.log('PASS: guided native setup, hidden credentials, browser-to-native handoff only after good fix, TLS, quality, offline archive, restart, revocation, 320–768px. Physical phone NOT tested.');
+    console.log('PASS: compact browser GPS, no credential fields, browser-to-native handoff only after good fix, TLS, quality, offline archive, restart, revocation, 320–768px. Physical phone NOT tested.');
   } finally {if(browser)await browser.close();for(const child of servers)await stop(child);}
 })().catch(error=>{console.error(error);process.exitCode=1;});

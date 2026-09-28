@@ -1,7 +1,7 @@
 :root{color-scheme:light;--ink:#202023;--muted:#74747b;--line:#e5e5e9;--yellow:#ffdc00;--paper:#f6f6f8;--green:#20765b}
 *{box-sizing:border-box}body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}[hidden]{display:none!important}
 button,input,select,textarea{font:inherit;color:inherit}button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}a{color:inherit}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #997c00;outline-offset:3px}
-#gps-keep-awake{width:20px;min-height:20px;vertical-align:middle;margin-right:6px}#gps-native-panel{margin-top:20px;font-size:13px;overflow-wrap:anywhere}#gps-native-panel summary{font-weight:650;cursor:pointer}#gps-native-panel .button-row>button{min-width:0}
+#gps-keep-awake{width:20px;min-height:20px;flex:none;margin:0;accent-color:var(--yellow)}
 button,.primary,.secondary{min-height:46px;border-radius:12px;padding:12px 16px;border:0;font-weight:650}.primary{background:var(--yellow);color:#171717}.secondary{background:white;border:1px solid var(--line);text-align:center}.primary:hover{background:#f2cf00}.secondary:hover{background:#f3f3f5}
 .app-header{background:white;border-bottom:1px solid var(--line);padding:16px max(20px,calc((100vw - 880px)/2));display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:max(16px,env(safe-area-inset-top))}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none}.brand strong{font-size:24px;letter-spacing:-1px}.brand>span:last-child{padding-left:12px;border-left:1px solid var(--line);font-size:13px;color:var(--muted)}.brand-mark{display:block;width:30px;height:30px;flex:none;border-radius:50%;background:repeating-linear-gradient(0deg,#191919 0 5px,#ffdc00 5px 11px);transform:rotate(-20deg)}.dispatcher-link{font-size:12px;text-decoration:none;padding:10px 0}
@@ -36,4 +36,11 @@ h1{font-size:28px;letter-spacing:-.7px}.stats{gap:12px}.stats>div{border-radius:
 .bottom-nav{gap:6px}.bottom-nav button{border-radius:8px;min-height:56px}.bottom-nav button[aria-current=page]{background:#fff4b3}
 dialog{border-radius:16px}.input-pair>div{min-width:0}.equipment>div{min-width:0}
 #gps-explanation{font-size:13px;color:var(--muted);line-height:1.6}
+.text-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 12px;background:transparent;border:0;font-size:13px;text-decoration:none;color:var(--ink)}.text-button:hover{background:#eeeef1}
+.page-heading .text-button{color:var(--muted)}.availability-summary{padding:12px 14px;background:#f5f6f7;border-radius:8px;font-size:13px;line-height:1.6}.availability-summary p{margin:0}.availability-summary p+p{margin-top:6px}
+.checkbox-row{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:12px;font-weight:400;line-height:1.5}.gps-summary{margin-bottom:16px}.equipment>div>div{font-size:12px;color:var(--muted)}.equipment strong{display:block;margin-top:4px;font-size:22px}
+.app-install{padding:4px 8px;text-align:center}.app-install .muted{display:block}.app-install .gps-message:empty{display:none}.optional{font-weight:400;color:var(--muted)}
+#availability-dialog,#history-dialog{max-width:520px}#availability-dialog .dialog-top h2,#history-dialog h2{font-size:22px}#availability-dialog textarea{min-height:72px}#availability-dialog .input-pair{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+#updates{background:transparent;border:0;padding:0 2px;color:var(--green)}#replan-note{background:#fff8d8;border-color:transparent;padding:10px 14px}.task-actions>.hint{grid-column:1/-1;margin:0;font-size:13px;color:var(--muted)}
+.bottom-nav button{transition:none}
 @media(max-width:600px){main{padding-top:20px}.identity{padding:14px}.stats{gap:8px}.stats>div{padding:13px}.stats strong{font-size:25px}.surface{padding:18px}.app-header .dispatcher-link{font-size:11px}.button-row{gap:8px}.button-row>button{min-width:140px}h1{font-size:26px}}

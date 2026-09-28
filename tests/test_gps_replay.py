@@ -75,7 +75,6 @@ def test_ui_distinguishes_status_update_from_route_change_and_removed_assignment
     script=r"""
 const assert=require('node:assert/strict');
 const {planComparison}=require('./src/field_router/static/gps-dispatcher.js');
-const {nativeConfigUrl}=require('./src/field_router/static/gps-engineer.js');
 const before={version:1,date:'2026-08-17',engineer:{id:'e1',shift:{start:540,end:1080}},status:null,
   tasks:[{id:'a',point:{lat:55.7,lon:37.7},visit:{start:600,end:630},windows:[{start:540,end:720}],duration_minutes:30,status:'planned'}]};
 const after=structuredClone(before);after.version=2;after.status={status:'available',time:540};
@@ -86,10 +85,6 @@ after.tasks[0].visit.start=620;diff=planComparison(before,after,'a');assert.equa
 after.tasks=[];assert.equal(planComparison(before,after,'a').canReplay,false);
 after.tasks=structuredClone(before.tasks);after.tasks[0].status='completion_pending';
 assert.equal(planComparison(before,after,'a').canReplay,false);
-const ios=new URL(nativeConfigUrl('https://example.test:8768','test-only-key',false));
-assert.equal(ios.protocol,'org.traccar.client:');assert.equal(ios.searchParams.get('url'),'https://example.test:8768/api/gps/native');
-assert.equal(ios.searchParams.get('accuracy'),'highest');assert.equal(ios.searchParams.get('id'),'test-only-key');
-assert.match(nativeConfigUrl('https://example.test','test-only-key',true),/^intent:\/\/config\?.*#Intent;scheme=org.traccar.client;package=org.traccar.client;end$/);
 """
     result=subprocess.run([node,'-'],input=script,cwd=root,capture_output=True,text=True,encoding='utf-8')
     assert result.returncode==0,result.stderr

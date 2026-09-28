@@ -90,3 +90,35 @@ def shift_blocks(periods, engineer_id, day, shift):
     """Only absences intersecting a scheduled shift can disrupt its route."""
     return [(block, item) for block, item in day_blocks(periods, engineer_id, day)
             if block[0] < shift.end and shift.start < block[1]]
+
+
+def project_availability(blocks, facts, engineer_id):
+    """Small date-specific projection, also safe to pass to the GPS worker."""
+    return {
+        'intervals': [{'start': start, 'end': end,
+                       'location_known': bool(item.get('location_id'))}
+                      for (start, end), item in blocks],
+        'return_confirmations': sorted(
+            fact['time'] for fact in facts if fact['engineer_id'] == engineer_id
+            and fact['status'] == 'available' and fact.get('location_id')),
+    }
+
+
+def availability_at(projection, minute):
+    """Evaluate using the consumer's clock, never a cached 'absent now' flag."""
+    intervals = projection.get('intervals', [])
+    if any(item['start'] <= minute < item['end'] for item in intervals):
+        return 'absent'
+    confirmed = max((time for time in projection.get('return_confirmations', [])
+                     if time <= minute), default=-1)
+    if any(item['end'] <= minute and not item['location_known']
+           and not item['end'] <= confirmed <= minute for item in intervals):
+        return 'awaiting_return'
+    return 'available'
+
+
+def trip_stopped_by_absence(projection, fact, minute):
+    """An announced absence supersedes an older trip, without rewriting facts."""
+    return bool(fact and fact.get('status') == 'traveling' and
+                any(fact.get('time', -1) <= item['start'] <= minute
+                    for item in projection.get('intervals', [])))

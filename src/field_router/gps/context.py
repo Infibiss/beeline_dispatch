@@ -1,5 +1,6 @@
 """Small immutable plan projections. Called only when the plan/facts change."""
 from copy import deepcopy
+from ..availability import shift_blocks, project_availability
 
 
 def project_context(session):
@@ -8,6 +9,9 @@ def project_context(session):
     done = {f['request_id'] for f in session.fact_log if f['status'] in ('completed', 'completion_pending')}
     result = {'version': session.version, 'date': session.scenario.date, 'time': session.time, 'engineers': {}}
     for engineer in session.initial_engineers.values():
+        shift = session._availability_shift(engineer.id)
+        blocks = shift_blocks(session.unavailability, engineer.id, session.scenario.date, shift)
+        pending = set(session.pending_reassignment_ids(engineer.id))
         visits = {}
         for route in session.frozen:
             if route['engineer_id'] == engineer.id:
@@ -17,7 +21,7 @@ def project_context(session):
                 visits.update({v.request_id: v.model_dump() for v in route.visits})
         tasks = []
         for key, visit in visits.items():
-            if key in done:
+            if key in done or key in pending:
                 continue
             job = session.catalog[key]
             point = session.geo_locations.get(key)
@@ -31,7 +35,8 @@ def project_context(session):
         tasks.sort(key=lambda t: (t['start'], t['id']))
         result['engineers'][engineer.id] = {
             'id': engineer.id, 'name': engineer.name, 'transport': engineer.transport.value,
-            'shift': engineer.shift.model_dump(), 'tasks': tasks,
+            'shift': shift.model_dump(), 'tasks': tasks,
+            'availability': project_availability(blocks, session.fact_log, engineer.id),
             'status': deepcopy(session.statuses.get(engineer.id)),
         }
     return result

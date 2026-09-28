@@ -118,6 +118,7 @@ class AuthHttp:
                     raise AuthError('Раздел доступен только диспетчеру', 403)
                 if handler.command=='POST' and route not in {'/api/gps/telemetry','/api/engineer/facts',
                                                                '/api/engineer/unavailability','/api/engineer/decline',
+                                                               '/api/engineer/return',
                                                                '/api/gps/mobile'}:
                     raise AuthError('Действие доступно только диспетчеру', 403)
                 if route=='/api/engineer' and parse_qs(raw.query).get('engineer_id') != [identity['engineer_id']]:

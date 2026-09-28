@@ -1,6 +1,7 @@
 """Explicit dispatcher observations; elapsed clock time never confirms work."""
 from copy import deepcopy
 from .models import Equipment, TimeWindow, Visit, Route
+from .availability import shift_blocks, project_availability, trip_stopped_by_absence
 
 
 def validate_fact(session,payload):
@@ -86,7 +87,13 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
                 jobs.setdefault(old['request_id'],session.catalog[old['request_id']])
     for eid,fact in session.statuses.items():
         if eid not in engineers:engineers[eid]=session.initial_engineers[eid]
-        e=engineers[eid].model_copy(update={'shift':session.initial_engineers[eid].shift})
+        e=engineers[eid]
+        effective_shift=(e.shift if session.initial_engineers[eid].off_duty and not e.off_duty
+                         else session.initial_engineers[eid].shift)
+        e=e.model_copy(update={'shift':effective_shift})
+        blocks=shift_blocks(session.unavailability,eid,s.date,effective_shift)
+        stopped_trip=trip_stopped_by_absence(
+            project_availability(blocks,session.fact_log,eid),fact,now)
         # Restore commitments that were projected beyond this observation.
         for route in frozen:
             if route['engineer_id']!=eid:continue
@@ -121,12 +128,17 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
                 for k in spent:spent[k]+=usage[k]
         stock=Equipment(**{k:getattr(session.initial_stock[eid],k)-spent[k] for k in spent})
         location=fact['location_id']
+        if stopped_trip:
+            declared=[item['location_id'] for (start,end),item in blocks
+                      if fact['time']<=start<=now and item.get('location_id')]
+            if declared:location=declared[-1]
         alias=f'observed:{session.version}:{eid}:{now}'
         if location in points:points[alias]=points[location]
         session._alias_location(alias,location)
         start=min(max(now,e.shift.start),e.shift.end)
         engineers[eid]=e.model_copy(update={'start_location':alias,'shift':TimeWindow(start=start,end=e.shift.end),'stock':stock})
         kind=fact['status'];key=fact.get('request_id')
+        if stopped_trip:continue
         if kind in ('working','traveling'):
             request=jobs.get(key,session.catalog[key]);jobs[key]=request
             # A fresh confirmed position can release the original trip before

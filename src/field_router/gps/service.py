@@ -15,6 +15,7 @@ from .config import GpsConfig
 from .contracts import GpsInputError, validate_packet, distance, plan_clock, alert
 from .worker import worker_main
 from .quality import assess, describe
+from ..availability import availability_at, trip_stopped_by_absence
 
 
 class GpsService:
@@ -245,6 +246,12 @@ class GpsService:
                 engineer = (stream and stream.get('demo_engineer')) or original
                 clock = plan_clock(now, self.config, context['date'], stream.get('demo_minute') if stream else None)
                 messages = []
+                availability = availability_at(engineer.get('availability', {}), clock['minute'])
+                if clock['date_matches'] and availability != 'available':
+                    messages.append(alert('reported_absence',
+                        'Заявлена временная недоступность' if availability == 'absent' else 'Ожидается подтверждение возвращения',
+                        'Оценка прибытия и опоздания отключена; координаты продолжают отображаться.',
+                        'После окончания периода подтвердите возвращение и текущую точку; диспетчер проверит новый план.', 'info'))
                 point = stream['last_good'] if stream else None
                 point_age = max(0, now - point['measured_at_ms'] / 1000) if point else None
                 heartbeat_age = max(0, now - stream['received_at']) if stream and stream['received_at'] is not None else None
@@ -272,20 +279,23 @@ class GpsService:
                     messages.append(alert('stale', 'Нет свежей координаты',
                         'Надёжная точка ещё не получена.' if point is None else f"Последнему надёжному измерению {round(point_age)} сек. Сигнал связи не обновляет возраст GPS.",
                         'Проверьте геолокацию, фоновую работу и связь телефона. Откройте приложение для диагностики; отсутствие GPS не означает недоступность инженера.'))
-                if clock['date_matches'] and not engineer.get('status') and engineer['shift']['start'] + self.config.shift_grace_minutes <= clock['minute'] < engineer['shift']['end']:
+                if clock['date_matches'] and availability == 'available' and not engineer.get('status') and engineer['shift']['start'] + self.config.shift_grace_minutes <= clock['minute'] < engineer['shift']['end']:
                     messages.append(alert('shift_unconfirmed', 'Выход на смену не подтверждён',
                         'В журнале нет отметки сотрудника после начала смены.', 'Свяжитесь с инженером. Наличие или отсутствие GPS не заменяет отметку о выходе.'))
                 result = None
                 if self.enabled and not self._metrics['last_error'] and stream and state == 'active' and not stream['quality'] and point_age is not None and point_age <= self.config.stale_seconds and stream['result_version'] == context['version'] and stream['result_seq'] == stream['seq'] and stream['result_minute'] == clock['minute']:
                     result = deepcopy(stream['result'])
                     if result:
-                        if not clock['date_matches']:
+                        if not clock['date_matches'] or availability != 'available':
                             result.update(alerts=[], eta=None, target=None)
                         messages.extend(result.get('alerts', []))
                 from .models import choose_target
                 status = engineer.get('status') or {}
                 target = next((t for t in engineer['tasks'] if t['id']==status.get('request_id')),None)
+                if trip_stopped_by_absence(engineer.get('availability', {}), status, clock['minute']):
+                    target = None
                 if target is None:target = choose_target(engineer,clock['minute'])[0]
+                if availability != 'available':target = None
                 assignment = None
                 if target:
                     assignment={'id':target['id'],'address':target['address'],

@@ -1,13 +1,18 @@
 """Read-only proposal. Only the normal, explicitly confirmed fact API writes."""
 from .contracts import GpsInputError
 from .models import hhmm
+from ..availability import availability_at, trip_stopped_by_absence
 
 def draft(context, snapshot, engineer_id):
     engineer=context['engineers'].get(engineer_id)
     row=next((r for r in snapshot['rows'] if r['engineer_id']==engineer_id),None)
     if not engineer or not row:
         raise GpsInputError('GPS: неизвестный инженер')
+    if availability_at(engineer.get('availability', {}), row['clock']['minute']) != 'available':
+        raise GpsInputError('Инженер сообщил недоступность или ещё не подтвердил возвращение. Сначала уточните его статус.')
     status=engineer.get('status') or {}
+    if trip_stopped_by_absence(engineer.get('availability', {}), status, row['clock']['minute']):
+        raise GpsInputError('Предыдущий выезд прерван периодом недоступности. Подтвердите новый выезд.')
     if status.get('status')!='traveling':
         raise GpsInputError('Сначала подтвердите статус «В пути». GPS сам не подтверждает выезд.')
     analysis=row.get('analysis') or {}

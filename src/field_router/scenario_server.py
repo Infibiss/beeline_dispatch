@@ -560,6 +560,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         wake_autopilot.set()
                     elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts',
                                       '/api/engineer/unavailability','/api/engineer/decline',
+                                      '/api/engineer/return',
                                       '/api/engineer/revoke-report',
                                       '/api/completions/confirm','/api/gps/confirm-delay'):
                         # Persist the candidate state before publishing it in memory.
@@ -571,6 +572,9 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         if self.path=='/api/engineer/facts':result=record_engineer_fact(candidate,payload)
                         elif self.path=='/api/engineer/unavailability':
                             candidate.report_unavailability(payload)
+                            result=engineer_state(candidate,payload['engineer_id'])
+                        elif self.path=='/api/engineer/return':
+                            candidate.return_from_absence(payload)
                             result=engineer_state(candidate,payload['engineer_id'])
                         elif self.path=='/api/engineer/decline':
                             candidate.decline_assignment(payload)

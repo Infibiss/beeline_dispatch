@@ -4,7 +4,8 @@ HTTP authorization binds employees to their region and ID. Dispatchers retain
 the preview picker. This projection never assigns jobs or approves a plan.
 """
 from copy import deepcopy
-from .availability import shift_blocks
+from .availability import (day_blocks, stamp, shift_blocks, project_availability, availability_at,
+                           trip_stopped_by_absence)
 
 
 def engineer_index(session):
@@ -29,13 +30,18 @@ def engineer_state(session, engineer_id):
     periods = [period for period in session.unavailability if period['engineer_id'] == engineer_id]
     blocks = shift_blocks(periods, engineer_id, session.scenario.date,
                           session._availability_shift(engineer_id))
-    active_absence = next((period for (start, end), period in blocks
+    active_absence = next((period for (start, end), period in day_blocks(periods, engineer_id, session.scenario.date)
                            if start <= session.time < end), None)
-    unknown_ends = [end for (start, end), period in blocks
-                    if end <= session.time and not period.get('location_id')]
-    return_confirmation_required = bool(unknown_ends) and not any(
-        fact['status'] == 'available' and fact['time'] >= max(unknown_ends) and
-        fact.get('location_id') for fact in facts)
+    return_confirmation_required = availability_at(
+        project_availability(blocks, facts, engineer_id), session.time) == 'awaiting_return'
+    awaiting_period = next((period for (start, end), period in reversed(blocks)
+                            if end <= session.time and not period.get('location_id')), None) if return_confirmation_required else None
+    now_stamp = stamp(session.scenario.date, '00:00') + session.time
+    scheduled_absences = sorted((period for period in periods if not period.get('revoked')
+                                and stamp(period['start_date'], period['start_time']) > now_stamp),
+                               key=lambda period: (period['start_date'], period['start_time']))
+    stopped_trip = trip_stopped_by_absence(
+        project_availability(blocks, facts, engineer_id), latest, session.time)
     pending_reassignment_ids = set(session.pending_reassignment_ids(engineer_id))
     visits = {}
     for route in session.frozen:
@@ -61,7 +67,7 @@ def engineer_state(session, engineer_id):
             status = 'completed'
         elif pending:
             status = 'completion_pending'
-        elif latest and latest.get('request_id') == key:
+        elif latest and not stopped_trip and latest.get('request_id') == key:
             status = latest['status']
         elif history and history[-1]['status'] == 'interrupted':
             status = 'interrupted'
@@ -114,7 +120,11 @@ def engineer_state(session, engineer_id):
         'status': deepcopy(latest), 'tasks': tasks,
         'unavailability': deepcopy(periods),
         'active_absence': deepcopy(active_absence),
+        'scheduled_absences': deepcopy(scheduled_absences),
+        'indefinite_absence': deepcopy(latest) if latest and latest.get('status') == 'unavailable' else None,
+        'return_report_id': (active_absence or awaiting_period or {}).get('id'),
         'return_confirmation_required': return_confirmation_required,
+        'return_pending_replan': session.return_pending_replan(engineer_id),
         'declined_assignments': deepcopy([item for item in session.declined_assignments
                                           if item['engineer_id'] == engineer_id]),
         'pending_reassignment_ids': sorted(pending_reassignment_ids),
@@ -142,15 +152,30 @@ def record_engineer_fact(session, payload):
         raise ValueError('Неизвестный статус инженера')
     old = session.statuses.get(eid, {})
     key = payload.get('request_id')
+    availability = availability_at(project_availability(
+        shift_blocks(session.unavailability, eid, session.scenario.date, session._availability_shift(eid)),
+        session.fact_log, eid), session.time)
+    if kind in ('available', 'traveling', 'working') and (
+            old.get('status') == 'unavailable' or availability != 'available'):
+        raise ValueError('После недоступности подтвердите возвращение кнопкой «Я снова доступен».')
+    if kind in ('traveling', 'working') and session.return_pending_replan(eid):
+        raise ValueError('Возвращение передано на перепланирование; дождитесь новых назначений')
     if kind in ('traveling', 'working', 'completed', 'interrupted'):
-        if key in session.pending_reassignment_ids(eid):
+        finishing_current = (kind in ('completed', 'interrupted') and old.get('status') == 'working'
+                             and old.get('request_id') == key)
+        # A scheduled absence may invalidate the old planned end, but must not
+        # trap actual work: its completion or interruption still needs a fact.
+        if key in session.pending_reassignment_ids(eid) and not finishing_current:
             raise ValueError('Заявка передана на перепланирование; обновите задания')
         # A fresh mobile action cannot act on another engineer's assignment or
         # a job removed since the last plan; historical corrections are dispatch-only.
         owned = {r['id'] for r in session.fact_requests() if r['engineer_id'] == eid}
         if not isinstance(key, str) or key not in owned:
             raise ValueError('Заявка больше не назначена вам или уже завершена; обновите задания')
-    if old.get('status') == 'traveling' and kind in ('traveling', 'working') and old.get('request_id') != key:
+    blocks = shift_blocks(session.unavailability, eid, session.scenario.date, session._availability_shift(eid))
+    stopped_trip = trip_stopped_by_absence(
+        project_availability(blocks, session.fact_log, eid), old, session.time)
+    if not stopped_trip and old.get('status') == 'traveling' and kind in ('traveling', 'working') and old.get('request_id') != key:
         raise ValueError('Сначала сообщите диспетчеру об остановке текущего выезда')
     if kind == 'completed' and not (old.get('status') == 'working' and old.get('request_id') == key):
         raise ValueError('Сначала отметьте начало работы по этой заявке')

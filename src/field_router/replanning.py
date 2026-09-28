@@ -22,7 +22,8 @@ from .completion import pending_completions
 from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
                           application_risk_seed)
 from .service_observations import confirmed_service_observations
-from .availability import day_blocks, day_interval, make_period, shift_blocks
+from .availability import (day_blocks, day_interval, make_period, shift_blocks, stamp,
+                           project_availability, availability_at)
 
 
 WORK_KINDS = {'connection': ('Подключение', Skill.CONNECTION, 'high'),
@@ -287,6 +288,16 @@ class ScenarioSession:
     def _record_fact(self,payload):
         from .fact_journal import record
         fact=record(self,payload)
+        # Check the newly submitted fact, not historical facts replayed by the
+        # journal. A correction must not silently override a declared absence.
+        blocks=shift_blocks(self.unavailability,fact['engineer_id'],self.scenario.date,
+                            self._availability_shift(fact['engineer_id']))
+        availability=availability_at(
+            project_availability(blocks,self.fact_log,fact['engineer_id']),fact['time'])
+        if fact['status'] in ('available','traveling','working') and availability=='absent':
+            raise ValueError('Действует период недоступности. Для досрочного возвращения нажмите «Я снова доступен».')
+        if fact['status'] in ('traveling','working') and availability=='awaiting_return':
+            raise ValueError('После периода недоступности сначала подтвердите возвращение и текущую точку.')
         from .completion import refresh_frozen_report
         refresh_frozen_report(self, fact)
         self.version+=1;self.needs_replanning=True
@@ -328,7 +339,7 @@ class ScenarioSession:
             for route in self.plan.routes:
                 if route.engineer_id!=engineer_id:continue
                 if any(v.start<=self.time<v.end and block[0]<v.end for v in route.visits):
-                    if current.get('status') not in ('completed','completion_pending','interrupted'):
+                    if not current and self.execution_mode!='manual':
                         raise ValueError('Сначала прервите или завершите начатую работу')
         self.unavailability.append(period)
         self.version+=1
@@ -350,6 +361,103 @@ class ScenarioSession:
         self._refresh_fact_inventory()
         self._save_view('Инженер сообщил период недоступности')
         return self.state()
+
+    def return_from_absence(self,payload):
+        candidate=deepcopy(self)
+        result=candidate._return_from_absence(payload)
+        self.__dict__.update(candidate.__dict__)
+        return result
+
+    def _return_from_absence(self,payload):
+        allowed={'version','engineer_id','report_id','unavailable_fact_id','time','location_id'}
+        if set(payload)-allowed:raise ValueError('Неизвестные поля возвращения')
+        if type(payload.get('version')) is not int or payload['version']!=self.version:
+            raise ValueError('Устаревшая версия плана')
+        eid=payload.get('engineer_id')
+        if not isinstance(eid,str) or eid not in self.initial_engineers:
+            raise ValueError('Неизвестный инженер')
+        now=payload.get('time')
+        if type(now) is not int or not self.time<=now<1440:
+            raise ValueError('Укажите время возвращения не раньше текущего времени плана')
+        location=payload.get('location_id')
+        if not isinstance(location,str) or location not in (set(self.scenario.points)|set(self.geo_locations)):
+            raise ValueError('Укажите подтверждённую текущую точку')
+        clock=f'{now//60:02}:{now%60:02}'
+        instant=stamp(self.scenario.date,clock)
+        report_id=payload.get('report_id')
+        period=None
+        unavailable_fact_id=None
+        return_info={'date':self.scenario.date,'time':clock,'location_id':location,
+                     'recorded_at':datetime.now(timezone.utc).isoformat(),'source':'engineer'}
+        if report_id is not None:
+            if payload.get('unavailable_fact_id') is not None:
+                raise ValueError('Укажите один источник недоступности')
+            period=next((item for item in self.unavailability if item['id']==report_id
+                         and item['engineer_id']==eid),None)
+            if period is None:raise ValueError('Период недоступности не найден')
+            if period.get('revoked') or period.get('early_return') or period.get('return_confirmation'):
+                raise ValueError('Период уже завершён или отменён')
+            start=stamp(period['start_date'],period['start_time'])
+            end=stamp(period['end_date'],period['end_time'])
+            if instant<start:
+                raise ValueError('Время возвращения должно попадать в действующий период')
+            if instant<end:
+                # Preserve the elapsed absence and the originally promised end.
+                period['early_return']={**return_info,
+                    'original_end_date':period['end_date'],'original_end_time':period['end_time']}
+                period.update(end_date=self.scenario.date,end_time=clock)
+            else:
+                blocks=shift_blocks([period],eid,self.scenario.date,self._availability_shift(eid))
+                if availability_at(project_availability(blocks,self.fact_log,eid),now)!='awaiting_return':
+                    raise ValueError('Период уже завершён; подтверждение возвращения не требуется')
+                period['return_confirmation']=return_info
+            marker=period['id']
+        else:
+            unavailable=self.statuses.get(eid,{})
+            if unavailable.get('status')!='unavailable':
+                raise ValueError('Нет действующей недоступности; обновите смену')
+            unavailable_fact_id=unavailable.get('id') or next((fact['id'] for fact in reversed(self.fact_log)
+                if fact['engineer_id']==eid and fact['status']=='unavailable' and fact['time']==unavailable['time']),None)
+            if not unavailable_fact_id:raise ValueError('Сообщение о недоступности не найдено; обновите смену')
+            expected=payload.get('unavailable_fact_id')
+            if expected is not None and expected!=unavailable_fact_id:
+                raise ValueError('Сообщение о недоступности изменилось; обновите смену')
+            marker='return:'+unavailable_fact_id
+        # A return from one reason cannot silently override another active period.
+        blocks=shift_blocks(self.unavailability,eid,self.scenario.date,self._availability_shift(eid))
+        if availability_at(project_availability(blocks,self.fact_log,eid),now)=='absent':
+            raise ValueError('Действует другой период недоступности; обновите смену')
+        from .fact_journal import record
+        fact=record(self,{'version':self.version,'engineer_id':eid,'status':'available',
+                         'time':now,'location_id':location,'source':'engineer',
+                         'comment':'Возвращение после недоступности'})
+        if marker not in self.pending_report_ids:self.pending_report_ids.append(marker)
+        self.version+=1;self.needs_replanning=True;self.batches.clear()
+        event={'id':'return:'+marker,'type':'engineer_return','time':now,
+               'engineer_id':eid,'pending_report_id':marker}
+        if period:event['report_id']=period['id']
+        if unavailable_fact_id:event['unavailable_fact_id']=unavailable_fact_id
+        self.history.append({'version':self.version,'fact':fact,'event':event})
+        self.dispatch_notifications.append({
+            'id':uuid4().hex,'kind':'replan_required','version':self.version,
+            'time':datetime.now(timezone.utc).isoformat(),
+            'title':self.initial_engineers[eid].name+' снова доступен',
+            'text':'Возвращение в '+clock+'. Пересчитайте план.',
+            'engineer_id':eid,'report_id':period['id'] if period else None,
+            'request_ids':self.pending_reassignment_ids(eid)})
+        self._refresh_fact_inventory()
+        self._save_view('Инженер вернулся; требуется пересчёт')
+        return self.state()
+
+    def return_pending_replan(self,engineer_id):
+        """Both dated and open-ended returns await a new approved assignment."""
+        pending=set(self.pending_report_ids)
+        if any(item['engineer_id']==engineer_id and item['id'] in pending and
+               (item.get('early_return') or item.get('return_confirmation')) and not item.get('revoked')
+               for item in self.unavailability):return True
+        return any(item.get('event',{}).get('type')=='engineer_return' and
+                   item['event'].get('engineer_id')==engineer_id and
+                   item['event'].get('pending_report_id') in pending for item in self.history)
 
     def decline_assignment(self,payload):
         candidate=deepcopy(self)
@@ -400,6 +508,7 @@ class ScenarioSession:
         declines={(item['engineer_id'],item['request_id']) for item in self.declined_assignments
                   if item['id'] in pending and not item.get('revoked')}
         periods=[item for item in self.unavailability if item['id'] in pending and not item.get('revoked')]
+        returning={eid for eid in self.initial_engineers if self.return_pending_replan(eid)}
         done={f['request_id'] for f in self.fact_log if f['status'] in ('completed','completion_pending')}
         result=set()
         routes=[(r.engineer_id,[v.model_dump() for v in r.visits]) for r in self.plan.routes]
@@ -411,7 +520,7 @@ class ScenarioSession:
             for visit in visits:
                 key=visit['request_id']
                 if key in done:continue
-                if (eid,key) in declines or any(visit['end']>start for start,_ in blocks):
+                if eid in returning or (eid,key) in declines or any(visit['end']>start for start,_ in blocks):
                     result.add(key)
                 elif self.needs_replanning and self.statuses.get(eid,{}).get('status')=='unavailable':
                     result.add(key)
@@ -457,17 +566,20 @@ class ScenarioSession:
             eid=owners.get(key)
             report=declines.get((eid,key))
             visit=visits.get(key)
-            period=next((item for item in periods.get(eid,[]) if visit and any(
+            period=next((item for item in periods.get(eid,[]) if item.get('early_return') or item.get('return_confirmation') or (visit and any(
                 visit['end']>block[0] for block,_ in shift_blocks(
-                    [item],eid,self.scenario.date,self._availability_shift(eid)))),None)
+                    [item],eid,self.scenario.date,self._availability_shift(eid))))),None)
             detail={'report_type':'decline','reason':'Отказ от выезда',
                     'report_id':report['id'],'comment':report['comment']} if report else (
-                {'report_type':'unavailability','reason':period['reason_label'],
+                {'report_type':'unavailability','reason':('Досрочное возвращение' if period.get('early_return') else 'Инженер вернулся')
+                 if period.get('early_return') or period.get('return_confirmation') else period['reason_label'],
                  'report_id':period['id'],'comment':period['comment'],'start_date':period['start_date'],
                  'start_time':period['start_time'],'end_date':period['end_date'],
                  'end_time':period['end_time']} if period and key in pending else
                 {'report_type':'fact' if key in pending else None,
-                 'reason':unassigned[key].reason if key in unassigned else 'Инженер сообщил недоступность через статус'})
+                 'reason':unassigned[key].reason if key in unassigned else (
+                     'Инженер вернулся; требуется пересчёт' if eid in self.initial_engineers and self.return_pending_replan(eid)
+                     else 'Инженер сообщил недоступность через статус')})
             rows.append({'request_id':key,'address':self.catalog[key].address,
                 'engineer_id':eid,'status':'awaiting_replan' if key in pending else 'unassigned',
                 'previous_engineer_id':previous_owners.get(key) if eid is None else None,
@@ -916,13 +1028,12 @@ class ScenarioSession:
             block=current_blocks.get(e.id)
             engineer_blocks=blocks.get(e.id,[])
             shift_end=e.shift.end
-            unknown_ends=[end for (start,end),item in engineer_blocks
-                          if start<=now and not item.get('location_id')]
-            confirmed_return=(not unknown_ends or any(f['engineer_id']==e.id and
-                f['status']=='available' and f['time']>=max(unknown_ends) and
-                bool(f.get('location_id')) for f in self.fact_log))
+            scheduled_end=(activation_window.end if e.id in activation_ids and activation_window
+                           else self._availability_shift(e.id).end)
+            availability=availability_at(
+                project_availability(engineer_blocks,self.fact_log,e.id),now)
             if any(end<=now for (start,end),_ in engineer_blocks):
-                shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
+                shift_end=max(shift_end,scheduled_end)
             if block is not None:
                 start,end,item=block
                 if now<start:
@@ -934,14 +1045,13 @@ class ScenarioSession:
                     # active absence. It is deliberately required at intake.
                     if item.get('location_id'):
                         location=item['location_id']
-                    shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
+                    shift_end=max(shift_end,scheduled_end)
                     following=next(((a,b) for (a,b),_ in engineer_blocks if a>=end),None)
                     if following:shift_end=min(shift_end,following[0])
             elif engineer_blocks and now>=engineer_blocks[-1][0][1]:
-                shift_end=max(shift_end,self.initial_engineers[e.id].shift.end)
-            if (block is not None and block[0]<=now and not block[2].get('location_id') and not confirmed_return) or (
-                    block is None and any(end<=now and not item.get('location_id') for
-                    (start,end),item in engineer_blocks) and not confirmed_return):
+                shift_end=max(shift_end,scheduled_end)
+            if (availability=='awaiting_return' or
+                    (block is not None and block[0]<=now and not block[2].get('location_id'))):
                 # A future leave was reported without a start/resume location.
                 # Returning to the route requires an explicit available fact;
                 # never invent a drive from a stale position.

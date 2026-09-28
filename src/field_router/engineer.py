@@ -17,9 +17,12 @@ def engineer_index(session):
     }
 
 
-def engineer_state(session, engineer_id):
+def engineer_state(session, engineer_id, *, current_minute=None, clock=None):
     if engineer_id not in session.initial_engineers:
         raise ValueError('Неизвестный инженер')
+    now = session.time if current_minute is None else current_minute
+    if type(now) is not int or not 0 <= now <= 1440:
+        raise ValueError('Недопустимое время профиля инженера')
     engineer = session.initial_engineers[engineer_id]
     current = next((item for item in session.scenario.engineers if item.id == engineer_id), None)
     if current is not None and current.off_duty != engineer.off_duty:
@@ -27,21 +30,32 @@ def engineer_state(session, engineer_id):
                                               'shift': session._availability_shift(engineer_id)})
     facts = [f for f in session.fact_log if f['engineer_id'] == engineer_id]
     latest = session.statuses.get(engineer_id)
-    periods = [period for period in session.unavailability if period['engineer_id'] == engineer_id]
+    now_stamp = stamp(session.scenario.date, '00:00') + now
+    periods = []
+    for stored in session.unavailability:
+        if stored['engineer_id'] != engineer_id:
+            continue
+        period = deepcopy(stored)
+        open_report = not any(period.get(key) for key in ('revoked', 'early_return', 'return_confirmation'))
+        editable = (open_report and period.get('source') == 'engineer'
+                    and stamp(period['end_date'], period['end_time']) > now_stamp)
+        period.update(can_edit=editable, can_cancel=editable,
+                      is_active=open_report and stamp(period['start_date'], period['start_time']) <= now_stamp
+                      < stamp(period['end_date'], period['end_time']))
+        periods.append(period)
     blocks = shift_blocks(periods, engineer_id, session.scenario.date,
                           session._availability_shift(engineer_id))
     active_absence = next((period for (start, end), period in day_blocks(periods, engineer_id, session.scenario.date)
-                           if start <= session.time < end), None)
+                           if start <= now < end), None)
     return_confirmation_required = availability_at(
-        project_availability(blocks, facts, engineer_id), session.time) == 'awaiting_return'
+        project_availability(blocks, facts, engineer_id), now) == 'awaiting_return'
     awaiting_period = next((period for (start, end), period in reversed(blocks)
-                            if end <= session.time and not period.get('location_id')), None) if return_confirmation_required else None
-    now_stamp = stamp(session.scenario.date, '00:00') + session.time
+                            if end <= now and not period.get('location_id')), None) if return_confirmation_required else None
     scheduled_absences = sorted((period for period in periods if not period.get('revoked')
                                 and stamp(period['start_date'], period['start_time']) > now_stamp),
                                key=lambda period: (period['start_date'], period['start_time']))
     stopped_trip = trip_stopped_by_absence(
-        project_availability(blocks, facts, engineer_id), latest, session.time)
+        project_availability(blocks, facts, engineer_id), latest, now)
     pending_reassignment_ids = set(session.pending_reassignment_ids(engineer_id))
     visits = {}
     for route in session.frozen:
@@ -74,6 +88,14 @@ def engineer_state(session, engineer_id):
         if key in pending_reassignment_ids and status == 'planned':
             status = 'pending_replan'
         point = session.geo_locations.get(key)
+        # Work already performed belongs to the request, including after a
+        # return or reassignment. A trip's remaining minutes are a separate
+        # quantity and must not become the default work duration on arrival.
+        work_fact = next((fact for fact in reversed(session.fact_log)
+                          if fact.get('request_id') == key
+                          and fact['status'] in ('working', 'interrupted')), None)
+        work_remaining = (0 if completed or pending else
+                          work_fact['remaining_minutes'] if work_fact else job.duration_minutes)
         spent = {device: sum(f['consumed'][device] for f in session.fact_log
                             if f.get('request_id') == key) for device in ('router', 'tv_box')}
         tasks.append({
@@ -82,7 +104,8 @@ def engineer_state(session, engineer_id):
             'status': status,
             'completed_at': completed['time'] if completed else None,
             'reported_completed_at': pending['time'] if pending else None,
-            'remaining_minutes': latest.get('remaining_minutes') if latest and latest.get('request_id') == key else job.duration_minutes,
+            'remaining_minutes': latest.get('remaining_minutes') if latest and latest.get('request_id') == key else work_remaining,
+            'work_remaining_minutes': work_remaining,
             'equipment_remaining': {k: max(0, getattr(job.equipment, k) - spent[k]) for k in spent},
             'point': point.model_dump(mode='json') if point else None,
             'history': deepcopy(history),
@@ -111,7 +134,8 @@ def engineer_state(session, engineer_id):
     inventory = next((i for i in session.inventory if i['engineer_id'] == engineer_id), None)
     return {
         'version': session.version, 'date': session.scenario.date,
-        'region': session.scenario.region, 'time': session.time,
+        'region': session.scenario.region, 'time': now, 'plan_time': session.time,
+        **({'clock': deepcopy(clock)} if clock is not None else {}),
         'plan_updates': [{'version': version, 'time': view['operations']['time'],
                           'label': view['operations']['label']}
                          for version, view in sorted(session.views.items())[-20:]],
@@ -124,6 +148,7 @@ def engineer_state(session, engineer_id):
         'indefinite_absence': deepcopy(latest) if latest and latest.get('status') == 'unavailable' else None,
         'return_report_id': (active_absence or awaiting_period or {}).get('id'),
         'return_confirmation_required': return_confirmation_required,
+        'location_confirmation_pending': session.location_confirmation_pending(engineer_id, current_minute=now),
         'return_pending_replan': session.return_pending_replan(engineer_id),
         'declined_assignments': deepcopy([item for item in session.declined_assignments
                                           if item['engineer_id'] == engineer_id]),
@@ -136,7 +161,7 @@ def engineer_state(session, engineer_id):
     }
 
 
-def record_engineer_fact(session, payload):
+def record_engineer_fact(session, payload, *, current_minute=None):
     """Validate mobile commands before using the same persistence as dispatch."""
     allowed = {'version', 'engineer_id', 'time', 'status', 'request_id', 'location_id',
                'remaining_minutes', 'consumed_router', 'consumed_tv_box', 'comment'}
@@ -144,6 +169,8 @@ def record_engineer_fact(session, payload):
         raise ValueError('Неизвестные поля сообщения инженера')
     if type(payload.get('version')) is not int or payload['version'] != session.version:
         raise ValueError('Устаревшая версия плана: обновите задания и повторите действие')
+    if type(payload.get('time')) is not int or payload['time'] < session.time:
+        raise ValueError('Время сообщения инженера не может быть раньше текущего времени плана')
     eid = payload.get('engineer_id')
     if not isinstance(eid, str) or eid not in session.initial_engineers:
         raise ValueError('Неизвестный инженер')
@@ -152,11 +179,17 @@ def record_engineer_fact(session, payload):
         raise ValueError('Неизвестный статус инженера')
     old = session.statuses.get(eid, {})
     key = payload.get('request_id')
+    now = session.time if current_minute is None else current_minute
     availability = availability_at(project_availability(
         shift_blocks(session.unavailability, eid, session.scenario.date, session._availability_shift(eid)),
-        session.fact_log, eid), session.time)
+        session.fact_log, eid), now)
+    location_pending = session.location_confirmation_pending(eid, current_minute=now)
+    if kind in ('traveling', 'working') and location_pending:
+        raise ValueError('После отсутствия уточните текущее местоположение перед новым выездом.')
+    confirming_location = (kind == 'available' and availability == 'awaiting_location'
+                           and payload.get('location_id') in (set(session.scenario.points) | set(session.geo_locations)))
     if kind in ('available', 'traveling', 'working') and (
-            old.get('status') == 'unavailable' or availability != 'available'):
+            old.get('status') == 'unavailable' or (availability != 'available' and not confirming_location)):
         raise ValueError('После недоступности подтвердите возвращение кнопкой «Я снова доступен».')
     if kind in ('traveling', 'working') and session.return_pending_replan(eid):
         raise ValueError('Возвращение передано на перепланирование; дождитесь новых назначений')
@@ -174,7 +207,7 @@ def record_engineer_fact(session, payload):
             raise ValueError('Заявка больше не назначена вам или уже завершена; обновите задания')
     blocks = shift_blocks(session.unavailability, eid, session.scenario.date, session._availability_shift(eid))
     stopped_trip = trip_stopped_by_absence(
-        project_availability(blocks, session.fact_log, eid), old, session.time)
+        project_availability(blocks, session.fact_log, eid), old, now)
     if not stopped_trip and old.get('status') == 'traveling' and kind in ('traveling', 'working') and old.get('request_id') != key:
         raise ValueError('Сначала сообщите диспетчеру об остановке текущего выезда')
     if kind == 'completed' and not (old.get('status') == 'working' and old.get('request_id') == key):
@@ -186,4 +219,4 @@ def record_engineer_fact(session, payload):
         raise ValueError('Опишите проблему для диспетчера')
     session.record_fact({**payload, 'status': 'completion_pending' if kind == 'completed' else kind,
                          'source': 'engineer'})
-    return engineer_state(session, eid)
+    return engineer_state(session, eid, current_minute=current_minute)

@@ -57,7 +57,8 @@ def confirm(session, gps, payload):
     proposal=gps.delay_draft({'version':payload.get('version'),'engineer_id':payload.get('engineer_id')})
     stamp=payload.get('gps_point_measured_at_ms')
     if (type(stamp) not in (int,float) or not math.isfinite(stamp)
-        or not 0 <= gps.clock()-stamp/1000 <= gps.config.stale_seconds):
+        or not 0 <= gps.clock()-stamp/1000 <= gps.config.stale_seconds
+        or stamp != proposal['point_measured_at_ms']):
         raise GpsInputError('GPS-оценка устарела. Получите свежую перед подтверждением.')
     if (session.version!=proposal['version'] or payload.get('status')!='traveling' or
         payload.get('request_id')!=proposal['request_id'] or payload.get('time')!=proposal['time'] or

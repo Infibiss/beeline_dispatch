@@ -1,4 +1,5 @@
 """Synthetic, isolated day for the early-return browser check."""
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import sys
@@ -26,6 +27,7 @@ if __name__ == '__main__':
     accounts.create_engineer('worker', password, 'east', 'e1')
     server = create_server(session, root/'day.json', port=0, time_limit=.1,
         accounts=accounts, disable_gps=True,
+        engineer_clock_now=lambda: datetime(2026, 9, 28, 9, tzinfo=timezone.utc),
         region_sources={'east': {'label': 'Восток', 'state': root/'day.json'}})
     def stop():
         deadline = time.monotonic()+180

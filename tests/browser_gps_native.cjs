@@ -70,6 +70,7 @@ function upload(url,params) {
     assert.equal(Number(head.headers()['content-length']),originalApk.length);
     const partial=await employee.request.get(apkUrl,{headers:{Range:'bytes=0-19'}});
     assert.equal(partial.status(),206);assert.deepEqual(await partial.body(),originalApk.subarray(0,20));
+    await page.locator('#android-app > summary').click();
     const received=page.waitForEvent('download');
     await page.click('#android-apk-download');
     const download=await received;

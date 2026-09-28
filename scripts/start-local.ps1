@@ -16,6 +16,11 @@
 
 $ErrorActionPreference = 'Stop'
 $repository = Split-Path -Parent $PSScriptRoot
+$occupiedPort = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() |
+    Where-Object { $_.Port -eq $Port } | Select-Object -First 1
+if ($occupiedPort) {
+    throw "Port $Port is already in use. Stop the previous server in its terminal (Ctrl+C), then run this command again. Do not start two copies on the same port."
+}
 $pythonCandidates = @(
     (Join-Path $repository '.venv-win311\Scripts\python.exe'),
     (Join-Path $repository '.venv\Scripts\python.exe')

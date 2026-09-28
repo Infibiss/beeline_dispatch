@@ -158,8 +158,9 @@ class BaselineGpsModel:
                 'tight_window', 'Времени на дорогу может не хватить',
                 f"Ориентировочная дорога и остаток работы: {low}–{high} мин; медленная оценка выходит за окна заявки № {target['id']}.",
                 'Уточните обстановку и проверьте запас времени в плане.', 'info'))
-        phase = (engineer.get('status') or {}).get('status')
-        if phase != 'traveling':
+        # A trip recorded before an absence is no longer confirmed. Keep the
+        # inferred plan ETA, but do not revive movement/arrival alerts from it.
+        if basis != 'confirmed':
             return result
         recent = [p for p in points if latest['measured_at_ms'] - p['measured_at_ms'] <= 180000]
         span = (recent[-1]['measured_at_ms'] - recent[0]['measured_at_ms']) / 1000

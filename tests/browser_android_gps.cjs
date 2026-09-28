@@ -52,7 +52,10 @@ function upload(url,params) {
     assert.equal((await apk.body()).subarray(0,2).toString(),'PK');
     await page.waitForFunction(()=>!document.querySelector('#gps-start').disabled);
     assert.equal(await page.locator('#gps-native-panel, #gps-native-url, #gps-end-shift').count(),0);
-    assert.equal(await page.locator('#android-app').isVisible(),false);
+    assert.equal(await page.locator('#android-app').isVisible(),true);
+    await page.locator('#android-app > summary').click();
+    assert.equal(await page.locator('#android-apk-download').textContent(),'Скопировать ссылку на APK');
+    await page.locator('#android-app > summary').click();
     assert.equal(await page.locator('#gps-stop').isVisible(),false);
     await page.click('#gps-start');
     await page.waitForFunction(()=>window.__androidTest.state.enabled);

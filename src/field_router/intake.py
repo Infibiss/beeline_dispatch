@@ -188,7 +188,7 @@ def cancellation_entry(session, candidate, request_id, previous, automatic):
             'llm_notice':'Проверенные факты доступны без YandexGPT; ИИ-пояснение добавляется только при успешном ответе модели.'}
 
 
-def apply_autopilot(session, *, time_limit=1, solver='hybrid'):
+def apply_autopilot(session, *, time_limit=1, solver='hybrid', gps_proposals=None):
     """Build one batch for all pending intake items and apply a verified candidate.
 
     This function mutates its argument. Call it on a deep copy and persist that
@@ -197,14 +197,23 @@ def apply_autopilot(session, *, time_limit=1, solver='hybrid'):
     from uuid import uuid4
     from .recommendation import eligible_candidates, recommendation_rank
 
-    if not session.autopilot_due():
+    gps_proposals=gps_proposals or []
+    if not session.autopilot_due() and not gps_proposals:
         return None
+    if gps_proposals:
+        if session.planning_settings.get('mode')!='autopilot':
+            return None
+        from .gps.autopilot import stage_estimates, record_applied
+        stage_estimates(session,gps_proposals)
+    event_time=max([session.time]+[p['time'] for p in gps_proposals])
     payload = {'version': session.version,
-               'event': {'id': 'auto:' + uuid4().hex, 'type': 'replan', 'time': session.time},
+               'event': {'id': 'auto:' + uuid4().hex, 'type': 'replan', 'time': event_time},
                'allow_redirect': False, 'preserve_in_progress': True,
                'protect_approved_assignments': True}
     batch = session.preview(payload, time_limit=time_limit, solver=solver)
     chosen = min(eligible_candidates(batch), key=recommendation_rank)
     session.approve({'version': session.version, 'batch_id': batch['id'],
                      'candidate_id': chosen['id']}, automatic=True)
+    if gps_proposals:
+        record_applied(session,gps_proposals)
     return batch, chosen['id']

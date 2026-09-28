@@ -24,7 +24,7 @@
     header.classList.add('product-header');
     if(!header.querySelector('.brand')){
       const brand=el('a',null,'brand');brand.href=url('/');
-      const mark=el('span',null,'brand-mark');mark.setAttribute('aria-hidden','true');brand.append(mark,el('strong','билайн'));header.prepend(brand);
+      const logo=el('img',null,'brand-logo');logo.src=url('/assets/beeline-logo.png');logo.alt='билайн';logo.width=132;logo.height=26;brand.append(logo);header.prepend(brand);
     }
     const bar=document.getElementById('region-context') || el('div',null,'header-region');
     bar.id='region-context';bar.className='header-region';

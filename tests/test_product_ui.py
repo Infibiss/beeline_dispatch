@@ -53,8 +53,22 @@ def test_manual_status_next_step_differs_from_autopilot():
 def test_autopilot_status_does_not_claim_facts_were_automatically_replanned():
     client('''
       assert.equal($('go-replan').hidden,false);
-      assert.match($('fact-next-step').textContent,/Автопилот обрабатывает новые заявки/);
+      assert.match($('fact-next-step').textContent,/задержки по GPS на подтверждённых выездах/);
+      assert.match($('fact-next-step').textContent,/Изменения статусов пересчитайте вручную/);
     ''',before="state.needs_replanning=true;state.planning_settings={mode:'autopilot'};")
+
+
+def test_gps_autopilot_failure_offers_manual_review_without_applying_a_plan():
+    client('''
+      const notice=$('dispatch-notifications');
+      assert.match(notice.textContent,/Проверить GPS-пересчёт/);
+      assert.match(notice.textContent,/Действующий план сохранён/);
+      await notice.querySelector('button').dispatch('click');
+      assert.equal($('panel-events').hidden,false);
+      assert.equal($('event-type').value,'replan');
+      assert.equal(requests.filter(r=>r.payload).length,0);
+    ''',before="""state.dispatch_notifications=[{id:'gps-failure',kind:'auto_gps_error',
+      title:'GPS-пересчёт требует проверки',text:'Действующий план сохранён.',version:7}];""")
 
 
 def test_mobile_arrow_navigation_keeps_drawer_open_until_selection():

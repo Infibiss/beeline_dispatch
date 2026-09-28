@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffdc00">
+  <meta name="theme-color" content="#ffc800">
   <title>Мой день · Выездной инженер</title>
   <link rel="stylesheet" href="/assets/leaflet.css">
   <link rel="stylesheet" href="/engineer.css">
@@ -14,11 +14,13 @@
   <script src="/gps-android.js" defer></script>
   <script src="/apk-download.js" defer></script>
 <script src="/time-input.js" defer></script>
+<link rel="stylesheet" href="/brand.css">
+<link rel="icon" type="image/svg+xml" href="/assets/beeline-symbol.svg">
 </head>
 <body>
   <a href="#main" class="skip-link">К заданиям</a>
   <header class="app-header">
-    <a class="brand" href="/engineer" aria-label="Мой день инженера"><span class="brand-mark" aria-hidden="true"></span><strong>билайн</strong><span>Инженер</span></a>
+    <a class="brand" href="/engineer" aria-label="Мой день инженера"><img class="brand-logo" src="/assets/beeline-logo.png" alt="билайн" width="132" height="26"><span>Инженер</span></a>
     <a class="dispatcher-link" href="/">Диспетчер ↗</a>
   </header>
   <main id="main">
@@ -46,12 +48,18 @@
       <div id="map-tasks" class="map-tasks"></div>
     </section>
     <section id="panel-shift" class="tab-panel" aria-labelledby="tab-shift" hidden>
-      <div class="page-heading"><h1>Моя смена</h1><button id="shift-history" class="text-button" type="button">История</button></div>
+      <div class="page-heading"><h1>Профиль</h1></div>
       <article class="surface shift-card">
-        <div class="section-top"><h2 id="engineer-name">Инженер</h2><span id="engineer-status" class="pill">Не на смене</span></div>
-        <dl id="shift-details" class="detail-grid"></dl>
+        <div class="section-top"><h2>Рабочий день</h2><span id="engineer-status" class="pill">Не на смене</span></div>
+        <p id="shift-plan-context" class="muted"></p>
+        <dl id="shift-details" class="day-strip"></dl>
+        <div id="shift-activity" class="shift-activity" hidden></div>
+        <button type="button" class="primary" id="shift-start">Начать смену</button>
+      </article>
+      <article class="surface availability-card" aria-labelledby="availability-title">
+        <div class="section-top"><h2 id="availability-title">Доступность для заявок</h2></div>
         <div id="availability-summary" class="availability-summary" aria-live="polite" hidden></div>
-        <div class="button-row"><button type="button" class="primary" id="shift-start">Начать смену</button><button type="button" class="primary" id="shift-return" hidden>Я снова доступен</button><button type="button" class="secondary" id="shift-problem">Не могу работать</button></div>
+        <div class="button-row availability-actions"><button type="button" class="primary" id="shift-return" hidden>Я снова доступен</button><button type="button" class="secondary" id="shift-problem">Сообщить об отсутствии</button></div>
       </article>
       <article class="surface gps-box" aria-labelledby="gps-title">
         <div class="section-top"><h2 id="gps-title">Геолокация</h2><span id="gps-state" class="pill">Выключена</span></div>
@@ -59,40 +67,45 @@
         <dl class="detail-grid gps-summary"><div><dt>Точность и время</dt><dd id="gps-fix">Нет координаты</dd></div><div><dt>Последняя отправка</dt><dd id="gps-sent">Ещё не передавали</dd></div></dl>
         <div class="button-row"><button id="gps-start" class="primary" type="button" disabled>Включить GPS</button><button id="gps-stop" class="secondary" type="button" disabled>Выключить</button></div>
         <p id="gps-feedback" role="status" class="gps-message"></p>
-        <label class="checkbox-row"><input id="gps-keep-awake" type="checkbox">Не выключать экран при передаче из браузера</label>
+        <label class="checkbox-row"><input id="gps-keep-awake" type="checkbox"><span>Не выключать экран при передаче GPS</span></label>
       </article>
-      <article class="surface equipment-card"><h2>Оборудование</h2><div id="equipment" class="equipment"></div></article>
-      <div id="android-app" class="app-install">
-        <a id="android-apk-download" class="text-button app-install-download" href="/engineer-app.apk" download>Скачать приложение для Android</a>
+      <article class="surface equipment-card"><div class="section-top"><h2>Оборудование</h2><span class="muted">Доступно</span></div><div id="equipment" class="equipment"></div></article>
+      <details id="android-app" class="app-install">
+        <summary>Приложение для Android</summary>
+        <a id="android-apk-download" class="secondary app-install-download" href="/engineer-app.apk" download>Скачать APK</a>
         <span id="android-apk-help" class="muted">Для передачи GPS при выключенном экране.</span>
         <p id="android-apk-status" role="status" class="gps-message"></p>
-      </div>
+      </details>
     </section>
   </main>
   <nav class="bottom-nav" aria-label="Разделы инженера">
     <button id="tab-tasks" type="button" aria-current="page" aria-controls="panel-tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M3 6h1M3 12h1M3 18h1"/></svg>Задачи</button>
     <button id="tab-map" type="button" aria-controls="panel-map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/></svg>Карта</button>
-    <button id="tab-shift" type="button" aria-controls="panel-shift"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Смена</button>
+    <button id="tab-shift" type="button" aria-controls="panel-shift"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg>Профиль</button>
   </nav>
   <dialog id="availability-dialog" aria-labelledby="unavailability-title">
-    <div class="dialog-top"><h2 id="unavailability-title">Не могу работать</h2><button id="close-availability" class="icon-button" type="button" aria-label="Закрыть">×</button></div>
+    <div class="dialog-top"><h2 id="unavailability-title">Период отсутствия</h2><button id="close-availability" class="icon-button" type="button" aria-label="Закрыть">×</button></div>
     <p id="absence-day" class="muted"></p>
     <form id="unavailability-form"><fieldset id="unavailability-fields" disabled>
-      <label for="unavailability-start-mode">Когда</label><select id="unavailability-start-mode"><option value="now">Сейчас</option><option value="later">Позже</option></select>
-      <div id="unavailability-start-fields" class="input-pair" hidden><div><label for="unavailability-start-date">Дата начала</label><input id="unavailability-start-date" type="date" required></div><div><label for="unavailability-start-time">Время начала</label><input id="unavailability-start-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required></div></div>
-      <label for="unavailability-duration">До какого времени</label><select id="unavailability-duration"><option value="fixed">Указать время</option><option value="unknown">Пока не знаю</option></select>
-      <div id="unavailability-end-fields" class="input-pair"><div><label for="unavailability-end-date">Дата</label><input id="unavailability-end-date" type="date" required></div><div><label for="unavailability-end-time">Время</label><input id="unavailability-end-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required></div></div>
+      <label for="unavailability-start-mode">Начало отсутствия</label><select id="unavailability-start-mode"><option value="now">Сейчас</option><option value="later">Указать дату и время</option></select>
+      <div id="unavailability-start-fields" class="input-pair" hidden><div><label for="unavailability-start-date">С даты</label><input id="unavailability-start-date" type="date" required></div><div><label for="unavailability-start-time">Со времени</label><input id="unavailability-start-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required></div></div>
+      <label for="unavailability-duration">Окончание отсутствия</label><select id="unavailability-duration"><option value="fixed">Указать время</option><option value="unknown">Пока не знаю</option></select>
+      <div id="unavailability-end-fields" class="input-pair"><div><label for="unavailability-end-date">До даты</label><input id="unavailability-end-date" type="date" required></div><div><label for="unavailability-end-time">До времени</label><input id="unavailability-end-time" type="text" data-time24 inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="ЧЧ:ММ" required></div></div>
       <label for="unavailability-reason">Причина</label><select id="unavailability-reason" required><option value="">Выберите причину</option><option value="sick">Болезнь</option><option value="transport">Транспорт</option><option value="personal">Личные обстоятельства</option><option value="other">Другое</option></select>
       <label for="unavailability-comment">Комментарий <span class="optional">· необязательно</span></label><textarea id="unavailability-comment" rows="2" maxlength="1000" placeholder="Что нужно знать диспетчеру"></textarea>
-      <div id="unavailability-location-group"><label for="unavailability-location">Где вы сейчас</label><select id="unavailability-location"></select></div>
       <p id="unavailability-error" class="notice error" role="alert" hidden></p>
       <button id="unavailability-submit" class="primary" type="submit">Сообщить диспетчеру</button>
     </fieldset></form>
   </dialog>
-  <dialog id="history-dialog" aria-labelledby="history-title">
-    <div class="dialog-top"><h2 id="history-title">История смены</h2><button id="close-history" class="icon-button" type="button" aria-label="Закрыть историю">×</button></div>
-    <h3>Отметки</h3><div id="fact-list"></div>
-    <h3>Отсутствия</h3><div id="unavailability-list"></div>
+  <dialog id="absence-cancel-dialog" aria-labelledby="absence-cancel-title">
+    <div class="dialog-top"><h2 id="absence-cancel-title">Отменить отсутствие</h2><button id="close-absence-cancel" class="icon-button" type="button" aria-label="Закрыть отмену">×</button></div>
+    <p id="absence-cancel-period"></p>
+    <p class="muted">Диспетчер получит исправление.</p>
+    <form id="absence-cancel-form"><fieldset id="absence-cancel-fields">
+      <label for="absence-cancel-reason">Причина отмены</label><select id="absence-cancel-reason"><option>Отправлено по ошибке</option><option>Планы изменились</option></select>
+      <p id="absence-cancel-error" class="notice error" role="alert" hidden></p>
+      <button id="confirm-absence-cancel" class="primary" type="submit">Отменить отсутствие</button>
+    </fieldset></form>
   </dialog>
   <dialog id="task-dialog" aria-labelledby="dialog-title">
     <div class="dialog-top"><span id="dialog-kicker" class="eyebrow">ЗАДАНИЕ</span><button id="close-dialog" class="icon-button" type="button" aria-label="Закрыть карточку">×</button></div>

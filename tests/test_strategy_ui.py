@@ -415,7 +415,8 @@ def test_planning_mode_is_visible_and_can_be_switched_both_ways():
     client('''
 assert.equal($('planning-mode').value,'autopilot');
 assert.equal($('autopilot-thresholds').hidden,false);
-assert.match($('planning-mode-summary').textContent,/Сейчас включён автопилот/);
+assert.match($('planning-mode-summary').textContent,/Автопилот: новые заявки/);
+assert.match($('planning-mode-summary').textContent,/задержки по GPS/);
 $('planning-mode').value='manual';await $('planning-mode').dispatch('change');
 assert.equal($('autopilot-thresholds').hidden,true);
 assert.equal($('planning-save').disabled,false);

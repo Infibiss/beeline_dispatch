@@ -1,9 +1,8 @@
 (function () {
   'use strict';
-  const labels = {planned:'Назначена', traveling:'В пути', working:'В работе', completion_pending:'Ожидает подтверждения', completed:'Выполнена', interrupted:'Приостановлена', available:'Свободен', unavailable:'Недоступен', pending_replan:'Ожидает перепланирования'};
+  const labels = {planned:'Назначена', traveling:'В пути', working:'В работе', completion_pending:'Ожидает подтверждения', completed:'Выполнена', interrupted:'Приостановлена', available:'На смене', unavailable:'Недоступен', pending_replan:'Ожидает перепланирования'};
   const actions = {traveling:'Выехать на заявку', working:'Начать работу', completed:'Сообщить о выполнении', interrupted:'Приостановить работу', available:'Начать смену', unavailable:'Не могу работать'};
   const absenceReasons = {sick:'Болезнь', transport:'Проблема с транспортом', personal:'Личные обстоятельства', other:'Другое'};
-  const transport = {car:'Автомобиль', walk:'Пешком', bicycle:'Велосипед', public:'Общественный транспорт'};
   const skills = {local:'Локальный ремонт', connection:'Подключение', emergency:'Аварийные работы'};
   function time(value) {
     if (!Number.isInteger(value)) return '—';
@@ -16,9 +15,9 @@
   function actionPayload(version, engineerId, status, taskId, input) {
     const payload = {version, engineer_id:engineerId, status, time:minute(input.time), comment:input.comment.trim()};
     if (taskId && ['traveling','working','completed','interrupted'].includes(status)) payload.request_id = taskId;
-    if (['available','unavailable','traveling'].includes(status)) {
-      if (!input.location) throw new Error('Укажите ваше текущее местоположение.');
-      payload.location_id = input.location;
+    if (['available','traveling'].includes(status)) {
+      if (status === 'traveling' && !input.location) throw new Error('Укажите точку начала выезда.');
+      if (input.location) payload.location_id = input.location;
     }
     if (['working','interrupted','traveling'].includes(status)) {
       const remaining = Number(input.remaining);
@@ -41,19 +40,19 @@
     const parsed = new Date(Date.UTC(year, month - 1, day));
     return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
   }
-  function unavailabilityPayload(version, engineerId, input, currentDate, currentMinute, shiftStart = 0, shiftEnd = 1440) {
+  function unavailabilityPayload(version, engineerId, input, currentDate, currentMinute, shiftStart = 0, shiftEnd = 1440, existingPeriod = null) {
     const startDate = input.startDate, endDate = input.endDate;
     if (!validDate(startDate) || !validDate(endDate)) throw new Error('Укажите корректные даты периода.');
     const startMinute = minute(input.startTime), endMinute = minute(input.endTime);
     if (endDate < startDate || (endDate === startDate && endMinute <= startMinute)) throw new Error('Конец периода должен быть позже начала.');
-    if (currentDate && (startDate < currentDate || (startDate === currentDate && startMinute < currentMinute))) throw new Error('Начало периода не может быть раньше текущего времени плана.');
+    const editingActive = !!existingPeriod?.is_active;
+    if (editingActive && (startDate !== existingPeriod.start_date || input.startTime !== existingPeriod.start_time)) throw new Error('Начало действующего отсутствия сохраняется.');
+    if (!editingActive && currentDate && (startDate < currentDate || (startDate === currentDate && startMinute < currentMinute))) throw new Error('Начало периода не может быть раньше текущего времени плана.');
+    if (editingActive && currentDate && (endDate < currentDate || (endDate === currentDate && endMinute <= currentMinute))) throw new Error('Для возвращения сейчас нажмите «Я снова доступен».');
     if (!Object.hasOwn(absenceReasons, input.reason)) throw new Error('Выберите причину недоступности.');
     const comment = (input.comment || '').trim();
     if (comment.length < 3 || comment.length > 1000) throw new Error('Кратко поясните ситуацию для диспетчера.');
     const payload = {version, engineer_id:engineerId, start_date:startDate, start_time:input.startTime, end_date:endDate, end_time:input.endTime, reason:input.reason, comment};
-    const started = currentDate && currentMinute >= shiftStart && currentMinute < shiftEnd && (startDate < currentDate || (startDate === currentDate && startMinute <= currentMinute));
-    if (started && !input.location) throw new Error('Для начавшегося периода укажите ваше текущее местоположение.');
-    if (started && input.location) payload.location_id = input.location;
     return payload;
   }
   function declinePayload(version, engineerId, requestId, input, currentMinute) {
@@ -69,9 +68,9 @@
   const $ = id => document.getElementById(id);
   const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
   const appUrl = path => window.FieldRouter ? window.FieldRouter.url(path) : path;
-  let rosterVersion = null;
+  let rosterVersion = null, currentClock = null;
   let data = null, engineerId = '', filter = 'pending', tab = 'tasks', selectedId = null;
-  let action = null, decline = null, absence = null, sending = false, connected = false, loading = false, generation = 0;
+  let action = null, decline = null, absence = null, cancelAbsence = null, sending = false, connected = false, loading = false, generation = 0;
   let map = null, mapLayer = null, mapBounds = [], polling = false;
   const dialog = $('task-dialog');
   function el(tag, text, className) {
@@ -89,9 +88,15 @@
     $('updates').hidden = !text || (!$('replan-note').hidden && ['Диспетчер уведомлён.', 'Вы снова доступны. Ожидаем задания.'].includes(text));
   }
   function error(text) { $('error').textContent = text; $('error').hidden = !text; }
+  function liveClock() { return currentClock?.mode === 'live'; }
+  function currentMinute() { return currentClock?.time ?? data.time; }
+  function clockIdentity(clock) { return clock ? [clock.mode, clock.date, clock.server_date].join('/') : null; }
+  function clockContext() {
+    return dateLabel(data.date) + (liveClock() ? ' · ' + time(currentMinute()) + ' МСК' : ' · время сценария ' + time(currentMinute()));
+  }
   function currentTask() { return data && data.tasks.find(t => t.id === selectedId); }
   function unavailableNow() { return !!(data && (data.active_absence || data.indefinite_absence || data.status?.status === 'unavailable' || data.return_confirmation_required)); }
-  function pendingReplan(task) { return !['completed','completion_pending'].includes(task.status) && (!!data.return_pending_replan || task.status === 'pending_replan' || (data.pending_reassignment_ids || []).includes(task.id)); }
+  function pendingReplan(task) { return !['completed','completion_pending'].includes(task.status) && (!!data.return_pending_replan || !!data.location_confirmation_pending || task.status === 'pending_replan' || (data.pending_reassignment_ids || []).includes(task.id)); }
   function taskStatus(task) { return pendingReplan(task) ? 'pending_replan' : task.status; }
   function factPair(dl, name, value, wide) {
     const row = el('div', null, wide ? 'wide' : '');
@@ -116,6 +121,10 @@
     $('unavailability-fields').disabled = sending || !connected || !data;
     $('unavailability-submit').disabled = sending || !connected || !!absence?.stale;
     $('close-availability').disabled = sending;
+    $('absence-cancel-fields').disabled = sending || !connected;
+    $('confirm-absence-cancel').disabled = sending || !connected || !!cancelAbsence?.stale;
+    $('close-absence-cancel').disabled = sending;
+    document.querySelectorAll('[data-absence-edit], [data-absence-cancel]').forEach(b => {b.disabled = sending || !connected;});
     $('action-fields').disabled = sending;
     $('send-action').disabled = sending || !connected || !!(action && action.stale);
     $('decline-fields').disabled = sending;
@@ -126,14 +135,14 @@
   async function request(path, payload) {
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 25000);
     try {
-      const response = await appFetch(appUrl(path), {cache:'no-store', signal:controller.signal, ...(payload ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)} : {})});
+      const response = await appFetch(appUrl(path), {cache:'no-store', signal:controller.signal, ...(payload ? {method:'POST', headers:{'Content-Type':'application/json', ...(path.startsWith('/api/engineer/') && currentClock ? {'X-Engineer-Clock':clockIdentity(currentClock)} : {})}, body:JSON.stringify(payload)} : {})});
       let result;
       try { result = await response.json(); } catch { throw new Error('Сервер вернул неполный ответ. Обновите задания.'); }
       if (!response.ok) { const failure = new Error(result.error || 'Не удалось выполнить запрос.'); failure.status = response.status; throw failure; }
       return result;
     } catch (failure) {
       if (!failure.status && (failure.name === 'AbortError' || failure instanceof TypeError)) {
-        throw new Error(payload ? 'Нет подтверждения от сервера. Обновите задания и проверьте журнал перед повторной отправкой.' : 'Не удалось связаться с компьютером. Проверьте Wi-Fi и запущенный сервер.');
+        throw new Error(payload ? 'Нет подтверждения от сервера. Обновите страницу и проверьте результат перед повторной отправкой.' : 'Не удалось связаться с компьютером. Проверьте Wi-Fi и запущенный сервер.');
       }
       throw failure;
     } finally { clearTimeout(timeout); }
@@ -169,26 +178,61 @@
   }
   function renderShift() {
     $('shift-return').hidden = !unavailableNow();
-    $('shift-start').hidden = unavailableNow() || !!data.status;
+    $('shift-start').hidden = unavailableNow() || !!data.status || data.engineer.off_duty;
     $('shift-problem').hidden = unavailableNow();
     const e = data.engineer;
-    $('engineer-name').textContent = e.name;
+    const future = data.scheduled_absences || [];
     if ($('personal-name')) $('personal-name').textContent = e.name;
-    $('engineer-status').textContent = unavailableNow() ? 'Недоступен' : data.return_pending_replan ? 'Ожидает назначений' : data.status ? labels[data.status.status] : e.off_duty ? 'Выходной' : 'Не на смене';
-    $('engineer-status').className = 'pill ' + (unavailableNow() ? 'unavailable' : data.status ? data.status.status : '');
+    const shiftStatus = {available:'На смене',traveling:'В пути',working:'Работает',completed:'На смене',completion_pending:'На смене',interrupted:'На смене'};
+    $('engineer-status').textContent = unavailableNow() ? 'Недоступен' : data.location_confirmation_pending ? 'Ожидаем уточнения точки' : data.return_pending_replan ? 'Ожидает назначений' : e.off_duty ? 'Выходной' : data.status ? (shiftStatus[data.status.status] || 'На смене') : 'Не на смене';
+    $('engineer-status').className = 'pill ' + (unavailableNow() ? 'unavailable' : data.return_pending_replan || data.location_confirmation_pending ? 'pending_replan' : ['working','traveling'].includes(data.status?.status) ? data.status.status : data.status && !e.off_duty ? 'available' : '');
+    $('shift-plan-context').textContent = clockContext();
     const dl = $('shift-details'); dl.replaceChildren();
-    if (e.off_duty) factPair(dl, 'График', 'Выходной по плану');
-    factPair(dl, 'Смена', time(e.shift.start) + '–' + time(e.shift.end));
-    factPair(dl, 'Транспорт', transport[e.transport]);
+    const remainingTasks = data.tasks.filter(task => !pendingReplan(task) && !['completed','completion_pending'].includes(task.status)).length;
+    factPair(dl, 'Смена', e.off_duty ? 'Выходной' : time(e.shift.start) + '–' + time(e.shift.end));
+    factPair(dl, 'Осталось заявок', String(remainingTasks));
+    factPair(dl, 'Выполнено', String(data.tasks.filter(task => task.status === 'completed').length));
+    const activity = $('shift-activity'); activity.replaceChildren();
+    const current = data.tasks.find(task => task.id === data.status?.request_id);
+    if (current && !unavailableNow() && !pendingReplan(current) && ['working','traveling'].includes(data.status?.status)) {
+      activity.append(el('span', (data.status.status === 'working' ? 'В работе' : 'В пути к заявке') + ' · № '+current.id),
+        button('Открыть заявку', 'text-button', () => openTask(current.id)));
+    }
+    activity.hidden = !activity.childElementCount;
     const summary = $('availability-summary'); summary.replaceChildren();
-    const periodTime = (day, clock) => (day === data.date ? '' : dateLabel(day) + ', ') + clock;
-    if (data.active_absence) {
-      const p = data.active_absence;
-      summary.append(el('p', 'Недоступен до ' + periodTime(p.end_date, p.end_time)));
-    } else if (data.return_confirmation_required) summary.append(el('p', 'Период закончился. Подтвердите возвращение.'));
-    else if (data.indefinite_absence || data.status?.status === 'unavailable') summary.append(el('p', 'Срок возвращения пока не указан.'));
-    for (const p of data.scheduled_absences || []) summary.append(el('p',
-      'Запланировано: ' + periodTime(p.start_date, p.start_time) + ' — ' + periodTime(p.end_date, p.end_time)));
+    const periodTime = (day, clock) => (day === data.date ? '' : dateLabel(day) + ', ') + (typeof clock === 'number' ? time(clock) : clock);
+    const reason = period => period.reason_label || absenceReasons[period.reason] || 'Отсутствие';
+    const addPeriodActions = (row, period) => {
+      const actions = el('div', null, 'absence-actions');
+      const periodLabel = periodTime(period.start_date, period.start_time) + ' — ' + periodTime(period.end_date, period.end_time);
+      if (period.can_edit) {
+        const edit = button('Изменить', 'text-button', () => beginAbsence(null, period));
+        edit.dataset.absenceEdit = period.id; edit.setAttribute('aria-label', 'Изменить отсутствие: ' + periodLabel); actions.append(edit);
+      }
+      if (period.can_cancel) {
+        const cancel = button('Отменить', 'text-button', () => beginAbsenceCancel(period));
+        cancel.dataset.absenceCancel = period.id; cancel.setAttribute('aria-label', 'Отменить отсутствие: ' + periodLabel); actions.append(cancel);
+      }
+      if (actions.childElementCount) row.append(actions);
+    };
+    const absenceRow = (period, current) => {
+      const row = el('div', null, 'absence-period ' + (current ? 'absence-current' : 'absence-future'));
+      const details = el('div', null, 'absence-description');
+      if (current) details.append(el('span', liveClock() ? 'Сейчас' : 'В это время сценария', 'absence-label'));
+      details.append(el('strong', current ? 'До ' + periodTime(period.end_date, period.end_time) : periodTime(period.start_date, period.start_time) + ' — ' + periodTime(period.end_date, period.end_time)), el('p', reason(period), 'absence-reason'));
+      row.append(details); addPeriodActions(row, period); return row;
+    };
+    if (data.active_absence) summary.append(absenceRow(data.active_absence, true));
+    else if (data.return_confirmation_required) summary.append(el('p', 'Период закончился. Подтвердите возвращение.', 'absence-note'));
+    else if (data.indefinite_absence || data.status?.status === 'unavailable') summary.append(el('p', 'Без даты возвращения.', 'absence-note'));
+    else if (data.location_confirmation_pending) summary.append(el('p', 'Диспетчер получил отметку. Для новых выездов нужно уточнить точку старта.', 'availability-note'));
+    else if (data.return_pending_replan) summary.append(el('p', 'Диспетчер обновляет задания.', 'availability-note'));
+    if (future.length) {
+      summary.append(el('h3', 'Предстоящие отсутствия'));
+      const periods = el('div', null, 'absence-list');
+      for (const period of future) periods.append(absenceRow(period, false));
+      summary.append(periods);
+    }
     summary.hidden = !summary.childElementCount;
     const inventory = data.inventory, stock = e.stock || {};
     $('equipment').replaceChildren(...[['router','Роутеры'],['tv_box','ТВ-приставки']].map(([key, title]) => {
@@ -196,46 +240,21 @@
       box.append(el('div', title), el('strong', inventory ? inventory.available[key] : stock[key] ?? '—'));
       return box;
     }));
-    $('fact-list').replaceChildren(...data.facts.slice().reverse().map(f => {
-      const row = el('div', null, 'fact');
-      row.append(el('strong', time(f.time) + ' · ' + labels[f.status]));
-      if (f.request_id) row.append(el('small', 'Заявка № ' + f.request_id));
-      if (f.comment) row.append(el('p', f.comment));
-      return row;
-    }));
-    if (!data.facts.length) $('fact-list').append(el('p', 'Отметок пока нет.', 'muted'));
-    const periods = Array.isArray(data.unavailability) ? data.unavailability : [];
-    $('unavailability-list').replaceChildren(...periods.map(period => {
-      const row = el('div', null, 'unavailability-entry');
-      const start = period.start_date + ' ' + (typeof period.start_time === 'number' ? time(period.start_time) : period.start_time);
-      const end = period.end_date + ' ' + (typeof period.end_time === 'number' ? time(period.end_time) : period.end_time);
-      row.append(el('strong', start + ' — ' + end), el('small', period.reason_label || absenceReasons[period.reason] || period.reason || 'Причина не указана'));
-      if (period.comment) row.append(el('p', period.comment));
-      if (period.revoked) row.append(el('small', 'Отменён'));
-      else if (period.early_return) row.append(el('small', 'Досрочно завершён'));
-      return row;
-    }));
-    if (!periods.length) $('unavailability-list').append(el('p', 'Периодов недоступности пока нет.', 'muted'));
     if (!$('unavailability-start-date').value) $('unavailability-start-date').value = data.date;
     if (!$('unavailability-end-date').value) $('unavailability-end-date').value = data.date;
     if (!$('unavailability-start-time').value) $('unavailability-start-time').value = time(Math.min(data.time, 1439));
     if (!$('unavailability-end-time').value) $('unavailability-end-time').value = time(Math.min(1439, Math.max(data.time + 1, e.shift.end)));
     $('unavailability-start-date').min = data.date;
     $('unavailability-end-date').min = data.date;
-    const previousLocation = $('unavailability-location').value;
-    $('unavailability-location').replaceChildren(...data.locations.map(point => {
-      const option = el('option', point.label); option.value = point.id; return option;
-    }));
-    $('unavailability-location').value = previousLocation || data.status?.location_id || e.start_location;
     updateUnavailabilityLocation();
   }
   function render(result) {
-    data = result;
+    data = result; currentClock = data.clock || null;
     window.dispatchEvent(new CustomEvent('engineer-state', {detail: {engineerId: data.engineer.id}}));
     $('plan-version').textContent = 'Версия ' + data.version;
     $('work-date').textContent = dateLabel(data.date).toUpperCase();
     $('region').textContent = data.region;
-    $('replan-note').hidden = !data.return_pending_replan && !(data.pending_reassignment_ids || []).length;
+    $('replan-note').hidden = !data.return_pending_replan && !data.location_confirmation_pending && !(data.pending_reassignment_ids || []).length;
     $('pending-count').textContent = data.tasks.filter(t => t.status !== 'completed' && !pendingReplan(t)).length;
     $('done-count').textContent = data.tasks.filter(t => t.status === 'completed').length;
     $('distance').textContent = (data.distance_m / 1000).toLocaleString('ru-RU', {maximumFractionDigits:1});
@@ -295,7 +314,7 @@
     if (unavailableNow() && task.status === 'working') {
       controlsNode.append(el('p', 'Сообщите результат начатой работы.', 'hint'), button('Сообщить о выполнении', 'primary', () => beginAction('completed', task)), button('Приостановить работу', 'secondary', () => beginAction('interrupted', task)));
     } else if (unavailableNow()) {
-      controlsNode.append(el('p', 'Вы недоступны.', 'hint'), button('К моей смене', 'secondary', () => {dialog.close(); activate('shift');}));
+      controlsNode.append(el('p', 'Вы недоступны.', 'hint'), button('К доступности', 'secondary', () => {dialog.close(); activate('shift');}));
     } else if (pendingReplan(task)) {
       controlsNode.append(el('p', 'Ожидаем новое назначение.', 'hint'));
     } else if (task.status === 'completion_pending') {
@@ -332,21 +351,22 @@
     action = {version:data.version, status, taskId:task ? task.id : null, stale:false};
     $('action-form').reset(); $('action-form').hidden = false; $('task-actions').hidden = true;
     $('action-error').hidden = true; $('action-title').textContent = actions[status];
-    $('action-day').textContent = 'Рабочий день: ' + dateLabel(data.date);
+    $('action-day').textContent = clockContext();
     const last = data.status ? data.status.time + 1 : data.engineer.shift.start;
     const planned = task && task.visit ? (status === 'completed' ? task.visit.end : status === 'working' ? task.visit.start : task.visit.arrival - task.visit.travel_minutes) : data.time;
-    $('action-time').value = time(Math.min(1439, Math.max(data.time, last, planned || data.time)));
+    $('action-time').value = time(liveClock() ? currentMinute() : Math.min(1439, Math.max(data.time, last, planned || data.time)));
+    $('action-time').readOnly = liveClock();
     const locationNeeded = ['available','unavailable','traveling'].includes(status);
-    $('location-field').hidden = !locationNeeded; $('action-location').required = locationNeeded;
-    $('action-location').replaceChildren(...data.locations.map(point => {
+    $('location-field').hidden = !locationNeeded; $('action-location').required = status === 'traveling';
+    document.querySelector('label[for="action-location"]').textContent = status === 'traveling' ? 'Точка начала выезда' : 'Местоположение · необязательно';
+    $('action-location').replaceChildren(new Option('Не указано', ''), ...data.locations.map(point => {
       const option = el('option', point.label); option.value = point.id; return option;
     }));
-    $('action-location').value = (data.status && data.status.location_id) || data.engineer.start_location;
-    if (!$('action-location').value && data.locations.length) $('action-location').selectedIndex = 0;
+    $('action-location').value = '';
     const remainingNeeded = ['working','interrupted','traveling'].includes(status);
     $('remaining-field').hidden = !remainingNeeded; $('action-remaining').required = remainingNeeded;
     $('remaining-label').textContent = status === 'traveling' ? 'Осталось в пути, мин' : 'Осталось работы, мин';
-    $('action-remaining').value = task ? Math.max(1, status === 'traveling' ? ((task.status === 'traveling' && task.remaining_minutes) || (task.visit && task.visit.travel_minutes) || 1) : ((task.status === 'working' && task.remaining_minutes) || task.duration_minutes)) : '';
+    $('action-remaining').value = task ? Math.max(1, status === 'traveling' ? ((task.status === 'traveling' && task.remaining_minutes) || (task.visit && task.visit.travel_minutes) || 1) : (task.work_remaining_minutes ?? task.duration_minutes)) : '';
     const consumed = ['completed','interrupted'].includes(status);
     $('consumed-fields').hidden = !consumed;
     $('action-router').required = consumed; $('action-tv').required = consumed;
@@ -361,45 +381,55 @@
   }
   function updateUnavailabilityLocation() {
     if (!data) return;
+    const editingActive = !!absence?.period?.is_active;
     const unknown = $('unavailability-duration').value === 'unknown';
     if (unknown) $('unavailability-start-mode').value = 'now';
-    $('unavailability-start-mode').disabled = unknown;
+    $('unavailability-start-mode').disabled = unknown || editingActive;
+    $('unavailability-duration').disabled = !!absence?.period;
+    $('unavailability-start-mode').querySelector('[value="now"]').textContent = (liveClock() ? 'Сейчас · ' : 'С времени сценария · ') + time(currentMinute());
+    $('absence-day').textContent = clockContext();
     const later = $('unavailability-start-mode').value === 'later';
-    $('unavailability-start-fields').hidden = !later;
-    for (const id of ['unavailability-start-date','unavailability-start-time']) $(id).disabled = !later;
+    $('unavailability-start-fields').hidden = !later && !editingActive;
+    for (const id of ['unavailability-start-date','unavailability-start-time']) $(id).disabled = !later || editingActive;
+    $('unavailability-start-date').min = editingActive ? absence.period.start_date : data.date;
     $('unavailability-end-fields').hidden = unknown;
     for (const id of ['unavailability-end-date','unavailability-end-time']) $(id).disabled = unknown;
     $('unavailability-comment').required = $('unavailability-reason').value === 'other';
     document.querySelector('label[for="unavailability-comment"] .optional').hidden = $('unavailability-comment').required;
-    $('unavailability-end-date').min = $('unavailability-start-date').value || data.date;
-    let started = !later;
-    try {
-      const startDate = $('unavailability-start-date').value;
-      started ||= data.time >= data.engineer.shift.start && data.time < data.engineer.shift.end && (startDate < data.date || (startDate === data.date && minute($('unavailability-start-time').value) <= data.time));
-    } catch { /* Native required validation handles an unfinished time. */ }
-    $('unavailability-location-group').hidden = !started;
-    $('unavailability-location').required = started;
+    $('unavailability-end-date').min = later ? $('unavailability-start-date').value || data.date : data.date;
   }
-  function beginAbsence(draft) {
-    if (!data || !connected || sending || unavailableNow()) return;
+  function beginAbsence(draft, period = null) {
+    if (!data || !connected || sending || (unavailableNow() && !period)) return;
     if (dialog.open) dialog.close();
-    absence = {version:data.version, stale:false};
+    absence = {version:data.version, stale:false, period};
     $('unavailability-form').reset();
     $('unavailability-start-date').value = data.date;
-    $('unavailability-start-time').value = time(data.time);
-    const end = data.time + 60, day = new Date(data.date+'T12:00:00Z');
+    $('unavailability-start-time').value = time(currentMinute());
+    const end = currentMinute() + 60, day = new Date(data.date+'T12:00:00Z');
     if (end >= 1440) day.setUTCDate(day.getUTCDate()+1);
     $('unavailability-end-date').value = day.toISOString().slice(0,10);
     $('unavailability-end-time').value = time(end%1440);
-    $('unavailability-location').value = data.status?.location_id || data.engineer.start_location;
-    if (!$('unavailability-location').value && data.locations.length) $('unavailability-location').selectedIndex = 0;
+    if (period) {
+      $('unavailability-start-mode').value = 'later';
+      for (const [field,key] of [['start-date','start_date'],['start-time','start_time'],['end-date','end_date'],['end-time','end_time'],['reason','reason'],['comment','comment']]) $('unavailability-'+field).value = period[key] || '';
+    }
     if (draft && !(draft instanceof Event)) {
       for (const [field, value] of Object.entries(draft)) $('unavailability-'+field).value = value;
     }
-    $('absence-day').textContent = dateLabel(data.date) + ' · время плана ' + time(data.time);
+    $('unavailability-title').textContent = period ? 'Изменить отсутствие' : 'Период отсутствия';
+    $('unavailability-submit').textContent = period ? 'Сохранить изменения' : 'Сообщить диспетчеру';
+    $('absence-day').textContent = clockContext();
     $('unavailability-error').hidden = true;
     updateUnavailabilityLocation(); controls();
     $('availability-dialog').showModal();
+  }
+  function beginAbsenceCancel(period) {
+    if (!data || !connected || sending || !period.can_cancel) return;
+    cancelAbsence = {version:data.version, period, stale:false};
+    $('absence-cancel-form').reset();
+    $('absence-cancel-period').textContent = period.start_date + ' ' + period.start_time + ' — ' + period.end_date + ' ' + period.end_time;
+    $('absence-cancel-error').hidden = true;
+    controls(); $('absence-cancel-dialog').showModal();
   }
   function beginDecline(task) {
     if (!data || !connected || sending || !task.visit || task.status !== 'planned' || pendingReplan(task)) return;
@@ -466,23 +496,25 @@
       if (comment && comment.length < 3) throw new Error('Комментарий: не менее трёх символов.');
       const later = $('unavailability-start-mode').value === 'later';
       payload = unknown ? actionPayload(absence.version, engineerId, 'unavailable', null, {
-        time:time(Math.max(data.time, data.status ? data.status.time+1 : data.time)),
-        location:$('unavailability-location').value, comment:comment || absenceReasons[reason]
+        time:time(liveClock() ? currentMinute() : Math.max(data.time, data.status ? data.status.time+1 : data.time)),
+        comment:comment || absenceReasons[reason]
       }) : unavailabilityPayload(absence.version, engineerId, {
         startDate:later ? $('unavailability-start-date').value : data.date,
-        startTime:later ? $('unavailability-start-time').value : time(data.time),
+        startTime:later ? $('unavailability-start-time').value : time(currentMinute()),
         endDate:$('unavailability-end-date').value, endTime:$('unavailability-end-time').value,
-        reason, comment:comment || absenceReasons[reason],
-        location:$('unavailability-location').value
-      }, data.date, data.time, data.engineer.shift.start, data.engineer.shift.end);
+        reason, comment:comment || absenceReasons[reason]
+      }, data.date, currentMinute(), data.engineer.shift.start, data.engineer.shift.end, absence.period);
+      if (!unknown && !later) payload.start_mode = 'now';
+      if (absence.period) payload.report_id = absence.period.id;
     } catch (failure) { $('unavailability-error').textContent = failure.message; $('unavailability-error').hidden = false; return; }
-    const startsNow = unknown || (payload.start_date === data.date && minute(payload.start_time) <= data.time);
+    const startsNow = unknown || (payload.start_date === data.date && minute(payload.start_time) <= currentMinute());
     if (startsNow && data.status?.status === 'working') {
       const task = data.tasks.find(t => t.id === data.status.request_id);
       if (!task) {error('Обновите задания: текущая работа не найдена.'); return;}
-      const draft = Object.fromEntries(['start-mode','start-date','start-time','duration','end-date','end-time','reason','comment','location'].map(field => [field,$('unavailability-'+field).value]));
+      const draft = Object.fromEntries(['start-mode','start-date','start-time','duration','end-date','end-time','reason','comment'].map(field => [field,$('unavailability-'+field).value]));
+      const period = absence.period;
       $('availability-dialog').close();
-      openTask(task.id); beginAction('interrupted',task); action.thenAbsence = draft;
+      openTask(task.id); beginAction('interrupted',task); action.thenAbsence = {draft, period};
       $('action-comment').value = payload.comment;
       $('action-title').textContent = 'Приостановить текущую работу';
       $('send-action').textContent = 'Сохранить и продолжить';
@@ -490,7 +522,7 @@
     }
     sending = true; controls(); $('unavailability-error').hidden = true;
     try {
-      const result = await request(unknown ? '/api/engineer/facts' : '/api/engineer/unavailability', payload);
+      const result = await request(absence.period ? '/api/engineer/unavailability/update' : unknown ? '/api/engineer/facts' : '/api/engineer/unavailability', payload);
       $('availability-dialog').close();
       $('unavailability-form').reset(); render(result); syncStatus(true); error('');
       notice('Диспетчер уведомлён.');
@@ -498,6 +530,21 @@
       $('unavailability-error').textContent = failure.message; $('unavailability-error').hidden = false;
       if (failure.status === 409) {absence.stale = true; $('unavailability-error').textContent += ' Закройте форму и обновите задания.';}
     } finally { sending = false; controls(); }
+  });
+  $('absence-cancel-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!cancelAbsence || sending || !connected || cancelAbsence.stale) return;
+    const pending = cancelAbsence;
+    const payload = {version:pending.version,engineer_id:engineerId,report_id:pending.period.id,correction_reason:$('absence-cancel-reason').value};
+    sending = true; controls(); $('absence-cancel-error').hidden = true;
+    try {
+      const result = await request('/api/engineer/unavailability/cancel',payload);
+      $('absence-cancel-dialog').close(); render(result); syncStatus(true); error('');
+      notice('Отсутствие отменено. Диспетчер уведомлён.');
+    } catch (failure) {
+      $('absence-cancel-error').textContent = failure.message; $('absence-cancel-error').hidden = false;
+      if (failure.status === 409) {pending.stale = true; $('absence-cancel-error').textContent += '. Закройте форму и обновите страницу.';}
+    } finally {sending = false; controls();}
   });
   $('decline-form').addEventListener('submit', async event => {
     event.preventDefault();
@@ -528,7 +575,7 @@
     let payload;
     try {
       payload = actionPayload(action.version, engineerId, action.status, action.taskId, {
-        time:$('action-time').value, location:$('action-location').value, remaining:$('action-remaining').value,
+        time:liveClock() ? time(currentMinute()) : $('action-time').value, location:action.returning ? null : $('action-location').value, remaining:$('action-remaining').value,
         router:$('action-router').value, tv:$('action-tv').value, comment:$('action-comment').value
       });
     } catch (failure) { $('action-error').textContent = failure.message; $('action-error').hidden = false; return; }
@@ -543,7 +590,7 @@
       action = null; dialog.close(); render(result); syncStatus(true); error('');
       window.dispatchEvent(new CustomEvent('engineer-action',{detail:{status:returning ? 'available' : payload.status}}));
       notice(returning ? 'Вы снова доступны. Ожидаем задания.' : payload.status === 'completed' ? 'Результат отправлен диспетчеру.' : 'Отметка сохранена.');
-      if (thenAbsence) {sending = false; beginAbsence(thenAbsence);}
+      if (thenAbsence) {sending = false; beginAbsence(thenAbsence.draft, thenAbsence.period);}
     } catch (failure) {
       $('action-error').textContent = failure.message; $('action-error').hidden = false;
       if (failure.status === 409) {
@@ -568,6 +615,8 @@
     action.returnReportId = data.return_report_id || data.active_absence?.id;
     if (!action.returnReportId) action.unavailableFactId = data.indefinite_absence?.id || data.status?.id;
     $('action-title').textContent = 'Я снова доступен';
+    $('location-field').hidden = true; $('action-location').required = false;
+    $('action-time').value = time(currentMinute());
     $('action-comment').hidden = true;
     document.querySelector('label[for="action-comment"]').hidden = true;
     $('send-action').textContent = 'Подтвердить возвращение';
@@ -576,8 +625,9 @@
   $('close-availability').addEventListener('click', () => $('availability-dialog').close());
   $('availability-dialog').addEventListener('cancel', event => {if (sending) event.preventDefault();});
   $('availability-dialog').addEventListener('close', () => {absence = null;});
-  $('shift-history').addEventListener('click', () => $('history-dialog').showModal());
-  $('close-history').addEventListener('click', () => $('history-dialog').close());
+  $('close-absence-cancel').addEventListener('click', () => $('absence-cancel-dialog').close());
+  $('absence-cancel-dialog').addEventListener('cancel', event => {if (sending) event.preventDefault();});
+  $('absence-cancel-dialog').addEventListener('close', () => {cancelAbsence = null;});
   $('search').addEventListener('input', renderTasks);
   document.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
     filter = b.dataset.filter; document.querySelectorAll('[data-filter]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderTasks();
@@ -586,8 +636,8 @@
   $('fit-map').addEventListener('click', fitMap);
   $('engineer-select').addEventListener('change', () => {
     engineerId = $('engineer-select').value; data = null; syncStatus(false); dialog.close();
-    $('availability-dialog').close(); $('history-dialog').close();
-    $('unavailability-form').reset(); $('unavailability-list').replaceChildren(); $('unavailability-error').hidden = true;
+    $('availability-dialog').close(); $('absence-cancel-dialog').close();
+    $('unavailability-form').reset(); $('unavailability-error').hidden = true;
     try { localStorage.setItem('field-router-engineer', engineerId); } catch {}
     $('task-list').replaceChildren(el('p','Загрузка заданий…','empty')); $('next-task').hidden = true; notice('');
     load(false);
@@ -615,19 +665,31 @@
       if (!await refreshRoster()) await load(false);
     } catch (failure) { syncStatus(false); error(failure.message); }
   });
-  window.addEventListener('online', () => { if (!action && !absence) load(true); });
+  window.addEventListener('online', () => { if (!action && !decline && !absence && !cancelAbsence) load(true); });
   window.addEventListener('offline', () => syncStatus(false));
   async function poll() {
     if (document.hidden || sending || loading || polling || !engineerId) return;
     polling = true;
     try {
       const revision = await request('/api/revision');
-      if (!data || revision.version !== data.version || revision.version !== rosterVersion || !connected) {
-        if (action || absence) {
-          const form = action || absence, errorId = action ? 'action-error' : 'unavailability-error';
-          if (revision.version !== form.version) {
+      if (!data || revision.version !== data.version || revision.version !== rosterVersion || revision.clock?.key !== data.clock?.key || clockIdentity(revision.clock) !== clockIdentity(data.clock) || !connected) {
+        if (action || decline || absence || cancelAbsence) {
+          const clockChanged = currentClock && revision.clock && clockIdentity(currentClock) !== clockIdentity(revision.clock);
+          if (revision.clock) {
+            currentClock = revision.clock;
+            if (absence) updateUnavailabilityLocation();
+            if (action && liveClock()) { $('action-time').value = time(currentMinute()); $('action-day').textContent = clockContext(); }
+          }
+          const form = action || decline || absence || cancelAbsence;
+          const period = absence?.period || cancelAbsence?.period;
+          const now = currentClock ? currentClock.date + 'T' + time(currentMinute()) : null;
+          const periodStarted = period && now && period.start_date + 'T' + period.start_time <= now;
+          const periodExpired = period && now && period.end_date + 'T' + period.end_time <= now;
+          const periodChanged = !!period && !!now && (periodExpired || periodStarted !== !!period.is_active);
+          const errorId = action ? 'action-error' : decline ? 'decline-error' : absence ? 'unavailability-error' : 'absence-cancel-error';
+          if (revision.version !== form.version || clockChanged || periodChanged) {
             form.stale = true; controls();
-            $(errorId).textContent = 'Данные изменились. Закройте форму и обновите задания.';
+            $(errorId).textContent = clockChanged ? 'Дата рабочего дня изменилась. Закройте форму и обновите задания.' : periodChanged ? 'Период уже начался или закончился. Закройте форму и обновите задания.' : 'Данные изменились. Закройте форму и обновите задания.';
             $(errorId).hidden = false;
           }
         } else {

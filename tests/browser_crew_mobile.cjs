@@ -16,7 +16,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   try {
     server = spawn(process.env.PYTHON_BIN || 'python', ['-B', 'tests/gps_browser_server.py',
       'data/demo-road/Восток.json', '--state', path.join(temporary, 'state.json'),
-      '--port', '0', '--time-limit', '.3', '--disable-gps'], {
+      '--port', '0', '--time-limit', '.3', '--morning-time-limit', '.3', '--disable-gps'], {
       cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
       env: {...process.env, PYTHONUTF8:'1', PYTHONPATH:path.join(root, 'src'), GPS_TEST_STOP_FILE:stopFile, FIELD_ROUTER_ADMIN_PASSWORD:password}
     });
@@ -44,6 +44,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await mobile.waitForFunction(() => document.querySelector('#plan-version').textContent === 'Версия 1');
     const dispatch = await context.newPage();
     await dispatch.goto(base);
+    if(await dispatch.locator('#menu-toggle').isVisible()) await dispatch.locator('#menu-toggle').click();
     await dispatch.getByRole('tab', {name:'Состав и оборудование', exact:true}).click();
     const editor=dispatch.frameLocator('#crew-frame');
     await editor.locator('.crew-row').first().waitFor();
@@ -102,13 +103,17 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await mobile.selectOption('#engineer-select',id);
     await mobile.waitForFunction(() => document.querySelector('#plan-version').textContent === 'Версия 2');
     assert.equal(await mobile.locator('#engineer-select option:checked').textContent(),'Бригада — проверка связи · Восток');
-    const direct=dispatch.locator('.crew-row[data-id="'+id+'"] .crew-mobile-link');
+    const direct=editor.locator('.crew-row[data-id="'+id+'"] .crew-mobile-link');
     assert.equal(await direct.getAttribute('href'),'/engineer?engineer_id='+id);
     await mobile.click('#tab-shift');
-    assert.match(await mobile.locator('#shift-details').textContent(), /Старт смены/);
-    assert.ok((await mobile.locator('#shift-details').textContent()).includes(home.label));
+    const summary = await mobile.locator('#shift-details').textContent();
+    assert.match(summary, /Смена/);
+    assert.match(summary, /Осталось заявок/);
+    assert.match(summary, /Выполнено/);
+    assert.doesNotMatch(summary, /Старт смены|Транспорт/);
     await mobile.click('#shift-start');
-    assert.equal(await mobile.locator('#action-location').inputValue(), 'home:' + id);
+    assert.equal(await mobile.locator('#action-location').inputValue(), '');
+    await mobile.selectOption('#action-location', 'home:' + id);
     assert.match(await mobile.locator('#action-location option:checked').textContent(), /^Старт: /);
     await mobile.click('#send-action');
     await mobile.waitForSelector('#task-dialog', {state:'hidden'});
@@ -131,6 +136,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await dispatch.bringToFront();
     await dispatch.goto(base);
     await dispatch.click('#reload');
+    if(await dispatch.locator('#menu-toggle').isVisible()) await dispatch.locator('#menu-toggle').click();
     await dispatch.click('#tab-facts');
     await dispatch.getByText('Результат из мобильного приложения', {exact:false}).first().waitFor();
     await dispatch.getByRole('button',{name:'Подтвердить выполнение',exact:true}).click();
@@ -139,11 +145,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(confirmed.fact_journal.at(-1).status,'completed');
     assert.equal(confirmed.fact_journal.at(-1).source,'dispatcher');
     await dispatch.selectOption('#region-select','south-east');
-    await dispatch.waitForURL(base+'/r/south-east/');
-    await dispatch.getByRole('link',{name:'Состав и оборудование',exact:true}).click();
+    await dispatch.waitForURL(url=>url.pathname==='/r/south-east/');
+    if(await dispatch.locator('#menu-toggle').isVisible()) await dispatch.locator('#menu-toggle').click();
+    await dispatch.getByRole('tab',{name:'Состав и оборудование',exact:true}).click();
     await editor.locator('.crew-row').first().waitFor();
-    assert.match(await dispatch.locator('#context').textContent(),/^Юго-восток/);
-    assert.ok(!(await dispatch.locator('#context').textContent()).includes('в системе 16'));
+    assert.match(await dispatch.locator('#region-select option:checked').textContent(),/^Юго-восток/);
+    assert.equal(await editor.locator('.crew-row[data-id="'+id+'"]').count(),0);
     await editor.locator('#add').click();
     await editor.locator('.crew-row').last().locator('[data-key="name"]').fill('Только юго-восток');
     const southId=await editor.locator('.crew-row').last().getAttribute('data-id');
@@ -151,7 +158,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await editor.locator('#preview').waitFor({state:'visible'});
     assert.ok(!(await (await context.request.get(base+'/r/south-east/api/engineers')).json()).engineers.some(e=>e.id===southId));
     await editor.locator('#apply').click();
-    await dispatch.waitForURL(base+'/r/south-east/');
+    await dispatch.locator('#panel-plan').waitFor({state:'visible'});
     const southMobile=await context.newPage();
     await southMobile.goto(base+'/r/south-east/engineer?engineer_id='+southId);
     await southMobile.waitForFunction(id=>document.querySelector('#engineer-select').value===id,southId);

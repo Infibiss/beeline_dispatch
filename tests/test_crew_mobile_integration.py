@@ -18,7 +18,8 @@ from test_replanning import demo
 def test_added_engineer_completes_job_and_receives_approved_remaining_plan(make_scenario, tmp_path, solver):
     scenario, plan = demo(make_scenario)
     path = tmp_path / 'day.json'
-    server = create_server(ScenarioSession(scenario, plan), path, port=0, time_limit=.1, solver=solver)
+    server = create_server(ScenarioSession(scenario, plan), path, port=0, time_limit=.1, solver=solver,
+                           engineer_clock_now=lambda: 0)  # Exercise the explicit scenario clock.
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base = f'http://127.0.0.1:{server.server_port}'
@@ -120,7 +121,9 @@ def test_added_engineer_completes_job_and_receives_approved_remaining_plan(make_
         assert tasks['b']['status'] == 'planned'
         assert [v['request_id'] for r in approved['plan']['routes'] for v in r['visits']] == ['b']
         restored = ScenarioSession.restore(json.loads(path.read_text(encoding='utf-8')))
-        assert engineer_state(restored, 'crew-new') == mobile
+        assert mobile['clock']['mode'] == 'plan'
+        assert mobile['clock']['plan_time'] == restored.time
+        assert engineer_state(restored, 'crew-new', clock=mobile['clock']) == mobile
     finally:
         server.shutdown()
         server.server_close()

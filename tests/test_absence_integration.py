@@ -158,17 +158,30 @@ def test_employee_period_dispatcher_replan_and_return_over_http(secured, tmp_pat
              'time': 599, 'location_id': 'office'}
     assert employee.request('/api/engineer/facts', early)[0] == 400
     assert admin.request('/api/state')[1]['version'] == version
-    # A known-location period ends naturally once the plan clock reaches its end.
-    # Posting a future 'available' while it is still active cannot bypass return.
+    # Legacy location fields in an employee absence form are ignored. The
+    # end of the interval still requires an explicit return declaration.
     assert employee.request('/api/engineer/facts', {**early, 'time': 600})[0] == 400
     status, state, _ = admin.request('/api/facts', {'version': version, 'engineer_id': 'e2',
         'status': 'available', 'time': 600, 'location_id': 'office'})
     assert status == 200
-    status, mobile, _ = employee.request('/api/engineer/facts',
+    status, _, _ = employee.request('/api/engineer/facts',
         {**early, 'version': state['version'], 'time': 600})
+    assert status == 400
+    mobile = employee.request('/api/engineer?engineer_id=e1')[1]
+    assert mobile['return_confirmation_required']
+    assert admin.request('/api/state')[1]['version'] == state['version']
+    status, mobile, _ = employee.request('/api/engineer/return', {
+        'version': state['version'], 'engineer_id': 'e1',
+        'report_id': mobile['return_report_id'], 'time': 600})
     assert status == 200 and mobile['active_absence'] is None
+    assert not mobile['return_confirmation_required']
+    assert mobile['return_pending_replan'] and mobile['location_confirmation_pending']
     restored = ScenarioSession.restore(json.loads((tmp_path/'state.json').read_text(encoding='utf-8')))
-    assert restored.unavailability and restored.statuses['e1']['status'] == 'available'
+    assert restored.unavailability[0]['location_id'] is None
+    assert restored.statuses['e1']['status'] == 'available'
+    assert restored.statuses['e1']['location_id'] is None
+    assert restored.dispatch_notifications[-1]['kind'] == 'replan_required'
+    assert restored.history[-1]['event']['type'] == 'engineer_return'
 
 
 

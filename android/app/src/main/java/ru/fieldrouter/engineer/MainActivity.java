@@ -118,7 +118,7 @@ public final class MainActivity extends Activity {
     private JSONObject localStatus() throws Exception {
         JSONObject status=store.status().put("permission",hasLocation())
             .put("finePermission",checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
-            .put("appVersion","0.1.3");
+            .put("appVersion",getPackageManager().getPackageInfo(getPackageName(),0).versionName);
         android.location.LocationManager manager=(android.location.LocationManager)getSystemService(LOCATION_SERVICE);
         try{status.put("gpsEnabled",manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER));}
         catch(SecurityException ignored) { /* Status remains readable before permission is granted. */ }

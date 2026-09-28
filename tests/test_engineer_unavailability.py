@@ -119,8 +119,8 @@ def test_decline_and_period_validation_is_atomic(make_scenario):
     assert session.dump() == before
     session = session_with_route(make_scenario)
     before = session.dump()
-    with pytest.raises(ValueError, match='местоположение'):
-        report(session, location_id=None)
+    with pytest.raises(ValueError, match='точка'):
+        report(session, location_id='missing')
     assert session.dump() == before
 
 

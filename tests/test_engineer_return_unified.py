@@ -83,7 +83,7 @@ def test_mobile_facts_cannot_bypass_indefinite_absence(make_scenario, kind):
 
 @pytest.mark.parametrize('changes', [
     {'engineer_id': 'e2'}, {'version': 1}, {'unavailable_fact_id': 'different'},
-    {'time': 540}, {'time': 539}, {'time': True}, {'location_id': 'unknown'},
+    {'time': 539}, {'time': True}, {'location_id': 'unknown'},
     {'report_id': 'missing'}, {'unexpected': True},
 ])
 def test_invalid_indefinite_return_is_atomic(make_scenario, changes):

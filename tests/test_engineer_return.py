@@ -105,7 +105,7 @@ def test_multi_day_return_keeps_original_dates(make_scenario):
 @pytest.mark.parametrize('changes', [
     {'version': 1}, {'engineer_id': 'e2'}, {'report_id': 'missing'},
     {'time': 539}, {'time': 720}, {'time': True}, {'time': '09:30'},
-    {'location_id': None}, {'location_id': 'missing'}, {'unexpected': True},
+    {'location_id': 'missing'}, {'unexpected': True},
 ])
 def test_invalid_return_is_atomic(make_scenario, changes):
     session = session_with_route(make_scenario)

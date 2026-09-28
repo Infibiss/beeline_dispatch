@@ -72,12 +72,13 @@ def validate_public_origin(value):
 def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,host='127.0.0.1',
                   gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid',
                   morning_time_limit=None,public_origin=None,gps_routing=None,intake_token=None,demo_stream_requests=None,
-                  demo_reset_session=None):
+                  demo_reset_session=None,engineer_clock_now=None):
     public_origin = validate_public_origin(public_origin)
     # Windows spawn imports this module in the model child. Keep OR-Tools and
     # rendering imports inside the server entrypoints, outside that cold path.
     from .dispatcher import render_dispatcher
     from .engineer import engineer_index, engineer_state, record_engineer_fact
+    from .engineer_clock import operational_clock, require_current_write
     from .completion import confirm_completion
     from .models import Scenario, Plan
     from .report import render_report
@@ -119,6 +120,12 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         **{key:{'label':other.scenario.region,'state':other_path,'session':other}
                            for key,(other,other_path) in regions.items()}}
     regions=RegionRegistry(session,state_path,context_factory,region_sources)
+    def employee_clock(current):
+        return operational_clock(current, engineer_clock_now() if engineer_clock_now else None)
+
+    def employee_state(current, eid):
+        clock = employee_clock(current)
+        return engineer_state(current, eid, current_minute=clock['time'], clock=clock)
     demo_baseline=deepcopy(demo_reset_session) if demo_reset_session is not None else None
     if demo_baseline is not None:
         if demo_baseline.scenario.region != session.scenario.region:
@@ -221,29 +228,85 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
 
     def autopilot_loop():
         from .intake import apply_autopilot
+        import logging
+        logger=logging.getLogger(__name__)
+        def gps_retry_later(policy,proposals,gps):
+            try:
+                policy.failed(proposals,gps.clock() if gps else None)
+            except Exception:logger.debug('GPS retry policy failed',exc_info=True)
         while not stop_autopilot.is_set():
             wake_autopilot.wait(2)
             wake_autopilot.clear()
             if stop_autopilot.is_set():break
             with regions.lock: active=list(regions.contexts.items())
             for region_key, context in active:
+                if stop_autopilot.is_set():break
                 batch_choice=None
+                proposals=[]
+                policy=None
                 with context['lock']:
                     current=context['holder']['session']
-                    if not current.autopilot_due():continue
-                    candidate=deepcopy(current)
-                    try:
-                        batch_choice=apply_autopilot(candidate,time_limit=time_limit,solver=solver)
-                    except Exception:
-                        candidate=deepcopy(current)
-                        candidate.record_autopilot_failure('Не удалось построить допустимый план. Заявки остались в очереди; проверьте их вручную.')
-                    try:persist(region_key,context,candidate)
-                    except OSError:continue
                     demo_run_id=context.get('demo_run_id')
+                    intake_due=current.autopilot_due()
+                    # Optional GPS failures cannot stop ordinary request intake.
+                    try:
+                        from .gps.autopilot import GpsAutopilot
+                        policy_key=(demo_run_id,id(context['gps'].service))
+                        if context.get('gps_autopilot_key')!=policy_key:
+                            context['gps_autopilot_policy']=GpsAutopilot()
+                            context['gps_autopilot_key']=policy_key
+                        policy=context['gps_autopilot_policy']
+                        proposals=policy.collect(current,context['gps'].service)
+                    except Exception:
+                        logger.debug('GPS autopilot observation failed in %s',region_key,exc_info=True)
+                    if not intake_due and not proposals:continue
+                    candidate=deepcopy(current)
+                # Optimization must not hold the region lock: engineers can send
+                # facts, GPS and absence reports while this snapshot is solved.
+                gps_failed=False
+                try:
+                    batch_choice=apply_autopilot(candidate,time_limit=time_limit,solver=solver,
+                                                 gps_proposals=proposals)
+                except Exception:
+                    logger.warning('Autopilot calculation failed in %s',region_key,exc_info=True)
+                    candidate=deepcopy(current)
+                    gps_failed=bool(proposals)
+                    if gps_failed:
+                        gps_retry_later(policy,proposals,context['gps'].service)
+                        if intake_due:
+                            try:
+                                batch_choice=apply_autopilot(candidate,time_limit=time_limit,solver=solver)
+                            except Exception:
+                                candidate=deepcopy(current)
+                                candidate.record_autopilot_failure('Не удалось построить допустимый план. Заявки остались в очереди; проверьте их вручную.')
+                        try:
+                            from .gps.autopilot import record_failure
+                            record_failure(candidate,proposals)
+                        except Exception:
+                            logger.debug('GPS failure notice unavailable',exc_info=True)
+                    else:
+                        candidate.record_autopilot_failure('Не удалось построить допустимый план. Заявки остались в очереди; проверьте их вручную.')
+                with context['lock']:
+                    # Identity also detects same-version enrichment and demo resets.
+                    # Never overwrite a human change received during optimization.
+                    if (stop_autopilot.is_set() or context['holder']['session'] is not current
+                            or context.get('demo_run_id')!=demo_run_id):
+                        continue
+                    if proposals and not gps_failed:
+                        try:
+                            if not policy.revalidate(current,context['gps'].service,proposals):
+                                gps_retry_later(policy,proposals,context['gps'].service)
+                                continue
+                        except Exception:
+                            gps_retry_later(policy,proposals,context['gps'].service)
+                            logger.debug('GPS autopilot revalidation failed in %s',region_key,exc_info=True)
+                            continue
+                    try:persist(region_key,context,candidate)
+                    except OSError:
+                        # No durable acknowledgement: retry fresh evidence later.
+                        continue
                 if batch_choice and not stop_autopilot.is_set():
                     batch, chosen_id=batch_choice
-                    # The provider can take tens of seconds; keep ingestion and
-                    # later autopilot batches responsive while it is answering.
                     threading.Thread(target=enrich_decisions,
                         args=(region_key,context,batch,chosen_id,candidate.version,True,demo_run_id),
                         daemon=True).start()
@@ -385,11 +448,13 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         if route.path=='/api/engineer':
                             if set(query)!={'engineer_id'} or len(query['engineer_id'])!=1:
                                 raise ValueError('Укажите одного инженера')
-                            result=engineer_state(session,query['engineer_id'][0])
+                            result=employee_state(session,query['engineer_id'][0])
                         else:
                             if query:raise ValueError('Неизвестные параметры запроса')
                             result=engineer_index(session) if route.path=='/api/engineers' else {'version':session.version}
-                            if route.path=='/api/revision':result.update(demo_fields(self.region_key))
+                            if route.path=='/api/revision':
+                                result.update(demo_fields(self.region_key))
+                                result['clock']=employee_clock(session)
                             if route.path=='/api/engineers' and self.identity and self.identity['role']=='engineer':
                                 result['engineers']=[e for e in result['engineers'] if e['id']==self.identity['engineer_id']]
                     return self.reply(200,result)
@@ -591,25 +656,49 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                         wake_autopilot.set()
                     elif self.path in ('/api/approve','/api/facts','/api/mode','/api/engineer/facts',
                                       '/api/engineer/unavailability','/api/engineer/decline',
+                                      '/api/engineer/unavailability/update','/api/engineer/unavailability/cancel',
                                       '/api/engineer/return',
                                       '/api/engineer/revoke-report',
                                       '/api/completions/confirm','/api/gps/confirm-delay'):
                         # Persist the candidate state before publishing it in memory.
                         candidate=deepcopy(holder['session'])
+                        command_clock=None
+                        if self.path.startswith('/api/engineer/') and self.path!='/api/engineer/revoke-report':
+                            command_clock=employee_clock(candidate)
+                            require_current_write(candidate,payload,command_clock,
+                                expected_context=self.headers.get('X-Engineer-Clock'))
+                            if command_clock['mode']=='live' and self.path in (
+                                    '/api/engineer/facts','/api/engineer/return','/api/engineer/decline'):
+                                # Employee buttons describe a current action. Only
+                                # dispatcher corrections may backdate the journal.
+                                payload={**payload,'time':command_clock['time']}
+                        if self.path in ('/api/engineer/unavailability', '/api/engineer/unavailability/update') or (
+                                self.path == '/api/engineer/facts' and payload.get('status') == 'unavailable'):
+                            # Absence reports describe time and reason, never a route
+                            # origin. Ignore location fields left by older clients.
+                            payload={key:value for key,value in payload.items() if key!='location_id'}
                         if self.path=='/api/approve' and explainer is not None:
                             stored=candidate.batches.get(payload.get('batch_id'))
                             if stored is not None:
                                 manual_explanation=(deepcopy(stored['batch']),payload.get('candidate_id'))
-                        if self.path=='/api/engineer/facts':result=record_engineer_fact(candidate,payload)
+                        if self.path=='/api/engineer/facts':
+                            record_engineer_fact(candidate,payload,current_minute=command_clock['time'])
+                            result=employee_state(candidate,payload['engineer_id'])
                         elif self.path=='/api/engineer/unavailability':
-                            candidate.report_unavailability(payload)
-                            result=engineer_state(candidate,payload['engineer_id'])
+                            candidate.report_unavailability(payload,current_minute=command_clock['time'])
+                            result=employee_state(candidate,payload['engineer_id'])
+                        elif self.path=='/api/engineer/unavailability/update':
+                            candidate.update_unavailability(payload,current_minute=command_clock['time'])
+                            result=employee_state(candidate,payload['engineer_id'])
+                        elif self.path=='/api/engineer/unavailability/cancel':
+                            candidate.cancel_unavailability(payload,current_minute=command_clock['time'])
+                            result=employee_state(candidate,payload['engineer_id'])
                         elif self.path=='/api/engineer/return':
                             candidate.return_from_absence(payload)
-                            result=engineer_state(candidate,payload['engineer_id'])
+                            result=employee_state(candidate,payload['engineer_id'])
                         elif self.path=='/api/engineer/decline':
                             candidate.decline_assignment(payload)
-                            result=engineer_state(candidate,payload['engineer_id'])
+                            result=employee_state(candidate,payload['engineer_id'])
                         elif self.path=='/api/engineer/revoke-report':
                             result=candidate.revoke_engineer_report(payload)
                         elif self.path=='/api/completions/confirm':result=confirm_completion(candidate,payload)
@@ -641,7 +730,22 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             except OSError:
                 self.reply(500,{'error':'Не удалось сохранить локальное состояние; изменения не применены'})
 
+    autopilot_thread=None
+
     class Server(ThreadingHTTPServer):
+        def server_bind(self):
+            # On Windows SO_REUSEADDR can let two live servers share a port,
+            # serving old Python code with freshly loaded HTML/JS unpredictably.
+            if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                self.allow_reuse_address=False
+                self.socket.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
+            try:
+                super().server_bind()
+            except OSError as exc:
+                raise OSError(exc.errno,
+                    f'Не удалось открыть порт {self.server_address[1]}. '
+                    'Остановите предыдущий сервер в его терминале (Ctrl+C) или выберите другой порт.') from exc
+
         def get_request(self):
             connection, address = super().get_request()
             connection.settimeout(10)
@@ -652,7 +756,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
 
         def server_close(self):
             stop_autopilot.set();wake_autopilot.set()
-            autopilot_thread.join(timeout=30)
+            if autopilot_thread is not None:autopilot_thread.join(timeout=30)
             super().server_close()
             regions.close()
 

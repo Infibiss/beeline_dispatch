@@ -9,6 +9,7 @@ from .operational_facts import validate_fact
 def migrate(session):
     for index,fact in enumerate(session.fact_log):
         fact.setdefault('id',f'legacy-{index+1}')
+        fact.setdefault('sequence',index+1)
         fact.setdefault('recorded_at','unknown (legacy)')
         if 'input' not in fact:
             fact['input']={k:fact.get(k) for k in ('time','engineer_id','status','request_id','location_id','remaining_minutes')}
@@ -43,16 +44,25 @@ def record(session,payload):
         raw.setdefault('source',old.get('source','dispatcher'))
         raw.setdefault('comment',old.get('comment',''))
     if type(raw.get('time')) is not int or not 0<=raw['time']<=1439:raise ValueError('Время факта должно быть в пределах текущего дня')
-    entry={'id':identity or uuid4().hex,'recorded_at':datetime.now(timezone.utc).isoformat(),'input':raw}
+    entry={'id':identity or uuid4().hex,'recorded_at':datetime.now(timezone.utc).isoformat(),'input':raw,
+           'sequence':old['sequence'] if old else max((f['sequence'] for f in session.fact_log),default=0)+1}
     records=[deepcopy(f) for f in session.fact_log if f['id']!=identity]+[entry]
-    records.sort(key=lambda f:(f['input']['time'],f['recorded_at'],f['id']))
+    # Same-minute declarations retain server acceptance order, even if wall
+    # timestamps tie or move backwards. Corrections retain the original slot.
+    records.sort(key=lambda f:(f['input']['time'],f['sequence']))
     shadow=deepcopy(session);shadow.statuses={};shadow.fact_log=[];shadow.time=0
     for item in records:
         request=item['input'].get('request_id')
-        owner=historical_owner(session,request,item['input']['time']) if request else None
+        # An approved reassignment can share the minute of the preceding
+        # interruption. It cannot invalidate the already accepted old owner's
+        # fact when another employee submits the next status. New reports and
+        # corrections still go through the historical assignment check.
+        accepted=(item['id']!=entry['id'] and item.get('request_id')==request)
+        owner=(item['engineer_id'] if accepted else
+               historical_owner(session,request,item['input']['time'])) if request else None
         shadow.fact_owner_override={request:owner} if request else {}
         normalized=validate_fact(shadow,{'version':session.version,**item['input']})
-        normalized.update(id=item['id'],recorded_at=item['recorded_at'],input=item['input'])
+        normalized.update(id=item['id'],recorded_at=item['recorded_at'],input=item['input'],sequence=item['sequence'])
         shadow.fact_log.append(normalized);shadow.statuses[normalized['engineer_id']]=normalized
     current=next(f for f in shadow.fact_log if f['id']==entry['id'])
     session.fact_log=shadow.fact_log;session.statuses=shadow.statuses

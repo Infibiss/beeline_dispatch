@@ -247,11 +247,18 @@ class GpsService:
                 clock = plan_clock(now, self.config, context['date'], stream.get('demo_minute') if stream else None)
                 messages = []
                 availability = availability_at(engineer.get('availability', {}), clock['minute'])
-                if clock['date_matches'] and availability != 'available':
+                declared_unavailable = (engineer.get('status') or {}).get('status') == 'unavailable'
+                if clock['date_matches'] and (availability != 'available' or declared_unavailable):
                     messages.append(alert('reported_absence',
-                        'Заявлена временная недоступность' if availability == 'absent' else 'Ожидается подтверждение возвращения',
+                        'Инженер сообщил о недоступности' if declared_unavailable else
+                        {'absent': 'Заявлена временная недоступность',
+                         'awaiting_location': 'Точка для нового маршрута не подтверждена'}.get(
+                             availability, 'Ожидается подтверждение возвращения'),
                         'Оценка прибытия и опоздания отключена; координаты продолжают отображаться.',
-                        'После окончания периода подтвердите возвращение и текущую точку; диспетчер проверит новый план.', 'info'))
+                        ('Инженер подтвердит возвращение; затем уточните точку и пересчитайте план.' if declared_unavailable else
+                         'Инженер сообщил о доступности. Диспетчер уточнит место начала маршрута и пересчитает назначения.'
+                         if availability == 'awaiting_location' else
+                         'После окончания периода подтвердите возвращение; диспетчер проверит новый план.'), 'info'))
                 point = stream['last_good'] if stream else None
                 point_age = max(0, now - point['measured_at_ms'] / 1000) if point else None
                 heartbeat_age = max(0, now - stream['received_at']) if stream and stream['received_at'] is not None else None

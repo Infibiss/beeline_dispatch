@@ -549,7 +549,7 @@
     $('notification-total').textContent=`${notifications.length} событий`;
     const labels={incoming:'Поступление',auto_applied:'Автопилот',manual_applied:'План применён',planning_mode:'Режим изменён',
       explanation_ready:'Пояснение готово',
-      auto_error:'Нужно вмешательство',replan_required:'Требуется пересчёт'};
+      auto_error:'Нужно вмешательство',auto_gps_error:'Проверить GPS-пересчёт',replan_required:'Требуется пересчёт'};
     $('dispatch-notifications').replaceChildren(...(notifications.length ? [...notifications].reverse().map(item=>{
       const card=element('article',null,'notification-card');
       const head=element('div',null,'notification-card-head');
@@ -583,9 +583,15 @@
       if(item.cancelled_request_ids?.length)card.append(element('p',`Отменено и удалено из плана: ${item.cancelled_request_ids.length}.`,'hint'));
       if((item.request_ids || []).length)card.append(element('small',`Заявок в событии: ${item.request_ids.length}`,'hint'));
       if((item.changed_request_ids || []).length)card.append(element('small',`Изменены назначения: ${item.changed_request_ids.length}. Причины — в журнале справа.`,'hint'));
-      if(['auto_error','replan_required'].includes(item.kind) || left) {
-        const action=element('button','Открыть заявки','secondary');action.type='button';
-        action.addEventListener('click',openReplanningPool);card.append(action);
+      if(['auto_error','auto_gps_error','replan_required'].includes(item.kind) || left) {
+        const gpsFailure=item.kind==='auto_gps_error';
+        const action=element('button',gpsFailure?'Проверить варианты':'Открыть заявки','secondary');action.type='button';
+        action.addEventListener('click',()=>{
+          if(!gpsFailure){openReplanningPool();return;}
+          if(busy||!state)return;
+          activateTab('events');$('event-type').value='replan';targets();resetCandidates();
+          $('manual-event-panel').scrollIntoView({block:'start'});$('preview').focus();
+        });card.append(action);
       }
       return card;
     }) : [element('p','Событий пока нет. Новые заявки и перепланирования появятся здесь.','hint')]));
@@ -645,7 +651,7 @@
       (cancelled?` · отменены ${cancelled}`:'');
     $('incoming-history-summary').textContent = `История обработанных · ${processed.length}`;
     $('planning-mode-summary').textContent = settings.mode === 'autopilot'
-      ? `Сейчас включён автопилот: ${[settings.every_n_requests && `после ${settings.every_n_requests} новых заявок`, settings.every_n_minutes && `после ${settings.every_n_minutes} минут ожидания`].filter(Boolean).join(' или ')}.`
+      ? `Автопилот: новые заявки — ${[settings.every_n_requests && `после ${settings.every_n_requests} заявок`, settings.every_n_minutes && `после ${settings.every_n_minutes} минут ожидания`].filter(Boolean).join(' или ')}; устойчивые задержки по GPS — на подтверждённых выездах.`
       : 'Сейчас ручной режим: план считает и применяет диспетчер.';
     $('quick-planning-mode').value=settings.mode;
     $('quick-planning-mode').title=$('planning-mode-summary').textContent;
@@ -704,7 +710,7 @@
     $('mode-badge').textContent = mode === 'mixed' ? 'Смешанный учёт' : mode === 'manual' ? 'Ручной учёт' : 'Симуляция';
     $('clock-label').textContent = mode === 'simulation' ? 'Время симуляции' : 'Время состояния';
     $('mode-notice').textContent = mode === 'simulation' ? (data.geography_mode === 'road' ? 'Дорожные матрицы; исполнение по времени плана моделируется.' : 'Условная география и исполнение по времени плана.') : mode === 'mixed' ? 'Факты инженеров и диспетчера + симуляция остальных. Время само по себе не закрывает заявку инженера с записанными фактами.' : 'Ручной учёт: выполнение подтверждает диспетчер.';
-    $('mode-notice').textContent += ' GPS используется для наблюдения; координаты не меняют план и не подтверждают выполнение автоматически.';
+    $('mode-notice').textContent += ' В автопилоте устойчивая оценка задержки по GPS на подтверждённом выезде может запустить пересчёт. Нужен дорожный или комбинированный маршрут; оценка по прямой — только подсказка. GPS не меняет статусы и не объявляет инженера недоступным.';
     if (data.approximate_locations) $('mode-notice').textContent += ' Приблизительных точек: ' + data.approximate_locations + '. Исходный и выбранный адрес сохранены в карточке.';
     $('execution-mode').value=data.execution_mode || 'simulation';
     populateSelect('fact-edit',data.fact_journal || [],f=>engineerName(f.engineer_id)+' · '+time(f.time)+' · '+factLabels[f.status],'Новый факт');
@@ -717,7 +723,7 @@
     factRequests();
     $('replan-needed').hidden = true; $('go-replan').hidden = !data.needs_replanning;
     $('fact-next-step').textContent=data.needs_replanning ? 'План требует пересчёта по новым статусам.' : '';
-    if(data.needs_replanning && data.planning_settings?.mode==='autopilot')$('fact-next-step').textContent+=' Автопилот обрабатывает новые заявки; текущие изменения можно рассчитать сейчас.';
+    if(data.needs_replanning && data.planning_settings?.mode==='autopilot')$('fact-next-step').textContent+=' Автопилот учитывает новые заявки и устойчивые задержки по GPS на подтверждённых выездах. Изменения статусов пересчитайте вручную.';
     populateSelect('fact-location', data.locations || [], item => item.label || item.id, 'Без уточнения места');
     const versions = data.versions && data.versions.length ? data.versions : [{version: data.version, time: data.time, label: 'Текущий план'}];
     $('plan-version').replaceChildren(...versions.map(item => { const option = element('option', '№ ' + item.version + ' · ' + time(item.time) + ' · ' + (item.version === data.version ? 'Текущий план' : (item.label || 'План'))); option.title=item.label || 'План'; option.value = item.version; return option; }));
@@ -1332,7 +1338,7 @@
     busy=true;controls();$('error').hidden=true;
     try{
       renderState(await request('/api/inbox/settings',{version:state.version,mode,every_n_requests,every_n_minutes:saved.every_n_minutes??null}));
-      $('status').textContent=mode==='autopilot'?'Автопилот включён. Новые заявки обрабатываются по сохранённым порогам.':'Ручной режим включён. План применяет диспетчер.';
+      $('status').textContent=mode==='autopilot'?'Автопилот включён: новые заявки — по сохранённым порогам, устойчивые задержки по GPS — на подтверждённых выездах.':'Ручной режим включён. План применяет диспетчер.';
     }catch(error){failure(error);}
     finally{
       $('quick-planning-mode').value=inboxSnapshot?.planning_settings?.mode || saved.mode;

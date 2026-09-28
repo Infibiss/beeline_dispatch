@@ -1,0 +1,7 @@
+Source: https://disk.yandex.ru/d/X_8NsRl7Uyi8qQ
+Downloaded: 2026-09-28
+beeline-logo.png: unchanged original beeline_logo_yellow_rgb.png
+beeline-symbol.svg and Android ic_engineer.xml: symbol geometry from beeline_logo_yellow_rgb.svg; no redrawing.
+Original SVG SHA256: ca9d84beeff0934842ba573b738f86f8f8efc01a717a9156cec7798c9d247cc7
+Palette: Corporate colours / 01.jpg and 02.jpg in the same shared folder.
+Bee #FFC800; Line Black #141414; White #FFFFFF; Beige #FFF9E5; Light Grey #F1F1F1; Grey #A1A1A1.

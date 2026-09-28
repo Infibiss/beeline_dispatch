@@ -110,6 +110,7 @@ def render_dispatcher(payload: dict) -> str:
     operations_context, operations_history = _operation_context(payload)
     plan_heading = 'Пересчитываемый остаток дня' if isinstance(payload.get('operations'), dict) else 'Каждый выезд — на своём месте'
     css = (_STATIC / 'dispatcher.css').read_text(encoding='utf-8')
+    brand_symbol = (_STATIC / 'brand/beeline-symbol.svg').read_text(encoding='utf-8').split('?>')[-1].strip()
     js = (_STATIC / 'dispatcher.js').read_text(encoding='utf-8')
     return '''<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
@@ -118,7 +119,7 @@ def render_dispatcher(payload: dict) -> str:
 <link rel="stylesheet" href="./assets/leaflet.css">
 <style>''' + css + '''</style></head><body class="''' + ('embedded' if payload.get('operations') else 'standalone') + '''">
 <a class="skip-link" href="#schedule">К расписанию</a>
-<header class="topbar"><div class="brand"><span class="brand-icon" aria-hidden="true">↗</span>
+<header class="topbar"><div class="brand"><span class="brand-icon" aria-hidden="true">''' + brand_symbol + '''</span>
 <div><strong>ПУЛЬТ ВЫЕЗДОВ</strong><span>Рабочее место диспетчера</span></div></div>
 <div class="day"><strong id="scenario-date">Рабочий день</strong><span id="scenario-region"></span></div></header>
 <main>''' + dataset_links + operations_context + '''<section class="heading"><div><p class="eyebrow">ОПЕРАЦИОННЫЙ ПЛАН</p><h1>''' + plan_heading + '''</h1>

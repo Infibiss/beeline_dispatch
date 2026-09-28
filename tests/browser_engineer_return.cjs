@@ -59,6 +59,9 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
       await mobile.click('#shift-problem');
       await mobile.locator('#availability-dialog').waitFor({state:'visible'});
       assert.equal(await mobile.locator('#unavailability-duration').inputValue(),'fixed');
+      assert.match(await mobile.locator('#unavailability-title').textContent(),/Период отсутствия/);
+      assert.deepEqual(await mobile.locator('#unavailability-reason option').evaluateAll(
+        options => options.map(option => option.value)),['','sick','transport','personal','other']);
       await mobile.selectOption('#unavailability-start-mode',later ? 'later' : 'now');
       await mobile.selectOption('#unavailability-duration',duration);
       if (later) {
@@ -71,9 +74,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
       }
       await mobile.selectOption('#unavailability-reason','transport');
       await mobile.fill('#unavailability-comment','Ремонт автомобиля');
-      if (await mobile.locator('#unavailability-location').isVisible()) {
-        await mobile.selectOption('#unavailability-location','office');
-      }
+      assert.equal(await mobile.locator('#unavailability-location').count(),0);
       await noOverflow();
       await mobile.screenshot({path:path.join(tmp,duration+'-absence-form.png'),fullPage:true});
       if (!send) return;
@@ -90,12 +91,14 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
       assert.equal(await mobile.locator('#action-title').textContent(),'Я снова доступен');
       assert.equal(await mobile.locator('#action-comment').isVisible(),false);
       await mobile.fill('#action-time',time);
-      await mobile.selectOption('#action-location','office');
+      assert.equal(await mobile.locator('#action-location').isVisible(),false);
       await noOverflow();
       const result = await submit('#send-action','/api/engineer/return');
       await mobile.locator('#action-form').waitFor({state:'hidden'});
       assert.equal(await mobile.locator('#shift-return').isVisible(),false);
       assert.equal(result.return_pending_replan,true);
+      assert.equal(result.location_confirmation_pending,true);
+      assert.equal(result.status.location_id,null);
       assert.ok(result.pending_reassignment_ids.length);
       await mobile.reload();
       await waitVersion(result.version);
@@ -112,9 +115,57 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     await mobile.waitForURL('**/engineer');
     await waitVersion(2);
     await mobile.click('#tab-shift');
+    assert.equal(await mobile.locator('#panel-shift h1').textContent(),'Профиль');
+    assert.equal(await mobile.locator('#availability-title').textContent(),'Доступность для заявок');
+    assert.match(await mobile.locator('#shift-plan-context').textContent(),/17 августа 2026/);
+    assert.match(await mobile.locator('#shift-plan-context').textContent(),/09:00/);
+    await mobile.locator('#android-app summary').click();
+    assert.equal(await mobile.locator('#android-apk-download').isVisible(),true);
+    await mobile.locator('#android-app summary').click();
     assert.equal(await mobile.locator('#gps-native-panel').count(),0);
+    assert.equal(await mobile.locator('#availability-state').count(),0);
+    assert.equal(await mobile.locator('#shift-start-location').count(),0);
     assert.equal(await mobile.locator('#shift-return').isVisible(),false);
     assert.equal(await mobile.locator('#unavailability-form').isVisible(),false);
+
+    // A scheduled day off requires dispatcher's call-in flow. A stale available
+    // status must not label it a working day or reveal a start-shift bypass.
+    // Project responses in this browser only; the synthetic server is untouched.
+    const originalDay = await employeeState();
+    const employeeUrl = /\/api\/engineer\?/;
+    for (const [offDuty,status,expectedLabel,startVisible] of [
+      [true,null,'Выходной',false],
+      [true,{id:'off-day-ui-only',status:'available',time:540,location_id:'office'},'Выходной',false],
+      [false,null,'Не на смене',true]
+    ]) {
+      const projected = {...originalDay,engineer:{...originalDay.engineer,off_duty:offDuty},status};
+      await mobileContext.route(employeeUrl,route => route.fulfill({json:projected}));
+      await mobile.reload();
+      await waitVersion(originalDay.version);
+      await mobile.click('#tab-shift');
+      assert.equal(await mobile.locator('#engineer-status').textContent(),expectedLabel);
+      assert.equal(await mobile.locator('#shift-start').isVisible(),startVisible);
+      await mobileContext.unroute(employeeUrl);
+    }
+    await mobile.reload();
+    await waitVersion(originalDay.version);
+    await mobile.click('#tab-shift');
+    assert.deepEqual(await employeeState(),originalDay);
+
+    // Opening and cancelling a form must not produce an absence or a fact.
+    const beforeCancel = await employeeState();
+    await openAbsence('fixed',null,'12:00',false,false);
+    await mobile.click('#close-availability');
+    await mobile.locator('#availability-dialog').waitFor({state:'hidden'});
+    assert.deepEqual(await employeeState(),beforeCancel);
+    await mobile.click('#shift-problem');
+    await mobile.keyboard.press('Escape');
+    assert.deepEqual(await employeeState(),beforeCancel);
+    await openAbsence('fixed','11:00','10:00',true,false);
+    await mobile.click('#unavailability-submit');
+    await mobile.locator('#unavailability-error').waitFor({state:'visible'});
+    assert.deepEqual(await employeeState(),beforeCancel);
+    await mobile.click('#close-availability');
 
     // An unknown end must use exactly the same return control as a fixed period.
     const indefinite = await openAbsence('unknown','09:00');
@@ -129,20 +180,37 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
       await dispatch.click('#tab-notifications');
       await dispatch.waitForFunction(() => document.querySelector('#dispatch-notifications')
         .textContent.includes('снова доступен'));
-      const state = await (await adminContext.request.get(base+'/r/east/api/state')).json();
-      const response = await adminContext.request.post(base+'/r/east/api/preview', {data:{
-        version:state.version, event:{id,type:'replan',time}}});
-      assert.equal(response.status(),200);
-      const batch = await response.json();
-      const applied = await adminContext.request.post(base+'/r/east/api/approve',{data:{
-        version:state.version,batch_id:batch.id,candidate_id:'stable'}});
-      assert.equal(applied.status(),200);
+      const apply = async (suffix,when,expectHeld=false) => {
+        const state = await (await adminContext.request.get(base+'/r/east/api/state')).json();
+        const response = await adminContext.request.post(base+'/r/east/api/preview', {data:{
+          version:state.version, event:{id:id+suffix,type:'replan',time:when}}});
+        assert.equal(response.status(),200,await response.text());
+        const batch = await response.json();
+        if (expectHeld) for (const option of batch.candidates)
+          assert.ok(option.plan.routes.filter(route=>route.engineer_id==='e1')
+            .every(route=>route.visits.length===0));
+        const applied = await adminContext.request.post(base+'/r/east/api/approve',{data:{
+          version:state.version,batch_id:batch.id,candidate_id:'stable'}});
+        assert.equal(applied.status(),200,await applied.text());
+      };
+      // Availability does not invent a location. Even an approved replan must
+      // keep assignments held until dispatch explicitly confirms the point.
+      await apply('-unknown',time,true);
+      const held = await employeeState();
+      assert.equal(held.location_confirmation_pending,true);
+      assert.equal(held.status.location_id,null);
+      const known = await adminContext.request.post(base+'/r/east/api/facts',{data:{
+        version:held.version,engineer_id:'e1',status:'available',time:time+1,
+        location_id:'office',comment:'Место подтверждено диспетчером'}});
+      assert.equal(known.status(),200,await known.text());
+      await apply('-known',time+1);
       const refreshed = mobile.waitForResponse(response => response.url().includes('/api/engineer?'));
       await mobile.click('#refresh');
       await refreshed;
       const after = await employeeState();
       await waitVersion(after.version);
       assert.equal(after.return_pending_replan,false);
+      assert.equal(after.location_confirmation_pending,false);
       assert.equal(after.pending_reassignment_ids.length,0);
       assert.ok(after.tasks.length);
     };
@@ -153,7 +221,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     const returned = await returnToWork('09:30');
     const completedPeriod = returned.unavailability.find(period => period.id === fixed.active_absence.id);
     assert.ok(completedPeriod.early_return);
-    assert.equal(completedPeriod.start_time,'09:15');
+    assert.equal(completedPeriod.start_time,'09:16');
     assert.equal(completedPeriod.end_time,'09:30');
     const persisted = await employeeState();
     assert.equal(persisted.unavailability.find(period => period.id === completedPeriod.id).end_time,'09:30');
@@ -165,6 +233,9 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     assert.equal(future.status.status,'available');
     assert.equal(await mobile.locator('#shift-return').isVisible(),false);
     assert.match(await mobile.locator('#availability-summary').textContent(),/11:00/);
+    assert.match(await mobile.locator('#availability-summary').textContent(),/Предстоящие отсутствия/);
+    assert.match(await mobile.locator('#availability-summary').textContent(),/[Тт]ранспорт/);
+    assert.doesNotMatch(await mobile.locator('#availability-summary').textContent(),/Запланировано/);
     assert.doesNotMatch(await mobile.locator('#engineer-status').textContent(),/^Недоступен/);
     await mobile.reload();
     await waitVersion(future.version);
@@ -177,6 +248,29 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     await mobile.screenshot({path:path.join(tmp,'shift-desktop.png'),fullPage:true});
     assert.equal(await mobile.locator('nav [aria-current="page"]').count(),1);
     assert.equal(await mobile.locator('nav [aria-current="page"]').getAttribute('id'),'tab-shift');
+    await mobile.setViewportSize({width:320,height:740});
+    await noOverflow();
+    await mobile.screenshot({path:path.join(tmp,'shift-small-mobile.png'),fullPage:true});
+    assert.equal(await mobile.locator('#shift-history').count(),0);
+    assert.equal(await mobile.locator('#history-dialog').count(),0);
+    const preservedHistory = await employeeState();
+    assert.ok(preservedHistory.facts.some(fact => fact.status === 'unavailable'));
+    assert.ok(preservedHistory.unavailability.some(period => period.start_time === '11:00'));
+    assert.ok(preservedHistory.unavailability.some(period => period.end_time === '09:30'));
+
+    // A failed refresh retains the last plan and blocks sending changes until
+    // the connection is restored. No successful action is implied while offline.
+    const stateBeforeOffline = await employeeState();
+    await mobileContext.route('**/api/**',route => route.abort('internetdisconnected'));
+    await mobile.click('#refresh');
+    await mobile.waitForFunction(() => document.querySelector('#connection').classList.contains('offline'));
+    assert.equal(await mobile.locator('#shift-problem').isDisabled(),true);
+    assert.match(await mobile.locator('#availability-summary').textContent(),/11:00/);
+    await mobileContext.unroute('**/api/**');
+    await mobile.click('#refresh');
+    await mobile.waitForFunction(() => !document.querySelector('#connection').classList.contains('offline'));
+    assert.equal(await mobile.locator('#shift-problem').isDisabled(),false);
+    assert.deepEqual(await employeeState(),stateBeforeOffline);
 
     // Announcing a future absence must not interrupt work already in progress.
     await mobile.setViewportSize({width:390,height:844});
@@ -184,13 +278,26 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     assert.equal(await mobile.locator('nav [aria-current="page"]').count(),1);
     assert.equal(await mobile.locator('nav [aria-current="page"]').getAttribute('id'),'tab-tasks');
     await mobile.click('button[aria-label^="Заявка a,"]');
-    await mobile.locator('#task-actions').getByRole('button',{name:'Начать работу',exact:true}).click();
+    await mobile.locator('#task-actions').getByRole('button',{name:'В пути',exact:true}).click();
+    await mobile.fill('#action-time','09:35');
+    await mobile.selectOption('#action-location','office');
+    await mobile.fill('#action-remaining','5');
+    const traveling = await submit('#send-action','/api/engineer/facts');
+    assert.equal(traveling.status.status,'traveling');
+    await mobile.locator('#action-form').waitFor({state:'hidden'});
+    await mobile.click('button[aria-label^="Заявка a,"]');
+    await mobile.locator('#task-actions').getByRole('button',{name:'На месте · начать работу',exact:true}).click();
     await mobile.fill('#action-time','09:40');
     await mobile.fill('#action-remaining','30');
     const working = await submit('#send-action','/api/engineer/facts');
     assert.equal(working.status.status,'working');
     await mobile.locator('#action-form').waitFor({state:'hidden'});
     await mobile.click('#tab-shift');
+    assert.match(await mobile.locator('#engineer-status').textContent(),/Работает/);
+    assert.match(await mobile.locator('#shift-activity').textContent(),/В работе · № a/);
+    await mobile.locator('#shift-activity').getByRole('button',{name:'Открыть заявку'}).click();
+    assert.match(await mobile.locator('#dialog-title').textContent(),/Address a/);
+    await mobile.click('#close-dialog');
     const laterWhileWorking = await openAbsence('fixed','13:00','14:00',true);
     assert.equal(laterWhileWorking.status.status,'working');
     assert.equal(laterWhileWorking.facts.filter(fact => fact.status === 'interrupted').length,0);
@@ -219,7 +326,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     assert.equal(await mobile.locator('#unavailability-end-time').inputValue(),'10:30');
     assert.equal(await mobile.locator('#unavailability-reason').inputValue(),'transport');
     assert.equal(await mobile.locator('#unavailability-comment').inputValue(),'Ремонт автомобиля');
-    assert.equal(await mobile.locator('#unavailability-location').inputValue(),'office');
+    assert.equal(await mobile.locator('#unavailability-location').count(),0);
     assert.equal(absenceRequests.length,0);
     await noOverflow();
     const nowAbsent = await submit('#unavailability-submit','/api/engineer/unavailability');
@@ -229,8 +336,44 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'engineer-return-'));
     assert.equal(nowAbsent.active_absence.end_time,'10:30');
     assert.equal(nowAbsent.active_absence.comment,'Ремонт автомобиля');
     assert.equal(await mobile.locator('#shift-return').isVisible(),true);
+    await returnToWork('09:50');
+    await approve('returned-interrupted',590);
+
+    // The engineer can resume and finish work; completion is visible only after
+    // dispatcher confirmation, while the unconfirmed result stays in history.
+    await mobile.click('#tab-tasks');
+    await mobile.click('button[aria-label^="Заявка a,"]');
+    await mobile.locator('#task-actions').getByRole('button',{name:'Начать работу',exact:true}).click();
+    assert.equal(await mobile.locator('#action-remaining').inputValue(),'20');
+    await mobile.fill('#action-time','09:55');
+    await mobile.fill('#action-remaining','20');
+    const resumed = await submit('#send-action','/api/engineer/facts');
+    assert.equal(resumed.status.status,'working');
+    await mobile.locator('#action-form').waitFor({state:'hidden'});
+    await mobile.click('button[aria-label^="Заявка a,"]');
+    await mobile.locator('#task-actions').getByRole('button',{name:'Сообщить о выполнении',exact:true}).click();
+    await mobile.fill('#action-time','10:15');
+    await mobile.fill('#action-router','0');
+    await mobile.fill('#action-tv','0');
+    await mobile.fill('#action-comment','Работа завершена');
+    const reported = await submit('#send-action','/api/engineer/facts');
+    assert.equal(reported.tasks.find(task => task.id === 'a').status,'completion_pending');
+    assert.equal(await mobile.locator('#done-count').textContent(),'0');
+    const state = await (await adminContext.request.get(base+'/r/east/api/state')).json();
+    const confirmation = await adminContext.request.post(base+'/r/east/api/completions/confirm',{
+      data:{version:state.version,fact_id:reported.status.id}});
+    assert.equal(confirmation.status(),200,await confirmation.text());
+    await mobile.reload();
+    await waitVersion((await employeeState()).version);
+    await mobile.click('[data-filter="completed"]');
+    assert.equal(await mobile.locator('#done-count').textContent(),'1');
+    assert.equal(await mobile.locator('button[aria-label^="Заявка a,"]').count(),1);
+    await mobile.click('button[aria-label^="Заявка a,"]');
+    assert.match(await mobile.locator('#task-detail').textContent(),/Выполнена/);
+    assert.equal(await mobile.locator('#task-actions button').count(),0);
+    await noOverflow();
     assert.deepEqual(errors,[]);
-    console.log('PASS: unified absence, early return, dispatcher approval, future/current absence during work, persisted form, mobile/desktop; '+tmp);
+    console.log('PASS: absence cancellation/validation, offline recovery, early return, dispatcher approval, travel/work/interruption/completion, persisted audit, 320/390px and desktop; '+tmp);
   } finally {
     if (browser) await browser.close();
     fs.writeFileSync(path.join(tmp,'stop'),'stop');

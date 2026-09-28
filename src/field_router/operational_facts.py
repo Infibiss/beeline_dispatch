@@ -19,7 +19,9 @@ def validate_fact(session,payload):
     if kind not in ('available','traveling','working','completed','completion_pending','interrupted','unavailable'):raise ValueError('Неизвестный статус')
     key=payload.get('request_id') if kind in ('working','completed','completion_pending','interrupted','traveling') else None
     old=session.statuses.get(eid,{})
-    if old and now<=old['time']:raise ValueError('Новый статус инженера должен быть позже предыдущего')
+    # Minute precision can legitimately contain arrival, work and interruption.
+    # The journal sequence orders those observations without inventing time.
+    if old and now<old['time']:raise ValueError('Новый статус инженера не может быть раньше предыдущего')
     if old.get('status')=='working' and kind in ('available','traveling','unavailable'):
         raise ValueError('Сначала явно завершите или прервите начатую работу')
     if kind in ('working','completed','completion_pending','interrupted','traveling'):
@@ -36,7 +38,10 @@ def validate_fact(session,payload):
         if kind=='completion_pending' and not (old.get('status')=='working' and old.get('request_id')==key):raise ValueError('Сообщение о завершении возможно после начала работы')
         if old.get('status')=='working' and old.get('request_id')!=key:raise ValueError('Сначала завершите текущую работу')
     location=key if kind in ('working','completed','completion_pending','interrupted') else payload.get('location_id')
-    if location not in session.scenario.points and location not in getattr(session,'geo_locations',{}):raise ValueError('Укажите известную фактическую точку')
+    if not (location is None and kind in ('available','unavailable')) and location not in session.scenario.points and location not in getattr(session,'geo_locations',{}):raise ValueError('Укажите известную фактическую точку')
+    if (kind in ('available','unavailable') and old.get('time')==now and old.get('location_id') and location
+            and old['location_id']!=location):
+        raise ValueError('В эту минуту уже подтверждено другое место; уточните текущую точку')
     remaining=payload.get('remaining_minutes') if kind in ('working','interrupted','traveling') else None
     if kind in ('working','interrupted','traveling') and (type(remaining) is not int or not 0<remaining<=1440):raise ValueError('Укажите положительное оставшееся время')
     consumed=Equipment()
@@ -85,6 +90,7 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
         for old in (revision.get('previous'),revision.get('fact')):
             if old and old.get('request_id') in session.catalog and old['request_id'] not in cancelled:
                 jobs.setdefault(old['request_id'],session.catalog[old['request_id']])
+    fact_positions={fact['id']:index for index,fact in enumerate(session.fact_log)}
     for eid,fact in session.statuses.items():
         if eid not in engineers:engineers[eid]=session.initial_engineers[eid]
         e=engineers[eid]
@@ -107,7 +113,7 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
             key=f['request_id']
             # Each recorded consumption has its own ledger row. Completed visits
             # leave the pending set; interrupted work retains its declared remainder.
-            marker=f"fact:{eid}:{f['time']}:{key}:{f['status']}"
+            marker=f"fact:{f['id']}"
             if not any(v.get('fact_id')==marker for r in frozen for v in r['visits']):
                 for r in frozen:
                     r['visits'][:]=[v for v in r['visits'] if not (v['request_id']==key and not v.get('fact_id'))]
@@ -119,7 +125,7 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
             else:
                 request=jobs.get(key,session.catalog[key])
                 jobs[key]=request.model_copy(update={'duration_minutes':f['remaining_minutes'],
-                    'equipment':Equipment(**{k:max(0,getattr(session.catalog[key].equipment,k)-sum(row['consumed'][k] for row in session.fact_log if row.get('request_id')==key and row['time']<=f['time'])) for k in ('router','tv_box')})})
+                    'equipment':Equipment(**{k:max(0,getattr(session.catalog[key].equipment,k)-sum(row['consumed'][k] for row in session.fact_log if row.get('request_id')==key and fact_positions[row['id']]<=fact_positions[f['id']])) for k in ('router','tv_box')})})
         spent={'router':0,'tv_box':0}
         for r in frozen:
             if r['engineer_id']!=eid:continue
@@ -132,6 +138,12 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
             declared=[item['location_id'] for (start,end),item in blocks
                       if fact['time']<=start<=now and item.get('location_id')]
             if declared:location=declared[-1]
+        start=min(max(now,e.shift.start),e.shift.end)
+        if location is None:
+            # Keep the identity and stock, but never fabricate a current point
+            # from an old office/route anchor. No work fits this empty shift.
+            engineers[eid]=e.model_copy(update={'shift':TimeWindow(start=start,end=start),'stock':stock})
+            continue
         alias=f'observed:{session.version}:{eid}:{now}'
         if location in points:points[alias]=points[location]
         session._alias_location(alias,location)
@@ -149,11 +161,16 @@ def apply_observations(session,s,routes,frozen,now,*,allow_redirect=False):
                 jobs[key]=request.model_copy(update={'duration_minutes':duration})
                 visit=Visit(request_id=key,arrival=now,start=now,end=now+duration,travel_minutes=0,distance_m=0,explanation='Ручной статус: работа идет; остаток задан диспетчером')
             else:
-                arrival=now+fact['remaining_minutes']
+                from .gps.autopilot import travel_estimate
+                gps_estimate=travel_estimate(session,eid,fact,now)
+                remaining=gps_estimate['remaining_minutes'] if gps_estimate else fact['remaining_minutes']
+                arrival=now+remaining
                 starts=[max(arrival,w.start) for w in request.windows if max(arrival,w.start)<=w.end]
                 if not starts:raise ValueError('Подтвержденный переезд не укладывается в окно: уточните окно или разрешите перенаправление при аварии')
                 begin=min(starts)
-                visit=Visit(request_id=key,arrival=arrival,start=begin,end=begin+request.duration_minutes,travel_minutes=fact['remaining_minutes'],distance_m=0,explanation='Ручной статус: в пути; остаток времени задан диспетчером')
+                visit=Visit(request_id=key,arrival=arrival,start=begin,end=begin+request.duration_minutes,travel_minutes=remaining,distance_m=0,explanation=(
+                    'Подтверждённый выезд; оставшийся путь оценён по GPS, прибытие не подтверждено'
+                    if gps_estimate else 'Ручной статус: в пути; остаток времени задан диспетчером'))
                 engineers[eid]=engineers[eid].model_copy(update={'shift':TimeWindow(start=max(0,now-1),end=e.shift.end)})
             if visit.end>e.shift.end:raise ValueError('Фактический остаток работы/поездки выходит за смену: уточните условия, сверхурочные автоматически не разрешаются')
             routes[eid]=Route(engineer_id=eid,visits=[visit],distance_m=0,travel_minutes=0,service_minutes=0,loadout=request.equipment)

@@ -36,7 +36,7 @@ if (-not $StateFile) {
 }
 $listenAddress = if ($LocalOnly) { '127.0.0.1' } else { '0.0.0.0' }
 $serverArguments = @('-B', '-m', 'field_router.scenario_server', $comparison,
-    '--state', $StateFile, '--host', $listenAddress, '--port', "$Port", '--time-limit', '3', '--solver', $Solver)
+    '--state', $StateFile, '--host', $listenAddress, '--port', "$Port", '--time-limit', '30', '--morning-time-limit', '120', '--solver', $Solver)
 if ($Network) { $serverArguments += '--network' }
 if ($DisableGps) { $serverArguments += '--disable-gps' }
 if ($GpsModel) { $serverArguments += @('--gps-model', $GpsModel) }

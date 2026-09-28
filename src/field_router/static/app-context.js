@@ -28,10 +28,10 @@
     }
     const bar=document.getElementById('region-context') || el('div',null,'header-region');
     bar.id='region-context';bar.className='header-region';
-    const label=el('label');const labelText=el('span','Район');
+    const label=el('label');
     const select=document.getElementById('region-select') || el('select');
     select.id='region-select';select.setAttribute('aria-label','Район');select.disabled=true;select.replaceChildren();
-    label.append(labelText,select);bar.replaceChildren(label);
+    label.append(select);bar.replaceChildren(label);
     if(!header.contains(bar))header.append(bar);
     let slot=document.getElementById('account-slot');
     if(!slot){slot=el('div',null,'account-slot');slot.id='account-slot';header.append(slot);}
@@ -45,12 +45,13 @@
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&profile.open){close();trigger.focus();}});
     try {
       const account=await ready;
-      trigger.replaceChildren(el('span',account.username || 'Демо','account-name'));
+      trigger.replaceChildren(el('span',(account.username || 'Демо').slice(0,1).toLocaleUpperCase('ru-RU'),'account-avatar'));
+      trigger.setAttribute('aria-label','Профиль: '+(account.username || 'Демо'));
       trigger.title=account.username || 'Демо';
-      menu.append(el('strong',account.username || 'Демонстрация'),el('span',account.role==='engineer'?'Инженер':account.role==='demo'?'Демо-доступ':'Диспетчер','account-role'));
+      const identity=el('div',null,'account-identity');identity.append(el('strong',account.username || 'Демонстрация'),el('span',account.role==='engineer'?'Инженер':account.role==='demo'?'Демо-доступ':'Диспетчер','account-role'));menu.append(identity);
       if(account.role==='admin'){
         const accounts=el('a','Доступ сотрудников');accounts.href='/accounts';menu.append(accounts);
-        const crews=el('a','Состав и оборудование');crews.href=url('/crew');menu.append(crews);
+        const crews=el('a','Состав и оборудование');crews.href=url('/#crew');menu.append(crews);
       }
       if(account.role==='engineer')bar.hidden=true;
       if(account.role!=='demo'){
@@ -82,7 +83,7 @@
         const chosen=data.regions.find(region=>region.id===select.value);
         if(!chosen)return;
         const page=location.pathname.slice(base.length)||'/';
-        location.href=chosen.path+page;
+        location.href=chosen.path+page+location.hash;
       });
     }catch{
       const failure=el('span','Не удалось загрузить профиль или районы. Обновите страницу.','header-error');

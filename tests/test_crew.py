@@ -121,7 +121,9 @@ def test_crew_api_persists_only_apply_and_keeps_old_view(make_scenario,tmp_path,
  def post(route,data):
   with urlopen(Request(url+route,data=json.dumps(data).encode(),headers={'Content-Type':'application/json'})) as r:return json.load(r)
  try:
-  with urlopen(url+'/crew') as r:assert 'Подготовка дня' in r.read().decode()
+  with urlopen(url+'/crew') as r:
+   html=r.read().decode();assert 'id="sidebar"' in html and 'id="crew-frame"' in html
+  with urlopen(url+'/crew?embedded=1') as r:assert 'Подготовка дня' in r.read().decode()
   draft=post('/api/crew/preview',p);assert not path.exists()
   with urlopen(url+'/crew-plan?id='+draft['id']+'&version=1') as response:
    html=response.read().decode();assert 'Предпросмотр · не применён' in html and '/crew-report?id=' in html

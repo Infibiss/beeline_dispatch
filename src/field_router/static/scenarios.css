@@ -400,7 +400,7 @@ textarea{padding:10px;width:100%;resize:vertical}label{font-size:12px;font-weigh
 
 .technical-data{padding:18px;margin:16px 0}.technical-data pre{max-height:480px;overflow:auto;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 
-#panel-risk>.risk-heading{float:right;margin:0 0 12px 16px}#panel-risk>.risk-section-label{clear:both}
+#panel-risk>.risk-heading{float:none;justify-content:flex-end;margin:0 0 12px;flex-wrap:wrap}#panel-risk>.risk-section-label{clear:both}
 #panel-settings>.page-heading,#panel-demo>.page-heading,#panel-technical>.page-heading{display:none}
 #status.attention:not(:empty){background:transparent;border-left:3px solid #e5c500;padding:3px 10px;color:#665810}
 /* Consistent form controls across operational and preparation screens. */
@@ -418,3 +418,19 @@ textarea{box-sizing:border-box;width:100%;max-width:100%;padding:12px;resize:ver
 #panel-demo .stream-demo-controls{align-items:center;margin-top:16px}.stream-demo-controls>p{margin:0}.stream-demo-controls+ .hint{margin-top:16px}
 @media(max-width:640px){.plan-toolbar>div{flex:1 1 auto;display:block}.plan-toolbar label{display:block;margin-bottom:8px}.plan-toolbar select{max-width:100%}.plan-toolbar .hint{flex:0 1 auto}.demo-source-row{display:block}.demo-source-row>div{width:100%}#panel-demo>.panel,#panel-demo>.intake-import{padding:18px}.stream-demo-controls button{flex:1}.gps-demo-controls{gap:16px}}
 .input-pair>div,.crew-grid>div{display:flex;flex-direction:column;justify-content:flex-end;min-width:0}
+#panel-events>.workspace{grid-template-columns:minmax(0,1fr)}
+#manual-event-panel{max-width:none;width:100%;box-sizing:border-box}
+#manual-event-panel>form{max-width:none;margin:18px 0 0}
+#manual-event-panel>p{margin:10px 0 18px}
+#panel-crew{overflow-anchor:none}
+#manual-event-panel #event-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 24px}
+#event-fields>.event-wide,#event-engineers-group,#event-policy{grid-column:1/-1}
+#event-fields .event-field{min-width:0;display:flex;flex-direction:column;justify-content:flex-end}
+#event-fields label{margin-top:0}#event-fields .check{align-self:end;margin-bottom:0}
+#emergency-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 24px}
+#new-address-panel,#call-off-duty-panel{grid-column:1/-1}
+#ordinary-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 24px;align-items:end}
+#event-fields .input-pair{margin:0}#event-fields>button{grid-column:1/-1;justify-self:start;margin-top:0}
+.decision-filters{grid-template-columns:minmax(0,1fr) minmax(180px,.7fr);gap:16px;margin:18px 0;padding:16px;background:#f6f7f8;border-radius:10px}.decision-filters>div{min-width:0}.decision-filters label{margin:0 0 8px}
+#crew-frame{display:block;width:100%;min-height:600px;border:0;background:transparent}.crew-frame-actions{display:flex;justify-content:flex-end;margin-bottom:12px}.crew-frame-actions:has([hidden]){display:none}.inventory-panel{padding:24px;margin-top:24px}.section-links{display:flex;gap:12px;flex-wrap:wrap}.section-links button{min-height:44px}
+@media(max-width:720px){#manual-event-panel #event-fields,#emergency-fields,#ordinary-fields{grid-template-columns:minmax(0,1fr);gap:16px}.decision-filters{grid-template-columns:1fr}.inventory-panel{padding:16px}}

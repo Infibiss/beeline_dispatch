@@ -103,8 +103,8 @@ def test_cloud_restart_uses_fresh_state_and_preserves_inputs(tmp_path, monkeypat
         from pathlib import Path
         state = Path(args[args.index('--state') + 1])
         assert not state.exists()
-        assert args[args.index('--time-limit') + 1] == '3'
-        assert args[args.index('--morning-time-limit') + 1] == '10'
+        assert args[args.index('--time-limit') + 1] == '30'
+        assert args[args.index('--morning-time-limit') + 1] == '120'
         assert args[args.index('--regions-dir') + 1] == str(source)
         assert '--disable-gps' not in args
         assert args[args.index('--public-origin') + 1] == 'https://demo.onrender.com'

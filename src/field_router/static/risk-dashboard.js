@@ -102,6 +102,7 @@
   const $ = id => document.getElementById(id);
   if (!$('panel-risk')) return;
   let snapshot = null, active = false, demo = false, version = null, demoRunId = null, sequence = 0, controller = null, planningBusy = false;
+  let summarySequence=0,summaryController=null;
   const text = (tag, value, cls) => { const el = document.createElement(tag); if (value != null) el.textContent = value; if (cls) el.className = cls; return el; };
   const percent = value => value == null ? '—' : new Intl.NumberFormat('ru-RU', {maximumFractionDigits:1}).format(value) + '%';
   const number = value => isFiniteNumber(value) ? new Intl.NumberFormat('ru-RU', {maximumFractionDigits:2}).format(value) : '—';
@@ -358,7 +359,47 @@
         && ['title','caption','detail','explanation','recommendation'].every(key => typeof item[key] === 'string'));
   }
 
+  function clearSummary(){
+    summarySequence++;summaryController?.abort();summaryController=null;
+    $('risk-summary').hidden=true;$('risk-summary').replaceChildren();
+    $('risk-summary-button').disabled=true;
+  }
+  function summaryControls(){
+    const enabled=!!snapshot?.llm_enabled && !!snapshot?.snapshot_id && !demo;
+    $('risk-summary-button').disabled=!enabled || !!summaryController;
+    $('risk-summary-button').title=enabled?'':demo?'Вернитесь к показателям плана.':snapshot?'ИИ не подключён.':'Сначала обновите показатели.';
+  }
+  async function summarizeDay(){
+    if(!snapshot || demo || summaryController || !snapshot.llm_enabled)return;
+    const current=++summarySequence,id=snapshot.snapshot_id,planVersion=snapshot.context.plan_version;
+    summaryController=new AbortController();const requestController=summaryController,signal=requestController.signal;
+    const timer=setTimeout(()=>requestController.abort(),35000);
+    const box=$('risk-summary');box.hidden=false;box.replaceChildren(text('p','Готовим короткую сводку…'));summaryControls();
+    try{
+      const fetcher=window.FieldRouter?window.FieldRouter.fetch:fetch;
+      const url=window.FieldRouter?window.FieldRouter.url('/api/risk/summary'):'/api/risk/summary';
+      const response=await fetcher(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({snapshot_id:id,version:planVersion,demo_run_id:demoRunId}),signal});
+      const result=await response.json();
+      if(current!==summarySequence || snapshot?.snapshot_id!==id)return;
+      if(!response.ok)throw Error(result.error || 'Сводка временно недоступна.');
+      if(result.snapshot_id!==id || !boundedText(result.title,100) || !boundedText(result.action,400)
+          || !Array.isArray(result.items) || result.items.length<1 || result.items.length>3
+          || result.items.some(item=>!boundedText(item.title,100)||!boundedText(item.detail,300)))throw Error('Не удалось прочитать сводку.');
+      const list=text('ul');
+      for(const item of result.items){const row=text('li');row.append(text('strong',item.title),text('span',item.detail));list.append(row);}
+      const action=text('p',null,'risk-summary-action');action.append(text('strong','Следующий шаг: '),text('span',result.action));
+      box.replaceChildren(text('h3',result.title),list,action);
+      if(result.notice)box.append(text('p',boundedText(result.notice,300)||'','risk-summary-notice'));
+    }catch(error){
+      if(current===summarySequence)box.replaceChildren(text('p',signal.aborted?'ИИ не ответил вовремя. Можно повторить запрос.':error.message));
+    }finally{
+      clearTimeout(timer);
+      if(current===summarySequence){summaryController=null;summaryControls();}
+    }
+  }
+
   async function load() {
+    clearSummary();
     const current = ++sequence; controller?.abort(); controller = new AbortController();
     const requestController = controller;
     const signal = controller.signal, timeout = setTimeout(() => requestController.abort(), 6000);
@@ -392,12 +433,13 @@
       $('risk-error').hidden = false; $('risk-context').textContent = 'Актуальность показателей не подтверждена.';
     } finally {
       clearTimeout(timeout);
-      if (current === sequence) { $('risk-refresh').disabled = false; $('risk-demo').disabled = !snapshot; }
+      if (current === sequence) { $('risk-refresh').disabled = false; $('risk-demo').disabled = !snapshot; summaryControls(); }
     }
   }
 
   $('risk-refresh').onclick = load;
-  $('risk-demo').onclick = () => {if (snapshot) {demo = !demo; renderForecast();}};
+  $('risk-summary-button').onclick=summarizeDay;
+  $('risk-demo').onclick = () => {if (snapshot) {demo = !demo; clearSummary();summaryControls();renderForecast();}};
   $('risk-facts').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'facts'}}));
   $('risk-replan').onclick = () => window.dispatchEvent(new CustomEvent('risk-intent', {detail:{action:'replan'}}));
   window.addEventListener('workbench-tab', event => {active = ['risk','demo'].includes(event.detail.name); if (active) load();});
@@ -410,6 +452,7 @@
     const changed = version !== event.detail.version || runChanged;
     version = event.detail.version; demoRunId = event.detail.demoRunId || null;
     if (changed) {
+      clearSummary();
       // A reset can reuse version 1; invalidate outstanding responses as well
       // as the snapshot so a previous run cannot reappear on another tab.
       sequence++; controller?.abort(); snapshot = null; demo = false;

@@ -121,3 +121,28 @@ def test_failed_header_mode_switch_rolls_back_and_preserves_settings_draft():
       assert.equal($('auto-count').value,'4');
       assert.equal($('error').hidden,false);
     ''',before="state.planning_settings={mode:'autopilot',every_n_requests:3,every_n_minutes:null};")
+
+
+def test_crew_opens_inside_workspace_and_dirty_form_blocks_region_change():
+    client('''
+      await $('tab-crew').dispatch('click');
+      assert.equal($('panel-crew').hidden,false);
+      assert.equal($('page-title').textContent,'Состав и оборудование');
+      assert.ok($('crew-frame').src.includes('crew?embedded=1'));
+      const child={};$('crew-frame').contentWindow=child;
+      window.dispatchEvent(Object.assign(new Event('message'),{origin:'http://localhost',source:child,data:{type:'crew-editing',dirty:true,busy:false}}));
+      const region=new Event('region-change',{cancelable:true});window.dispatchEvent(region);
+      assert.equal(region.defaultPrevented,true);
+      assert.equal($('crew-discard').hidden,false);
+      await $('tab-plan').dispatch('click');await $('tab-crew').dispatch('click');
+      assert.equal($('crew-discard').hidden,false);
+    ''')
+
+
+def test_foreign_frame_cannot_mark_crew_dirty():
+    client('''
+      $('crew-frame').contentWindow={};
+      window.dispatchEvent(Object.assign(new Event('message'),{origin:'https://example.com',source:{},data:{type:'crew-editing',dirty:true}}));
+      const region=new Event('region-change',{cancelable:true});window.dispatchEvent(region);
+      assert.equal(region.defaultPrevented,false);
+    ''')

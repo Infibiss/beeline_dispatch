@@ -293,7 +293,7 @@
   function targets() {
     if (!state) return;
     const engineer = $('event-type').value === 'unavailable', emergency = $('event-type').value === 'emergency', ordinary = $('event-type').value === 'new_request', newJob = emergency || ordinary, replan = $('event-type').value === 'replan';
-    $('event-target').hidden = replan || engineer; $('target-label').hidden = replan || engineer;
+    $('event-address-field').hidden=replan || engineer; $('event-target').hidden = replan || engineer; $('target-label').hidden = replan || engineer;
     $('event-target').disabled = replan || engineer; $('event-target').required = !replan && !engineer;
     $('event-engineers-group').hidden = !engineer;
     const chosen = new Set([...$('event-engineers').querySelectorAll('input:checked')].map(input=>input.value));
@@ -1154,8 +1154,8 @@
     catch (error) { failure(error); }
     finally { busy = false; controls(); }
   });
-  const tabs = ['plan','events','facts','gps','risk','notifications','settings','demo'];
-  const pageNames={plan:'План дня',events:'Заявки и изменения',facts:'Бригады',gps:'Карта и связь',risk:'Контроль дня',notifications:'История',settings:'Настройки района',demo:'Демонстрация'};
+  const tabs = ['plan','events','facts','gps','crew','risk','notifications','settings','demo'];
+  const pageNames={plan:'План дня',events:'Заявки и изменения',facts:'Бригады',gps:'Карта и связь',crew:'Состав и оборудование',risk:'Контроль дня',notifications:'История',settings:'Настройки района',demo:'Демонстрация'};
   const mobileMenu=window.matchMedia?.('(max-width:900px)');
   function syncMenuAccess(){ $('sidebar').inert=!!mobileMenu?.matches&&!$('sidebar').classList.contains('is-open'); }
   mobileMenu?.addEventListener('change',syncMenuAccess);syncMenuAccess();
@@ -1177,22 +1177,55 @@
     if(busy||!state)return;activateTab('events');$('event-type').value='new_request';
     targets();defaultDuration();resetCandidates();$('event-target').focus();
   });
+  $('crew-settings-action').addEventListener('click',()=>activateTab('crew'));
   $('crew-map-action').addEventListener('click',()=>activateTab('gps'));
   $('demo-gps-action').addEventListener('click',()=>activateTab('gps'));
   $('risk-demo').addEventListener('click',()=>activateTab('risk'));
+  let crewDirty=false,crewBusy=false,crewLoading=false;
+  function loadCrew(){
+    if(crewDirty || crewBusy)return;
+    crewLoading=true;
+    $('crew-frame').src=appUrl('/crew?embedded=1');
+  }
+  $('crew-discard').addEventListener('click',()=>{
+    if(crewBusy)return;
+    $('crew-frame').contentWindow?.postMessage({type:'crew-discard'},new URL(location.href).origin);
+    $('error').hidden=true;
+  });
+  window.addEventListener('message',event=>{
+    if(event.origin!==new URL(location.href).origin || event.source!==$('crew-frame').contentWindow)return;
+    if(event.data?.type==='crew-editing'){
+      crewDirty=event.data.dirty===true;crewBusy=event.data.busy===true;
+      $('crew-discard').hidden=!crewDirty;$('crew-discard').disabled=crewBusy;
+      if(crewLoading && !crewBusy){
+        crewLoading=false;
+        requestAnimationFrame(()=>{if(!$('panel-crew').hidden){$('crew-frame').resizePlan?.();window.scrollTo?.({top:0,behavior:'instant'});}});
+      }
+    }else if(event.data?.type==='crew-applied'){
+      crewDirty=false;crewBusy=false;$('crew-discard').hidden=true;reload();activateTab('plan');
+    }
+  });
+  window.addEventListener('region-change',event=>{
+    if(!crewDirty&&!crewBusy)return;
+    event.preventDefault();$('error').textContent='В составе есть несохранённые правки. Примените их или нажмите «Отменить правки состава».';$('error').hidden=false;
+  });
+  window.addEventListener('beforeunload',event=>{if(crewDirty){event.preventDefault();event.returnValue='';}});
+  window.addEventListener('hashchange',()=>{const name=location.hash?.slice(1);if(tabs.includes(name))activateTab(name);});
   function activateTab(name, keepMenu=false) {
     if(!tabs.includes(name))return;
+    window.history?.replaceState(null,'',appUrl('/#'+name));
     const fromDrawer=$('sidebar').classList.contains('is-open');
     if(!keepMenu){closeMenu();window.scrollTo?.({top:0,behavior:'instant'});}$('page-title').textContent=pageNames[name];
-    for(const id of ['record-fact-action','new-request-action'])$(id).hidden=['settings','demo'].includes(name);
+    for(const id of ['record-fact-action','new-request-action'])$(id).hidden=['crew','settings','demo'].includes(name);
     if(fromDrawer&&!keepMenu){$('page-title').tabIndex=-1;$('page-title').focus();}
-    $('page-caption').textContent=['settings','demo'].includes(name)?'УПРАВЛЕНИЕ':'РАБОЧИЙ ДЕНЬ';
+    $('page-caption').textContent=['crew','settings','demo'].includes(name)?'УПРАВЛЕНИЕ':'РАБОЧИЙ ДЕНЬ';
     tabs.forEach(tab => { const active = tab === name; $('tab-' + tab).setAttribute('aria-selected', String(active)); $('tab-' + tab).tabIndex = active ? 0 : -1; $('panel-' + tab).hidden = !active; });
     if (name === 'notifications' && inboxSnapshot) {
       const notices=inboxSnapshot.dispatch_notifications || [];
       lastSeenNotificationId=notices[notices.length-1]?.id || null;
       renderInbox(inboxSnapshot,true);
     }
+    if (name === 'crew'){renderCommitments(state,false);loadCrew();requestAnimationFrame(()=>$('crew-frame').resizePlan?.());}
     if (name === 'plan') requestAnimationFrame(() => $('plan-frame').resizePlan?.());
     window.dispatchEvent(new CustomEvent('workbench-tab', {detail: {name}}));
   }
@@ -1455,10 +1488,12 @@
     } finally { polling = false; }
   }, 2000);
   reload();
+  const initial=location.hash?.slice(1) || (location.pathname?.endsWith('/crew')?'crew':null);
+  if(tabs.includes(initial))activateTab(initial);
 })();
 
 // The embedded plan scrolls with the workspace, not inside a second viewport.
-if (typeof document !== 'undefined') document.getElementById('plan-frame')?.addEventListener('load', function () {
+if (typeof document !== 'undefined') for(const id of ['plan-frame','crew-frame']) document.getElementById(id)?.addEventListener('load', function () {
   const frame = this, body = frame.contentDocument?.body;
   if (!body) return;
   if (frame.planObserver) frame.planObserver.disconnect();

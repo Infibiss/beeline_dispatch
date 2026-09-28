@@ -228,6 +228,10 @@ class Explainer:
     def recommend(self,batch):
         return self.explain(batch,None)
 
+    def summarize_day(self,snapshot):
+        from .risk_summary import summarize
+        return summarize(self,snapshot)
+
     def explain(self,batch,candidate_id):
         recommend=candidate_id is None
         if recommend:

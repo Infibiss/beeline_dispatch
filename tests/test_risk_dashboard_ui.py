@@ -192,3 +192,34 @@ def test_partial_missing_probabilities_are_not_reported_as_zero_risk():
       console.log(JSON.stringify(risk.forecastCounts({routes:[{visits:[{p_sla_breach:.4},{}]}]})));
     ''')
     assert result == {'sla': None, 'late': None, 'overtime': None}
+
+
+def test_ai_summary_is_opt_in_safe_and_invalidated_by_plan_change():
+    client(r'''
+snapshot.snapshot_id='snapshot-7';snapshot.llm_enabled=true;await refresh();
+let calls=0;
+const original=global.fetch;
+global.fetch=async(url,opts)=>{
+ if(url.endsWith('/summary')){calls++;assert.deepEqual(JSON.parse(opts.body),{snapshot_id:'snapshot-7',version:7,demo_run_id:null});return {ok:true,json:async()=>({snapshot_id:'snapshot-7',title:'На что обратить внимание',items:[{title:'Без исполнителя',detail:'2 заявки <script>опасно</script>'}],action:'Проверьте очередь.'})};}
+ return original(url,opts);
+};
+assert.equal(calls,0);await $('risk-summary-button').onclick();
+assert.equal(calls,1);assert.equal($('risk-summary').hidden,false);
+assert.match($('risk-summary').textContent,/Проверьте очередь/);
+assert.equal($('risk-summary').querySelectorAll('script').length,0);
+fire('planning-state',{version:8});
+assert.equal($('risk-summary').hidden,true);assert.equal($('risk-summary-button').disabled,true);
+''')
+
+
+def test_late_ai_summary_cannot_reappear_after_reset():
+    client(r'''
+snapshot.snapshot_id='snapshot-7';snapshot.llm_enabled=true;await refresh();
+let resolve;
+global.fetch=()=>new Promise(r=>resolve=r);
+const pending=$('risk-summary-button').onclick();
+fire('planning-state',{version:7,demoRunId:'new-run'});
+resolve({ok:true,json:async()=>({snapshot_id:'snapshot-7',title:'Old',items:[{title:'Old',detail:'Old'}],action:'Old'})});
+await pending;
+assert.equal($('risk-summary').hidden,true);assert.equal($('risk-summary').textContent,'');
+''')

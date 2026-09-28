@@ -38,7 +38,8 @@ def run(*, root=Path('.')):
             '--state', str(state / 'state.json'), '--accounts', str(state / 'accounts.sqlite3'),
             '--cache', str(state / 'geo-cache'), '--host', '0.0.0.0', '--port', str(port),
             '--public-origin', origin, '--network', '--solver', 'hybrid',
-            '--time-limit', '3', '--morning-time-limit', '10',
+            '--time-limit', str(scenario_server.DAY_TIME_LIMIT),
+            '--morning-time-limit', str(scenario_server.MORNING_TIME_LIMIT),
         ]
         routing = os.environ.get('FIELD_ROUTER_GPS_ROUTING')
         if routing:

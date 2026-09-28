@@ -2,6 +2,9 @@
 'use strict';
 const regionURL=path=>new URL(path.replace(/^\//,''),new URL('.',location.href)).href;
 const $=id=>document.getElementById(id);let state,draft,busy=false,dirty=false;
+const embedded=window.parent!==window && new URL(location.href).searchParams.get('embedded')==='1';
+if(embedded)document.body.classList.add('crew-embedded');
+const notifyParent=type=>{if(embedded)window.parent.postMessage({type,dirty,busy},new URL(location.href).origin);};
 const appFetch=(...args)=>window.FieldRouter?window.FieldRouter.fetch(...args):fetch(...args);
 const appUrl=path=>window.FieldRouter?window.FieldRouter.url(path):regionURL(path);
 // Local HTTP on an engineer phone may not expose secure-context UUIDs.
@@ -15,7 +18,7 @@ function reset(){draft=null;$('preview').hidden=true;$('plan-link').removeAttrib
 function updateContext(){if(state)$('context').textContent='Бригад в составе: '+state.engineers.length+' · в форме: '+$('rows').children.length;}
 function markDirty(){if(!canEdit())return;dirty=true;reset();updateContext();status('Есть изменения. Рассчитайте план перед сохранением.');}
 function status(message){$('status').textContent=message;$('error').hidden=true;}
-function controls(){ $('fields').disabled=busy||!state?.editable;$('apply').disabled=busy||!state?.editable||!draft; }
+function controls(){notifyParent('crew-editing'); $('fields').disabled=busy||!state?.editable;$('apply').disabled=busy||!state?.editable||!draft; }
 async function api(path,payload){const r=await appFetch(appUrl(path),payload?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:{cache:'no-store'});const d=await r.json();if(!r.ok)throw Error((d.error||'Ошибка сервера')+(r.status===409?' Обновите страницу и повторите настройку.':''));return d;}
 async function run(action){if(busy)return;busy=true;controls();$('error').hidden=true;try{await action();}catch(e){reset();$('error').textContent=e.message;$('error').hidden=false;$('status').textContent='Изменения не применены.';}finally{busy=false;controls();}}
 function clock(n){return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
@@ -85,8 +88,12 @@ $('preset-select').onchange=()=>{if(canEdit())describePreset();};
 $('recommend').onclick=()=>{if(!canEdit())return;const preset=selectedPreset();if(!preset)return;$('rows').replaceChildren();preset.engineers.forEach(row);markDirty();status('Форма заполнена: «'+preset.label+'». Рассчитайте и сравните план перед применением.');};
 $('add').onclick=()=>{if(!canEdit())return;row({id:'crew-'+uniqueId(),name:'Новая бригада',transport:'public',vehicle_id:null,shift:{start:540,end:1080},skills:['local'],start_location:'office',stock_mode:'plan',router:1,tv_box:0});markDirty();};
 $('crew-form').onsubmit=e=>{e.preventDefault();if(!canEdit())return;return run(async()=>{reset();status('Расчёт состава, дорог и нового плана…');draft=await api('/api/crew/preview',{version:state.version,engineers:collect()});showComparison();showChanges($('changes'),draft.changes);showAssumptions($('assumptions'),draft.assumptions);$('participation').replaceChildren(...(draft.engineers||[]).map(e=>node('p',e.name+' · '+e.region+' · заявок: '+e.assigned+(e.assigned?'':' — участвовал в расчёте, назначений в найденном плане нет'))));$('unassigned-summary').textContent='Без назначения: '+draft.before.unassigned+' → '+draft.after.unassigned;$('unassigned').replaceChildren(...draft.unassigned.map(x=>node('p',x.request_id+': '+x.reason)));$('issue').replaceChildren(...draft.issue.map(x=>node('p',x.name+': роутеры '+x.router+', ТВ '+x.tv_box)));$('plan-link').href=appUrl('/crew-plan?id='+encodeURIComponent(draft.id)+'&version='+state.version);$('preview').hidden=false;status('Проверьте план и выдачу. Состав пока не изменён.');});};
-$('apply').onclick=()=>{if(!canEdit()||!draft)return;return run(async()=>{await api('/api/crew/apply',{id:draft.id,version:state.version});dirty=false;location.href=appUrl('/');});};
+$('apply').onclick=()=>{if(!canEdit()||!draft)return;return run(async()=>{await api('/api/crew/apply',{id:draft.id,version:state.version});dirty=false;if(embedded)notifyParent('crew-applied');else location.href=appUrl('/');});};
 window.addEventListener('region-change',event=>{if(busy||dirty){event.preventDefault();$('error').textContent='Примените состав после предпросмотра или обновите страницу, чтобы отменить изменения.';$('error').hidden=false;window.scrollTo({top:0});}});
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
+window.addEventListener('message',event=>{
+  if(!embedded || event.origin!==new URL(location.href).origin || event.source!==window.parent || event.data?.type!=='crew-discard' || busy || !state)return;
+  $('rows').replaceChildren();state.engineers.forEach(row);dirty=false;reset();updateContext();status('Правки отменены.');
+});
 run(async()=>{state=await api('/api/crew');$('back-link').href=appUrl('/');state.engineers.forEach(row);updateContext();$('preset-select').replaceChildren(...(state.presets||[]).map(p=>{const option=node('option',p.label);option.value=p.id;return option;}));describePreset();status(state.editable?'Настройте смены, навыки и запас перед началом дня.':'День уже начат: состав доступен только для просмотра.');});
 })();

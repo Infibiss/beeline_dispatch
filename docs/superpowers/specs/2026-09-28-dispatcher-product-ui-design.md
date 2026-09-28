@@ -34,3 +34,12 @@
 
 ## Уточнения после проверки пользователем
 Убрать техническую вкладку, повторяющиеся географические подписи и нижние раскрывающиеся блоки плана. Форма события постоянно открыта. История плана получает широкий селектор с коротким названием текущей версии. Режим распределения переключается сразу в шапке с сохранёнными порогами; ошибка сохранения возвращает действующее значение, черновик порогов сохраняется. Демонстрация разделена на поток заявок, учебный прогноз и GPS. Поля одной высоты, профиль с геометрически центрированной стрелкой. В сводке прогноза — целое количество визитов/бригад с индивидуальным риском ≥20%; это порог внимания интерфейса, не норматив компании и не ожидаемое число нарушений. При неполных оценках показывать отсутствие подробной оценки.
+
+## Второе уточнение по результатам использования
+Район и режим имеют одинаковые селекторы без подписи «Район». Профиль — круглая кнопка, имя и роль в строке меню. Карточка заявки содержит только сведения для принятия решения; JSON, происхождение координат и доказательства допустимости скрыты из рабочей карточки. Приблизительный адрес отмечается явно. Выделение расписания ограничено внутренней областью блока. Форма события занимает всю ширину и группирует тип/время, адрес, работу/оборудование и клиентское окно. Фильтры истории сгруппированы в отдельные поля. Состав бригад встроен в общую оболочку рядом с GPS; черновик сохраняется между вкладками, регион заблокирован при несохранённых правках. Физический остаток оборудования показан в подразделе состава; закреплённые работы убраны с экрана статусов.
+
+## Day-control briefing
+- Extend the accepted compact AI-card pattern: explicit “Объяснить с ИИ” button, up to three verified findings, one next action, no expanding details or automatic plan changes.
+- The existing YandexGPT configuration selects emphasis from aggregate findings. Names, addresses and GPS stay local; numbers and actionable wording come from verified dashboard data. Missing forecast data is not described as zero risk. Mandatory unassigned/stale/equipment findings cannot be omitted by the model.
+- Use a bounded server-side snapshot cache per region. Summary requests reference a displayed snapshot and plan version; changed plans/demo runs invalidate the result. No risk recomputation or external call under the planner lock. Shared LLM budget/cache applies; fallback is clearly labelled.
+- Refresh toolbar uses normal document flow so timeout/error messages cannot cover buttons. Summary clears on refresh, plan changes and demo switch.

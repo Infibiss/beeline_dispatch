@@ -17,6 +17,8 @@ from urllib.parse import parse_qs, urlsplit, urlencode
 from uuid import uuid4
 from .regions import load_session, UnknownRegion
 
+DAY_TIME_LIMIT=30
+MORNING_TIME_LIMIT=120
 
 
 _STATIC=Path(__file__).with_name('static')
@@ -353,9 +355,20 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     # Freeze a coherent, compact view quickly; Monte Carlo must
                     # neither hold the mutation lock nor copy road matrices and
                     # historical workbench views.
-                    with lock: risk_session=capture_dashboard_session(holder['session'])
+                    with lock:
+                        source_session=holder['session']
+                        risk_session=capture_dashboard_session(source_session)
+                        risk_run=demo_fields(self.region_key).get('demo_run_id')
                     gps_status,gps_snapshot=gps.request('GET','/api/gps','channel=device')
                     result=dashboard(risk_session,gps_snapshot if gps_status==200 else None)
+                    with lock:
+                        if holder['session'] is not source_session or source_session.version!=risk_session.version or demo_fields(self.region_key).get('demo_run_id')!=risk_run:
+                            return self.reply(409,{'error':'План изменился. Обновите показатели.'})
+                        snapshot_id=uuid4().hex
+                        result.update(snapshot_id=snapshot_id,llm_enabled=explainer is not None)
+                        snapshots=holder.setdefault('risk_snapshots',{})
+                        snapshots[snapshot_id]=(result,id(source_session),risk_run)
+                        if len(snapshots)>8:snapshots.pop(next(iter(snapshots)))
                     return self.reply(200,result)
                 except Exception:
                     return self.reply(503,{'error':'Показатели риска временно недоступны. Планирование продолжает работать.'})
@@ -462,6 +475,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 return self.reply(200,(_STATIC/'vendor'/name).read_bytes(),_ASSETS[name])
             if route.path not in files:return self.reply(404,{'error':'Не найдено'})
             name,kind=files[route.path]
+            if route.path=='/crew' and parse_qs(route.query).get('embedded')!=['1']:
+                name='scenarios.html'
             self.reply(200,(_STATIC/name).read_bytes(),kind)
 
         def do_POST(self):
@@ -495,6 +510,22 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     return self.reply(403,{'error':'Можно отправлять только свои статусы и координаты'})
                 # Telemetry has its own lock; the solver may be busy for seconds.
                 if is_gps and gps_route.path!='/api/gps/confirm-delay':return self.reply(*gps.request('POST',gps_route.path,gps_route.query,payload))
+                if self.path=='/api/risk/summary':
+                    with lock:
+                        check_demo_run(self.region_key,demo_payload)
+                        session=holder['session']
+                        stored=holder.get('risk_snapshots',{}).get(payload.get('snapshot_id'))
+                        if (stored is None or stored[1]!=id(session) or payload.get('version')!=session.version
+                            or stored[0]['context']['plan_version']!=session.version
+                            or stored[2]!=demo_fields(self.region_key).get('demo_run_id')):
+                            return self.reply(409,{'error':'Показатели устарели. Нажмите «Обновить».'})
+                        snapshot=stored[0]
+                    if explainer is None:raise ValueError('LLM не настроена')
+                    result=explainer.summarize_day(snapshot)
+                    with lock:
+                        if holder['session'] is not session or session.version!=payload.get('version') or stored[2]!=demo_fields(self.region_key).get('demo_run_id'):
+                            return self.reply(409,{'error':'План изменился. Обновите показатели.'})
+                    return self.reply(200,{**result,'snapshot_id':payload['snapshot_id']})
                 if self.path in ('/api/explain','/api/recommend'):
                     with lock:
                         check_demo_run(self.region_key,demo_payload)
@@ -659,8 +690,8 @@ def main(argv=None):
     parser.add_argument('--public-origin',help='Внешний HTTPS origin за доверенным reverse proxy')
     parser.add_argument('--network',action='store_true',help='Разрешить поиск адресов через Photon и координатные запросы OSRM')
     parser.add_argument('--cache',type=Path,default=Path('output/geo-cache'))
-    parser.add_argument('--time-limit',type=float,default=3,help='Бюджет пересчёта после события дня, секунды')
-    parser.add_argument('--morning-time-limit',type=float,default=10,
+    parser.add_argument('--time-limit',type=float,default=DAY_TIME_LIMIT,help='Бюджет пересчёта после события дня, секунды')
+    parser.add_argument('--morning-time-limit',type=float,default=MORNING_TIME_LIMIT,
                         help='Бюджет утреннего плана (бригады, старты, выдача), секунды; ALNS v2 включается от 2,5 с на вызов')
     parser.add_argument('--solver',choices=['ortools','alns','hybrid'],default='hybrid',help='Оптимизатор; hybrid делит бюджет между OR-Tools и ALNS')
     parser.add_argument('--gps-config',type=Path)

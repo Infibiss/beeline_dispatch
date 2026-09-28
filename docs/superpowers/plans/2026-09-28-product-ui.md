@@ -27,3 +27,20 @@
 - Header mode save uses the scoped/versioned existing API, retains thresholds and unsaved threshold edits, blocks concurrent changes, and rolls back the displayed mode on failure.
 - Forecast cards count visits/crews whose individual probability is at least 20%; incomplete estimates are not displayed as zero. This UI review threshold is documented as an assumption.
 - Full check: 839 passed; package built and assets verified. Repeated focused checks after final copy/layout changes. Browser exercised both header modes, six arrivals with automatic application and history, reset, demo risk navigation, crew field heights, and mobile form alignment. All browser data was disposable.
+
+## Workspace integration follow-up
+- Matched header controls, circular account menu, operational request card, inset schedule selection, wide event form and grouped history filters.
+- Crew editor is embedded in the common shell; direct /crew links also open the shell. Same-origin/source-checked messages carry draft/busy state and apply completion. Dirty edits block region changes and remain intact while visiting another tab. Inventory is restored to current state when opening crews.
+- UI regression tests cover navigation, dirty guards, rejecting foreign messages, embedded apply notifications and explicit discard. Browser verification found and fixed a discard/unload conflict and old CSS width limits.
+- Browser verified a real preview/apply cycle on disposable data, draft retention across tabs, blocked region switch, explicit discard, regional editor, 44 px plan controls, inset schedule selection, wide event fields, profile alignment and 390 px layout without horizontal overflow. Screenshots: output/local/product-ui/crew-workspace-final.png and event-form-final.png.
+- Workspace-only full verification: 843 passed, wheel and runtime assets verified. Additional day-control changes below are included in the next full run.
+
+## Day-control follow-up before push
+- Add aggregate-only verified briefing builder and reuse the configured LLM client/budget.
+- Add a versioned regional endpoint referring to the dashboard snapshot shown in UI.
+- Render an opt-in compact card and cancel/invalidate stale responses; fix floated refresh/error layout.
+- Verify malformed model output, shared call limit, privacy, regional isolation, stale results and actual timeout/retry/summary in the browser; rerun CI before push.
+
+- Browser: actual YandexGPT briefing succeeded; deliberately delayed dashboard reproduced the timeout, confirmed non-overlapping refresh/error rectangles, and recovered on retry. Verified 390 px briefing and invalidation on refresh. Saved risk-summary-final.png and risk-timeout-final.png under output/local/product-ui/.
+
+- Full day-control verification: 849 passed; JavaScript syntax, wheel build and package assets verified. User then requested morning 120 s / day 30 s: CLI and Render share constants, PowerShell and README match; targeted deployment/crew checks: 38 passed. Runtime budgets are per optimizer invocation, not an end-to-end response deadline.

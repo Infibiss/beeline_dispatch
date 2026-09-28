@@ -44,32 +44,33 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await mobile.waitForFunction(() => document.querySelector('#plan-version').textContent === 'Версия 1');
     const dispatch = await context.newPage();
     await dispatch.goto(base);
-    await dispatch.getByRole('link', {name:'Состав и оборудование', exact:true}).click();
-    await dispatch.waitForSelector('.crew-row');
+    await dispatch.getByRole('tab', {name:'Состав и оборудование', exact:true}).click();
+    const editor=dispatch.frameLocator('#crew-frame');
+    await editor.locator('.crew-row').first().waitFor();
     const original = await (await context.request.get(base + '/api/crew')).json();
     const oldIndex = await (await context.request.get(base + '/api/engineers')).json();
     const home = original.locations.find(point => point.id !== 'office' && !point.id.startsWith('home:'));
     assert.ok(home, 'Demo must contain an alternative starting point');
     // Retain the existing 15 engineers, but give the new one the only
     // connection skill, so its participation does not depend on solver ties.
-    for (const existing of await dispatch.locator('.crew-row').all()) {
+    for (const existing of await editor.locator('.crew-row').all()) {
       await existing.locator('[data-skill="emergency"]').check();
       await existing.locator('[data-skill="local"]').uncheck();
       await existing.locator('[data-skill="connection"]').uncheck();
     }
-    await dispatch.click('#add');
-    const row = dispatch.locator('.crew-row').last();
+    await editor.locator('#add').click();
+    const row = editor.locator('.crew-row').last();
     const id = await row.getAttribute('data-id');
     await row.locator('[data-key="name"]').fill('Бригада — проверка связи');
     await row.locator('[data-key="transport"]').selectOption('car');
     await row.locator('[data-key="start_location"]').selectOption(home.id);
     await row.locator('[data-key="end"]').fill('22:00');
     for (const skill of ['local','connection','emergency']) await row.locator('[data-skill="' + skill + '"]').check();
-    await dispatch.click('#preview-button');
+    await editor.locator('#preview-button').click();
     try {
-      await dispatch.waitForSelector('#preview:not([hidden])');
+      await editor.locator('#preview').waitFor({state:'visible'});
     } catch (error) {
-      console.error(await dispatch.evaluate(() => ({
+      console.error(await editor.locator('body').evaluate(() => ({
         status:document.querySelector('#status').textContent,
         error:document.querySelector('#error').textContent,
         invalid:[...document.querySelectorAll(':invalid')].map(n => ({key:n.dataset.key, value:n.value, message:n.validationMessage}))
@@ -77,10 +78,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       throw error;
     }
     assert.equal((await (await context.request.get(base + '/api/engineers')).json()).version, 1);
-    await dispatch.click('#apply');
-    await dispatch.waitForURL(base+'/');
+    await editor.locator('#apply').click();
+    await dispatch.locator('#panel-plan').waitFor({state:'visible'});
     await dispatch.goto(base+'/crew');
-    await dispatch.waitForSelector('.crew-row');
+    await editor.locator('.crew-row').first().waitFor();
     assert.equal((await (await context.request.get(base+'/api/engineers')).json()).engineers.length, original.engineers.length+1);
     // Reproduce the race: old roster arrives with a newer personal plan.
     // A single plan-version comparison would then miss the new engineer forever.
@@ -140,16 +141,16 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     await dispatch.selectOption('#region-select','south-east');
     await dispatch.waitForURL(base+'/r/south-east/');
     await dispatch.getByRole('link',{name:'Состав и оборудование',exact:true}).click();
-    await dispatch.waitForSelector('.crew-row');
+    await editor.locator('.crew-row').first().waitFor();
     assert.match(await dispatch.locator('#context').textContent(),/^Юго-восток/);
     assert.ok(!(await dispatch.locator('#context').textContent()).includes('в системе 16'));
-    await dispatch.click('#add');
-    await dispatch.locator('.crew-row').last().locator('[data-key="name"]').fill('Только юго-восток');
-    const southId=await dispatch.locator('.crew-row').last().getAttribute('data-id');
-    await dispatch.click('#preview-button');
-    await dispatch.waitForSelector('#preview:not([hidden])');
+    await editor.locator('#add').click();
+    await editor.locator('.crew-row').last().locator('[data-key="name"]').fill('Только юго-восток');
+    const southId=await editor.locator('.crew-row').last().getAttribute('data-id');
+    await editor.locator('#preview-button').click();
+    await editor.locator('#preview').waitFor({state:'visible'});
     assert.ok(!(await (await context.request.get(base+'/r/south-east/api/engineers')).json()).engineers.some(e=>e.id===southId));
-    await dispatch.click('#apply');
+    await editor.locator('#apply').click();
     await dispatch.waitForURL(base+'/r/south-east/');
     const southMobile=await context.newPage();
     await southMobile.goto(base+'/r/south-east/engineer?engineer_id='+southId);

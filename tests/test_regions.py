@@ -30,9 +30,12 @@ def test_region_state_and_drafts_are_isolated(make_scenario,tmp_path):
         assert ScenarioSession.restore(json.loads(pb.read_text())).mode()=='manual'
         assert not pa.exists()
         with opener.open(base+'/regions/south/') as r:html=r.read().decode()
-        assert 'href="/regions/south/crew"' in html and 'id="region-select"' in html
+        assert 'id="tab-crew"' in html and 'id="crew-frame"' in html and 'id="region-select"' in html
+        with opener.open(base+'/regions/south/crew?embedded=1') as r:crew_html=r.read().decode()
+        assert 'id="crew-form"' in crew_html and 'src="/regions/south/crew.js"' in crew_html
         with opener.open(base+'/regions/south/crew') as r:html=r.read().decode()
-        assert 'href="/regions/south/"' in html and 'src="/regions/south/crew.js"' in html
+        assert 'href="/regions/south/"' in html and 'src="scenarios.js"' in html
+        with opener.open(base+'/regions/south/scenarios.js') as r:assert r.status==200
         with pytest.raises(HTTPError) as e:call('/regions/unknown/api/state')
         assert e.value.code==404
     finally:server.shutdown();server.server_close();thread.join()

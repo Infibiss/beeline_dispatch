@@ -29,7 +29,9 @@ tasks:
   - name: test-and-package
     cubes:
       - name: verify
-        image: python:3.11-bookworm
+        # Explicit official registry avoids SourceCraft's Docker Hub mirror,
+        # which can time out before the verification script starts.
+        image: public.ecr.aws/docker/library/python:3.11-bookworm
         script:
           - |
             set -eu

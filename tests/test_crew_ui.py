@@ -221,3 +221,38 @@ assert.equal($('rows').children.length,2);
 assert.ok($('rows').children[1].dataset.id.startsWith('crew-'));
 assert.equal(new Set($('rows').children.map(row=>row.dataset.id)).size,2);
 ''', before="Object.defineProperty(globalThis,'crypto',{value:undefined,configurable:true});")
+
+
+def test_embedded_editor_reports_drafts_and_apply_to_same_origin_parent():
+    client('''
+input('name').value='Новое имя';input('name').dispatch('input');
+assert.ok(messages.some(x=>x.data.type==='crew-editing' && x.data.dirty));
+await submit();await $('apply').onclick();await settle();
+assert.ok(messages.some(x=>x.data.type==='crew-applied' && !x.data.dirty));
+assert.ok(messages.every(x=>x.origin==='http://localhost'));
+assert.equal(location.href,'http://localhost/regions/south/crew?embedded=1');
+assert.ok(requests.some(x=>x.url==='http://localhost/regions/south/api/crew/apply'));
+''', before='''
+const messages=[];
+location.href='http://localhost/regions/south/crew?embedded=1';
+document.body={classList:{add(){}}};
+window.parent={postMessage(data,origin){messages.push({data,origin});}};
+''')
+
+
+def test_embedded_discard_restores_saved_rows_without_unload_confirmation():
+    client('''
+input('name').value='Черновик';input('name').dispatch('input');
+const discard={origin:'http://localhost',source:window.parent,data:{type:'crew-discard'}};
+for(const fn of window.events.message||[])fn({...discard,source:{}});
+assert.equal(input('name').value,'Черновик');
+for(const fn of window.events.message||[])fn(discard);
+assert.equal(input('name').value,'Анна');
+assert.equal(window.dispatch('beforeunload').prevented,false);
+assert.ok(messages.some(x=>x.data.type==='crew-editing'&&!x.data.dirty));
+''', before='''
+const messages=[];
+location.href='http://localhost/regions/south/crew?embedded=1';
+document.body={classList:{add(){}}};
+window.parent={postMessage(data,origin){messages.push({data,origin});}};
+''')

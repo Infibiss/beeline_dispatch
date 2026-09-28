@@ -95,7 +95,7 @@
   let records = [], filtered = [], selected = null;
   let map = null, mapLayer = null, mapBounds = null;
   const markers = new Map();
-  let tileState = 'Подложка OpenStreetMap загружается через интернет.';
+  let tileState = '';
   let geoStatus = '';
   const usingLeaflet = realGeography && Boolean(window.L);
 
@@ -127,7 +127,7 @@
       referrerPolicy:'strict-origin-when-cross-origin',
       maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openstreetmap.org/fixthemap">Исправить карту</a>'}).addTo(map);
     tiles.on('tileerror',()=>{ tileState='Подложка недоступна. Точки и маршруты сохранены; для карты нужен интернет.'; updateMapStatus(); });
-    tiles.on('tileload',()=>{ tileState='Подложка © OpenStreetMap · нужна сеть.'; updateMapStatus(); });
+    tiles.on('tileload',()=>{ tileState=''; updateMapStatus(); });
   }
   function updateMapStatus() { $('map-status').textContent = geoStatus + (usingLeaflet ? ' '+tileState : ''); }
   function empty(target,text) { target.replaceChildren(node('p',text,'empty')); }
@@ -171,12 +171,12 @@
     container.append(node('div',requestName(request.id),'card-id'),node('h3',request.address || 'Адрес не указан','card-address'),
       node('div',record.pendingReassignment?'Требует переназначения':visit?'Назначена · '+(record.engineer?.name || record.route.engineer_id):'Без назначения','card-state'+(visit && !record.pendingReassignment?'':' unassigned')));
     if(record.pendingReassignment)container.append(node('p','Прежний исполнитель недоступен или отказался от выезда. Ниже сохранено старое расписание для сравнения; назначение больше не считается действующим.','notice'));
-    const list=node('dl',null,'facts'), technical=node('dl',null,'facts');
+    const list=node('dl',null,'facts');
     fact(list,'Окно клиента',windows(request));
-    fact(list,'Продолжительность / тип работ',number(request.duration_minutes)+' мин · '+(SKILL[request.skill] || request.skill || '—'));
+    fact(list,'Работа на объекте',number(request.duration_minutes)+' мин · '+(SKILL[request.skill] || request.skill || '—'));
     if (visit) {
       fact(list,record.pendingReassignment?'Ранее: прибытие → начало → окончание':'Прибытие → начало → окончание',time(visit.arrival)+' → '+time(visit.start)+' → '+time(visit.end));
-      fact(list,'Предыдущий переезд / ожидание',number(visit.travel_minutes)+' мин · '+km(visit.distance_m)+' км / '+Math.max(0,visit.start-visit.arrival)+' мин');
+      fact(list,'Дорога / ожидание',number(visit.travel_minutes)+' мин · '+km(visit.distance_m)+' км / '+Math.max(0,visit.start-visit.arrival)+' мин');
       fact(list,'Инженер / транспорт',(record.engineer?.name || record.route.engineer_id)+' · '+(TRANSPORT[record.engineer?.transport] || record.engineer?.transport || '—'));
       if (record.engineer?.transport === 'public') {
         const index=record.route.visits.findIndex(v=>v.request_id===request.id);
@@ -186,26 +186,17 @@
         if (trip && trip.minutes === visit.travel_minutes && trip.metres === visit.distance_m) {
           const labels={walk:'Пешком',wait:'Ожидание',metro:'Метро',rail:'МЦД / МЦК',bus:'Автобус',tram:'Трамвай',alight:'Выход',transfer:'Пересадка',estimate:'Средняя оценка транспорта'};
           fact(list,'Состав переезда',trip.legs.map(x=>(labels[x.mode] || x.mode)+' '+x.minutes+' мин: '+x.origin+' → '+x.destination).join('; ') || 'В той же точке');
-          fact(list,'Точность транспорта',trip.kind==='walk'?'Пеший путь по дорожной матрице':trip.kind==='fallback'?'Вне покрытия метро: усреднённая оценка без известного маршрута':(geo.modes?.public?.pedestrian_access==='road-to-station-point'?'Пешие участки по дорожной сети. Наземный транспорт — оценки из GTFS, рельсовый — модель. Нет актуальных пробок и точного расписания отправления; входы не подтверждены.':'Неполная сеть метро; время, подходы и пересадки — оценки без расписания'));
+
         } else fact(list,'Состав переезда','Для этого участка детализация отсутствует; время указано по модели плана.');
       }
-      fact(technical,'Проверка назначения',visit.explanation || 'Допустимо по ограничениям модели');
     } else fact(list,'Причина',record.unassigned?.reason || (plans.length?'В плане нет назначения этой заявки.':'План ещё не рассчитан.'),'reason');
     const equipment=request.equipment || {};
     fact(list,'Оборудование для заявки','Роутеры: '+number(equipment.router)+' · ТВ-приставки: '+number(equipment.tv_box));
-    fact(list,'Приоритет / обязательный транспорт',priorityLabel(request.priority)+' / '+(TRANSPORT[request.required_transport] || request.required_transport || 'Любой'));
+    fact(list,'Приоритет',priorityLabel(request.priority));
+    if(request.required_transport)fact(list,'Нужен транспорт',TRANSPORT[request.required_transport] || request.required_transport);
     const location=locations[request.id];
-    if (validLocation(location)) fact(technical,'Координаты / качество',location.lat.toFixed(5)+', '+location.lon.toFixed(5)+' · '+({approximate:'Приблизительное расположение',manual:'Ручной выбор',building_match:'Совпадение здания'}[location.quality] || 'не указано'));
-    if (location?.quality === 'approximate') { fact(list,'Использованная точка',location.label); fact(list,'Допущение',location.approximation_reason,'reason'); }
-    fact(technical,'Источник координат',location?.source || (realGeography?'Координаты этой заявки отсутствуют':'Синтетические точки сценария'));
-    if (request.source_line != null) fact(technical,'Строка исходных данных',request.source_line);
+    if (location?.quality === 'approximate') fact(list,'Уточнить адрес',location.label || request.address,'reason');
     container.append(list);
-    const details=node('details',null,'provenance');
-    details.append(node('summary','Источники и проверка'),technical);
-    if (request.provenance && Object.keys(request.provenance).length) {
-      details.append(node('pre',JSON.stringify(request.provenance,null,2)));
-    }
-    container.append(details);
   }
   function renderSchedule() {
     const target=$('schedule');target.replaceChildren();

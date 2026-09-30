@@ -1,0 +1,211 @@
+{
+  "before": "8690613",
+  "after": "505ef0d",
+  "stock": "morning",
+  "rows": [
+    {
+      "region": "Восток",
+      "code_label": "before",
+      "budget_seconds": 3.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        202931
+      ],
+      "elapsed_seconds": 3.0019147919956595,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Восток",
+      "code_label": "after",
+      "budget_seconds": 3.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        202931
+      ],
+      "elapsed_seconds": 3.0017052500043064,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Восток",
+      "code_label": "after",
+      "budget_seconds": 10.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        187055
+      ],
+      "elapsed_seconds": 10.00194354201085,
+      "v2_absence_phases": true
+    },
+    {
+      "region": "Восток",
+      "code_label": "before",
+      "budget_seconds": 10.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        0,
+        13,
+        181882
+      ],
+      "elapsed_seconds": 10.001951084006578,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Юго-восток",
+      "code_label": "before",
+      "budget_seconds": 3.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        7,
+        11,
+        14,
+        566746
+      ],
+      "elapsed_seconds": 3.0659309169859625,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Юго-восток",
+      "code_label": "after",
+      "budget_seconds": 3.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        7,
+        11,
+        14,
+        566746
+      ],
+      "elapsed_seconds": 3.066951875021914,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Юго-восток",
+      "code_label": "after",
+      "budget_seconds": 10.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        7,
+        11,
+        14,
+        566331
+      ],
+      "elapsed_seconds": 10.068223209003918,
+      "v2_absence_phases": true
+    },
+    {
+      "region": "Юго-восток",
+      "code_label": "before",
+      "budget_seconds": 10.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        7,
+        11,
+        14,
+        566331
+      ],
+      "elapsed_seconds": 10.067204000020865,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Югоцентр",
+      "code_label": "before",
+      "budget_seconds": 3.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        171036
+      ],
+      "elapsed_seconds": 3.0031380000000354,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Югоцентр",
+      "code_label": "after",
+      "budget_seconds": 3.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        171036
+      ],
+      "elapsed_seconds": 3.003114999999525,
+      "v2_absence_phases": false
+    },
+    {
+      "region": "Югоцентр",
+      "code_label": "after",
+      "budget_seconds": 10.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        169992
+      ],
+      "elapsed_seconds": 10.003296625014627,
+      "v2_absence_phases": true
+    },
+    {
+      "region": "Югоцентр",
+      "code_label": "before",
+      "budget_seconds": 10.0,
+      "solver": "hybrid",
+      "seed": 0,
+      "valid": true,
+      "objective_key": [
+        0,
+        0,
+        1,
+        10,
+        170114
+      ],
+      "elapsed_seconds": 10.003527708002366,
+      "v2_absence_phases": false
+    }
+  ]
+}

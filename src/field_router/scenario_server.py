@@ -72,7 +72,7 @@ def validate_public_origin(value):
 def create_server(session,state_path,*,port=8766,time_limit=1,address_service=None,explainer=None,host='127.0.0.1',
                   gps_config=None,gps_model=None,disable_gps=False,tls_context=None,region_sources=None,accounts=None,regions=None,solver='hybrid',
                   morning_time_limit=None,public_origin=None,gps_routing=None,intake_token=None,demo_stream_requests=None,
-                  demo_reset_session=None,engineer_clock_now=None):
+                  demo_reset_session=None,engineer_clock_now=None,public_demo_login=False):
     public_origin = validate_public_origin(public_origin)
     # Windows spawn imports this module in the model child. Keep OR-Tools and
     # rendering imports inside the server entrypoints, outside that cold path.
@@ -150,7 +150,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
             if payload.get('demo_run_id')!=current:
                 raise ValueError('Сценарий уже перезапущен; загрузите текущую версию')
     from .auth_http import AuthHttp
-    auth=AuthHttp(accounts, regions, _STATIC, bool(tls_context) or bool(public_origin))
+    auth=AuthHttp(accounts, regions, _STATIC, bool(tls_context) or bool(public_origin), public_demo_login)
     from .gps.mobile import NativeGpsApi
     native_gps=NativeGpsApi(accounts, regions, bool(tls_context) or bool(public_origin), public_origin=public_origin)
     scheme='https' if tls_context else 'http'
@@ -808,6 +808,7 @@ def main(argv=None):
     parser.add_argument('--regions-dir',type=Path,help='Каталог сравнений регионов; по умолчанию соседние демо-участки')
     parser.add_argument('--port',type=int,default=8766)
     parser.add_argument('--host',default='127.0.0.1',help='IPv4 для прослушивания; 0.0.0.0 открывает доступ с телефона в локальной сети')
+    parser.add_argument('--public-demo-login', action='store_true', help='Показать опубликованные данные демо-входа')
     parser.add_argument('--public-origin',help='Внешний HTTPS origin за доверенным reverse proxy')
     parser.add_argument('--network',action='store_true',help='Разрешить поиск адресов через Photon и координатные запросы OSRM')
     parser.add_argument('--cache',type=Path,default=Path('output/geo-cache'))
@@ -848,7 +849,7 @@ def main(argv=None):
     server=create_server(session,args.state,port=args.port,time_limit=args.time_limit,morning_time_limit=args.morning_time_limit,solver=args.solver,explainer=explainer,address_service=AddressService(CachedHttp(args.cache),routed_access=True) if args.network else None,host=args.host,
                          gps_config=args.gps_config,gps_model=args.gps_model,disable_gps=args.disable_gps,tls_context=tls,
                          region_sources=discover_regions(args.comparison,args.state,args.regions_dir),accounts=accounts,
-                         public_origin=args.public_origin,gps_routing=args.gps_routing)
+                         public_origin=args.public_origin,gps_routing=args.gps_routing,public_demo_login=args.public_demo_login)
     print('Учётные записи: '+str(accounts.path.resolve()),flush=True)
     addresses=local_ipv4_addresses() if args.host=='0.0.0.0' else [args.host]
     for address in addresses:

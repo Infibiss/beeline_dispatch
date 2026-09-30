@@ -1,6 +1,6 @@
 """Build a tested main commit, push a private image, then request a Render deploy.
 
-Run only in the release workflow after checks. Secrets come from SourceCraft,
+Run only in the release workflow after checks. Secrets come from the CI secret store,
 not command arguments or the Docker build context. HTTP success means queued,
 not that Render has finished deploying.
 """
@@ -38,7 +38,7 @@ def publish(env=None, *, run=subprocess.run, trigger=trigger_deploy):
     env = dict(os.environ if env is None else env)
     token = env.get('DOCKERHUB_PUSH_TOKEN', '')
     if not token:
-        raise ValueError('Set SourceCraft secret DOCKERHUB_PUSH_TOKEN')
+        raise ValueError('Set CI secret DOCKERHUB_PUSH_TOKEN')
     mode = env.get('RENDER_TRIGGER', 'direct')
     if mode not in {'direct', 'dockerhub'}:
         raise ValueError('RENDER_TRIGGER must be direct or dockerhub')

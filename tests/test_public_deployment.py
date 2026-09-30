@@ -12,13 +12,15 @@ from test_replanning import demo
 
 
 @pytest.fixture
-def public_server(make_scenario, tmp_path):
+def public_server(make_scenario, tmp_path, request):
     scenario, plan = demo(make_scenario)
     accounts = AccountStore(tmp_path / 'accounts.sqlite3')
     accounts.bootstrap('test-cloud-password')
     server = create_server(ScenarioSession(scenario, plan), tmp_path / 'state.json',
                            port=0, disable_gps=True, accounts=accounts,
-                           public_origin='https://field-demo.onrender.com')
+                           public_origin='https://field-demo.onrender.com',
+                           public_demo_login=getattr(request, 'param', False))
+    server.public_demo_login = getattr(request, 'param', False)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield server
@@ -121,3 +123,34 @@ def test_cloud_restart_uses_fresh_state_and_preserves_inputs(tmp_path, monkeypat
     assert all(not path.exists() for path in calls)
     assert all(path.read_text() == 'fixture' for path in source.glob('*.json'))
     assert env['FIELD_ROUTER_ADMIN_PASSWORD'] not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('public_server', [False, True], indirect=True)
+def test_demo_credentials_only_on_explicit_public_demo(public_server):
+    status, _, body = request(public_server, '/login')
+    html = body.decode()
+    assert status == 200
+    enabled = public_server.public_demo_login
+    assert ('1f8ee261de8e35b09d38269b2bf34474' in html) == enabled
+    assert ('Демо-доступ' in html) == enabled
+    assert 'test-cloud-password' not in html
+    if enabled:
+        assert html.index('demo-access') > html.index('</form>')
+
+
+@pytest.mark.parametrize('password, exposed', [
+    ('1f8ee261de8e35b09d38269b2bf34474', True),
+    ('some-other-private-password', False),
+])
+def test_cloud_only_advertises_known_public_password(tmp_path, monkeypatch, password, exposed):
+    from field_router import cloud_demo, scenario_server
+    source = tmp_path / 'data' / 'demo-road'
+    source.mkdir(parents=True)
+    for region in ('Восток', 'Юго-восток', 'Югоцентр'):
+        (source / (region + '.json')).write_text('fixture')
+    calls = []
+    monkeypatch.setattr(scenario_server, 'main', calls.append)
+    monkeypatch.setenv('FIELD_ROUTER_ADMIN_PASSWORD', password)
+    monkeypatch.setenv('FIELD_ROUTER_PUBLIC_ORIGIN', 'https://demo.onrender.com')
+    cloud_demo.run(root=tmp_path)
+    assert ('--public-demo-login' in calls[0]) == exposed

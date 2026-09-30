@@ -6,6 +6,16 @@ from urllib.parse import urlsplit, parse_qs
 
 from .auth import AuthError
 
+# Explicitly published by the owner for the shared demonstration account.
+PUBLIC_DEMO_PASSWORD = "1f8ee261de8e35b09d38269b2bf34474"
+_DEMO_ACCESS = (
+    '<section class="demo-access" aria-labelledby="demo-access-title">'
+    '<h2 id="demo-access-title">Демо-доступ</h2>'
+    '<dl><div><dt>Логин</dt><dd><code>admin</code></dd></div>'
+    f'<div><dt>Пароль</dt><dd><code>{PUBLIC_DEMO_PASSWORD}</code></dd></div></dl>'
+    '</section>'
+)
+
 
 _BRAND_FILES = {
     '/brand.css': ('brand.css', 'text/css; charset=utf-8'),
@@ -15,8 +25,9 @@ _BRAND_FILES = {
 
 
 class AuthHttp:
-    def __init__(self, store, regions, static, secure):
+    def __init__(self, store, regions, static, secure, public_demo_login=False):
         self.store, self.regions, self.static, self.secure = store, regions, static, secure
+        self.public_demo_login = public_demo_login
 
     def cookie_name(self, handler):
         return 'field_router_' + str(handler.server.server_port)
@@ -83,7 +94,11 @@ class AuthHttp:
             if handler.command=='GET' and route in ('/login', '/login.js', '/auth.css'):
                 name = 'login.html' if route=='/login' else route[1:]
                 kind = 'text/html' if name.endswith('.html') else 'text/javascript' if name.endswith('.js') else 'text/css'
-                handler.reply(200, (self.static/name).read_bytes(), kind+'; charset=utf-8')
+                body = (self.static/name).read_bytes()
+                if name == 'login.html':
+                    body = body.replace(b'<!-- PUBLIC_DEMO_ACCESS -->',
+                                        _DEMO_ACCESS.encode() if self.public_demo_login else b'')
+                handler.reply(200, body, kind+'; charset=utf-8')
                 return True
             if handler.command=='POST' and route=='/api/auth/login':
                 payload = self.payload(handler)

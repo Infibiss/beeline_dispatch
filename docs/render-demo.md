@@ -34,7 +34,8 @@ Health Check Path: `/healthz`. Docker Command оставить пустым.
 - `YANDEX_MODEL`: выбранная модель (необязательно).
 - `YANDEX_LLM_MAX_CALLS=20`: лимит вызовов на процесс, сбрасывается при перезапуске.
 
-Не помещать `.env`, пароли, ключи registry или deploy hook в образ и Git.
+Не помещать `.env`, частные пароли, ключи registry или deploy hook в образ и Git.
+Исключение — явно опубликованный владельцем пароль общего демо-аккаунта.
 Пароль администратора публичного сервера не печатается в журнал.
 Перезапуск сервиса возвращает и начальный пароль из окружения.
 
@@ -51,20 +52,26 @@ Free засыпает после 15 минут без обращений; хол
 
 ## Автоматическое обновление
 
-SourceCraft остаётся основным репозиторием. Workflow `release` для push в main
-сначала выполняет `test-and-package`, затем собирает linux/amd64-образ и публикует
-единственный тег `docker.io/infibiss/field-router-demo:demo`. Docker Hub webhook
-вызывает Render с `imgURL` этого тега. Полный SHA сохранён в OCI-метке
-`org.opencontainers.image.revision` и журнале CI. Pull request запускает только `checks`. Доступ CI на запись и
-доступ Render только на чтение задаются отдельно. Публикацию из pull request
-не включать. Секреты передаются только кубику публикации.
+С 30.09.2026 основной репозиторий — приватный GitHub `Infibiss/lzt_beeline_tracker`.
+Рабочая папка — `/Users/infibiss/Desktop/lzt_beeline_tracker`. Прежнюю папку
+и SourceCraft запрещено изменять или использовать для push.
 
-`scripts/deploy_render.py` в CI использует `RENDER_TRIGGER=dockerhub` и секрет
-`DOCKERHUB_PUSH_TOKEN` (Read & Write без Delete). Deploy hook хранится в webhook
-приватного Docker Hub. Прямое соединение SourceCraft с `api.render.com` завершалось
-таймаутом; сохранённый ранее `RENDER_DEPLOY_HOOK` этим workflow не используется.
-Успешный CI означает публикацию; доставку webhook проверять в Docker Hub,
-а завершение запуска — по статусу Live в Render.
+Workflow `.github/workflows/ci.yml` на PR и push в main выполняет полный
+`sh scripts/check.sh`: Python-тесты, синтаксис JavaScript, сборку wheel и проверку
+ресурсов. После успешных проверок main собирает linux/amd64-образ и публикует
+единственный тег `docker.io/infibiss/field-router-demo:demo`. PR образ не публикуют.
+Полный SHA сохранён в OCI-метке `org.opencontainers.image.revision`.
+Публикации main выполняются последовательно, без отмены работающего деплоя.
+
+GitHub Actions secret `DOCKERHUB_PUSH_TOKEN` передаётся только задаче публикации;
+она использует `RENDER_TRIGGER=dockerhub`. Существующий Docker Hub webhook
+вызывает Render с тегом demo. Render сохраняет отдельный доступ только на чтение.
+Успешный CI означает публикацию; завершение обновления проверяется по статусу
+Live в Render и по странице `/login`.
+
+В приватном GitHub Free есть 2 000 минут Actions в месяц и 500 МБ артефактов.
+Отчёты тестов сохраняются на семь дней, зависимости кешируются. Текущий остаток
+зависит от остальных репозиториев владельца. Тариф: https://docs.github.com/en/billing/concepts/product-billing/github-actions.
 
 Webhook срабатывает на любой push репозитория, поэтому release публикует только
 `demo`, без второго SHA-тега. Не отправлять сюда экспериментальные образы:
@@ -73,7 +80,11 @@ Webhook срабатывает на любой push репозитория, по
 ему нужны оба секрета и доступ к API Render.
 
 Публичный адрес: https://beeline-field-router-demo.onrender.com.
-Логин `admin`, пароль задаётся владельцем в Render, в репозитории его нет.
+Логин `admin`. Владелец явно разрешил публикацию демо-пароля на странице входа.
+`cloud_demo` включает эту подсказку только при совпадении настроенного пароля
+с опубликованным `PUBLIC_DEMO_PASSWORD`; произвольные пароли из окружения не раскрываются.
+Обычный локальный запуск подсказку не показывает. Все гости демо имеют роль диспетчера
+и работают с общими данными. Другие секреты остаются только в окружении сервиса.
 
 На первом публичном прогоне подтверждены вход, расчёт трёх вариантов,
 ответ YandexGPT и применение плана. Затем запись факта превысила 512 МБ,
@@ -112,9 +123,11 @@ Docker Hub webhook получил HTTP 200 в 22:21 МСК, Render вышел в
 повторный расчёт Востока занял 27.7 с: бюджет поиска не включает всю подготовку
 и проверку результата. Это локальная проверка контейнера, не публичного Render.
 
-Для Render создан токен Docker Hub Read-only, для SourceCraft — отдельный
-Read & Write без Delete. Оба истекают 24.10.2026. Обновить их до этой даты:
-иначе CI перестанет публиковать образы, а Render — скачивать приватный образ.
+Для Render используется Docker Hub Read-only до **24.10.2026**.
+Для GitHub создан отдельный `GitHub lzt_beeline_tracker deploy`: Read & Write
+без Delete, до **30.10.2026**, сохранён в GitHub Actions secrets.
+Обновить эти доступы до истечения срока, иначе публикация или скачивание образа остановится.
+Прежний токен SourceCraft не используется новым workflow.
 
 Источники: https://render.com/docs/free,
 https://render.com/docs/deploying-an-image,

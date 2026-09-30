@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 from . import scenario_server
 from .auth import validate_password
+from .auth_http import PUBLIC_DEMO_PASSWORD
 
 
 def run(*, root=Path('.')):
@@ -41,6 +42,10 @@ def run(*, root=Path('.')):
             '--time-limit', str(scenario_server.DAY_TIME_LIMIT),
             '--morning-time-limit', str(scenario_server.MORNING_TIME_LIMIT),
         ]
+        # Never reveal an arbitrary deployment password. This credential was
+        # explicitly designated public by the demo owner.
+        if password == PUBLIC_DEMO_PASSWORD:
+            arguments += ['--public-demo-login']
         routing = os.environ.get('FIELD_ROUTER_GPS_ROUTING')
         if routing:
             arguments += ['--gps-routing', routing]

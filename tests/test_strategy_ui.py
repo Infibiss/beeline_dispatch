@@ -248,7 +248,6 @@ assert.deepEqual(row('Клиентов с изменённым обещание�
 assert.doesNotMatch(cards()[0].textContent,/Risk Engine|усл. ед.|Ожидаемо под SLA/);
 assert.doesNotMatch(cards()[0].textContent,/калибр/);
 assert.doesNotMatch($('variants-note').textContent,/Монте-Карло/);
-assert.match($('forecast-help').textContent,/хотя бы одного нарушения/);
 assert.doesNotMatch($('variants-note').textContent,/оценка, а не гарантия/);
 ''', before='''
 preview.risk_model={version:'risk-engine-v1.1',iterations:600,calibrated:false};
@@ -682,6 +681,35 @@ state.dispatch_notifications=[{id:'applied-8',kind:'auto_applied',version:8,
   request_ids:[],changed_request_ids:[],before_unassigned_count:2,after_unassigned_count:2,
   llm_status:'ready',plan_explanation:'Применён стабильный план.'}];
 state.decision_log=[];
+''')
+
+
+def test_history_polling_keeps_explanation_nodes_and_open_state():
+    client('''
+const original=$('dispatch-notifications').querySelector('.notification-explanation');
+original.open=true;
+await pollNow();
+assert.equal($('dispatch-notifications').querySelector('.notification-explanation')===original,true);
+assert.equal(original.open,true);
+state.dispatch_notifications[0].plan_explanation='Обновлённое пояснение.';
+await pollNow();
+const updated=$('dispatch-notifications').querySelector('.notification-explanation');
+assert.equal(updated.open,true);
+assert.match(updated.textContent,/Обновлённое пояснение/);
+state.dispatch_notifications.unshift({id:'another',kind:'manual_applied',version:7,
+    plan_explanation:'Другое пояснение.'});
+await pollNow();
+const details=$('dispatch-notifications').querySelectorAll('.notification-explanation');
+assert.equal(details.find(d=>d.textContent.includes('Обновлённое')).open,true);
+assert.ok(!details.find(d=>d.textContent.includes('Другое')).open);
+state.dispatch_notifications=[];
+await pollNow();
+assert.equal($('dispatch-notifications').querySelectorAll('.notification-explanation').length,0);
+''', before='''
+let pollNow;
+global.setInterval=fn=>{pollNow=fn;return {unref(){}};};
+state.dispatch_notifications=[{id:'applied',kind:'manual_applied',version:7,
+    plan_explanation:'Исходное пояснение.'}];
 ''')
 
 

@@ -400,7 +400,10 @@ textarea{padding:10px;width:100%;resize:vertical}label{font-size:12px;font-weigh
 
 .technical-data{padding:18px;margin:16px 0}.technical-data pre{max-height:480px;overflow:auto;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 
-#panel-risk>.risk-heading{float:none;justify-content:flex-end;margin:0 0 12px;flex-wrap:wrap}#panel-risk>.risk-section-label{clear:both}
+#panel-risk>.risk-heading{float:none;display:grid;grid-template-columns:minmax(0,1fr) auto;margin:0 0 12px}
+#panel-risk>.risk-heading>div:first-child{text-align:center}
+#panel-risk>.risk-section-label{clear:both}
+@media(max-width:900px){#panel-risk>.risk-heading{grid-template-columns:1fr}#panel-risk>.risk-heading>div:first-child{text-align:left}}
 #panel-settings>.page-heading,#panel-demo>.page-heading,#panel-technical>.page-heading{display:none}
 #status.attention:not(:empty){background:transparent;border-left:3px solid #e5c500;padding:3px 10px;color:#665810}
 /* Consistent form controls across operational and preparation screens. */

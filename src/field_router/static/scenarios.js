@@ -112,6 +112,7 @@
   };
   let state = null, batch = null, selected = null, busy = false, recommendation = null, recommendationPending = false, localScopeEngineerIds = [];
   let inboxSnapshot = null, lastSeenNotificationId = null, notificationsInitialized = false;
+  let renderedNotificationsKey = null;
   let streamDemoEnabled=false, streamRows=null, streamTimer=null, streamRunning=false;
   let demoEpoch=0, streamGeneration=0, demoResetting=false, streamLoading=false;
   const strategyNames = {sla:'Быстрее к аварии', stable:'Меньше изменений', cost:'Меньше дороги'};
@@ -232,6 +233,7 @@
   function clearDemoWorkspace() {
     stopStream();streamRows=null;streamLoading=false;
     inboxSnapshot=null;lastSeenNotificationId=null;notificationsInitialized=false;
+    renderedNotificationsKey=null;
     localScopeEngineerIds=[];clearGpsDelay();resetCandidates();
     $('decision-search').value='';$('decision-filter').value='all';
     for(const id of ['event-form','facts-form'])$(id).reset?.();
@@ -569,43 +571,53 @@
     const labels={incoming:'Поступление',auto_applied:'Автопилот',manual_applied:'План применён',planning_mode:'Режим изменён',
       explanation_ready:'Пояснение готово',
       auto_error:'Нужно вмешательство',auto_gps_error:'Проверить GPS-пересчёт',replan_required:'Требуется пересчёт'};
-    $('dispatch-notifications').replaceChildren(...(notifications.length ? [...notifications].reverse().map(item=>{
-      const card=element('article',null,'notification-card');
-      const head=element('div',null,'notification-card-head');
-      head.append(element('span',labels[item.kind] || 'Событие','notification-kind'),
-        element('small',`${item.time ? new Date(item.time).toLocaleString('ru-RU') : 'Время не указано'} · план №${item.version ?? '—'}`,'hint'));
-      card.append(head,element('strong',item.title || 'Событие'),element('p',item.text || ''));
-      if(['auto_applied','manual_applied'].includes(item.kind)){
-        const before=item.assignment_comparison?.before_assigned,after=item.assignment_comparison?.after_assigned;
-        if(before!=null && after!=null)
-          card.append(element('small',`В остатке дня назначено: ${before} → ${after}.`,'hint'));
-        if(item.backlog_attempted_request_ids?.length)
-          card.append(element('small',`Перепроверено ранее нераспределённых: ${item.backlog_attempted_request_ids.length}; назначено: ${item.recovered_request_ids?.length || 0}.`,'hint'));
-        if(item.plan_explanation){
-          const detail=element('details',null,'notification-explanation');
-          detail.append(element('summary','Почему применён этот план'),element('p',item.plan_explanation));
-          card.append(detail);
+    const notificationList=$('dispatch-notifications');
+    const notificationKey=JSON.stringify(notifications);
+    if(notificationKey!==renderedNotificationsKey){
+      const expanded=new Set([...notificationList.querySelectorAll('.notification-card')]
+        .filter(card=>card.querySelector('.notification-explanation')?.open)
+        .map(card=>card.dataset.notificationId));
+      notificationList.replaceChildren(...(notifications.length ? [...notifications].reverse().map(item=>{
+        const card=element('article',null,'notification-card');
+        card.dataset.notificationId=item.id;
+        const head=element('div',null,'notification-card-head');
+        head.append(element('span',labels[item.kind] || 'Событие','notification-kind'),
+          element('small',`${item.time ? new Date(item.time).toLocaleString('ru-RU') : 'Время не указано'} · план №${item.version ?? '—'}`,'hint'));
+        card.append(head,element('strong',item.title || 'Событие'),element('p',item.text || ''));
+        if(['auto_applied','manual_applied'].includes(item.kind)){
+          const before=item.assignment_comparison?.before_assigned,after=item.assignment_comparison?.after_assigned;
+          if(before!=null && after!=null)
+            card.append(element('small',`В остатке дня назначено: ${before} → ${after}.`,'hint'));
+          if(item.backlog_attempted_request_ids?.length)
+            card.append(element('small',`Перепроверено ранее нераспределённых: ${item.backlog_attempted_request_ids.length}; назначено: ${item.recovered_request_ids?.length || 0}.`,'hint'));
+          if(item.plan_explanation){
+            const detail=element('details',null,'notification-explanation');
+            detail.append(element('summary','Почему применён этот план'),element('p',item.plan_explanation));
+            detail.open=expanded.has(item.id);
+            card.append(detail);
+          }
+          if(item.llm_status==='unavailable')
+            card.append(element('small','Не удалось получить пояснение с ИИ.','hint'));
         }
-        if(item.llm_status==='unavailable')
-          card.append(element('small','Не удалось получить пояснение с ИИ.','hint'));
-      }
-      const left=(item.unassigned_request_ids || []).length;
-      if(left)card.append(element('p',`После этого решения без исполнителя: ${left}`,'notification-attention'));
-      if(item.cancelled_request_ids?.length)card.append(element('p',`Отменено и удалено из плана: ${item.cancelled_request_ids.length}.`,'hint'));
-      if((item.request_ids || []).length)card.append(element('small',`Заявок в событии: ${item.request_ids.length}`,'hint'));
-      if((item.changed_request_ids || []).length)card.append(element('small',`Изменены назначения: ${item.changed_request_ids.length}. Причины — в журнале справа.`,'hint'));
-      if(['auto_error','auto_gps_error','replan_required'].includes(item.kind) || left) {
-        const gpsFailure=item.kind==='auto_gps_error';
-        const action=element('button',gpsFailure?'Проверить варианты':'Открыть заявки','secondary');action.type='button';
-        action.addEventListener('click',()=>{
-          if(!gpsFailure){openReplanningPool();return;}
-          if(busy||!state)return;
-          activateTab('events');$('event-type').value='replan';targets();resetCandidates();
-          $('manual-event-panel').scrollIntoView({block:'start'});$('preview').focus();
-        });card.append(action);
-      }
-      return card;
-    }) : [element('p','Событий пока нет. Новые заявки и перепланирования появятся здесь.','hint')]));
+        const left=(item.unassigned_request_ids || []).length;
+        if(left)card.append(element('p',`После этого решения без исполнителя: ${left}`,'notification-attention'));
+        if(item.cancelled_request_ids?.length)card.append(element('p',`Отменено и удалено из плана: ${item.cancelled_request_ids.length}.`,'hint'));
+        if((item.request_ids || []).length)card.append(element('small',`Заявок в событии: ${item.request_ids.length}`,'hint'));
+        if((item.changed_request_ids || []).length)card.append(element('small',`Изменены назначения: ${item.changed_request_ids.length}. Причины — в журнале справа.`,'hint'));
+        if(['auto_error','auto_gps_error','replan_required'].includes(item.kind) || left) {
+          const gpsFailure=item.kind==='auto_gps_error';
+          const action=element('button',gpsFailure?'Проверить варианты':'Открыть заявки','secondary');action.type='button';
+          action.addEventListener('click',()=>{
+            if(!gpsFailure){openReplanningPool();return;}
+            if(busy||!state)return;
+            activateTab('events');$('event-type').value='replan';targets();resetCandidates();
+            $('manual-event-panel').scrollIntoView({block:'start'});$('preview').focus();
+          });card.append(action);
+        }
+        return card;
+      }) : [element('p','Событий пока нет. Новые заявки и перепланирования появятся здесь.','hint')]));
+      renderedNotificationsKey=notificationKey;
+    }
     const decisions=data.decision_log || [];
     const assignments=new Map(current ? (state.plan?.routes || []).flatMap(route=>(route.visits || []).map(visit=>[visit.request_id,{engineer_id:route.engineer_id,start:visit.start}])) : []);
     const unresolved=new Set(current ? (state.plan?.unassigned || []).map(item=>item.request_id) : []);

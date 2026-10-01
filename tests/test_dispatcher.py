@@ -70,7 +70,6 @@ console.log(JSON.stringify({current:core.assignmentExplanation(record,scenario),
     assert 'Локальные работы' in text and 'Место 1 из 2' in text
     assert 'Второй адрес' in text and 'ожидание 10 мин' in text
     assert payload['current']['stored']=='Сохранённое <b>объяснение</b>'
-    assert 'оптимального' in payload['current']['notice']
 
 
 def test_assignment_explanation_does_not_invent_missing_qualifications():

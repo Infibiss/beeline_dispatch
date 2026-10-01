@@ -85,7 +85,7 @@
     if(loadout && stock) lines.push(loadout.router<=stock.router && loadout.tv_box<=stock.tv_box ?
       'Оборудования хватает на весь этот маршрут с учётом остальных заявок.' : 'Оборудование для всего маршрута требует повторной проверки.');
     else if(request.equipment?.router || request.equipment?.tv_box) lines.push('Потребность в оборудовании учтена в плане; фактическую выдачу нужно подтвердить.');
-    return {stale,lines,stored:visit.explanation || '',notice:'Объяснение допустимости выбранного порядка, а не доказательство единственного или оптимального маршрута.'};
+    return {stale,lines,stored:visit.explanation || ''};
   }
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {timelineSegments,buildRecords,filterRecords,validLocation,routeCoordinates,nearestPointId,priorityLabel,prioritySummary,assignmentExplanation};
@@ -282,7 +282,7 @@
       if(explanation.stored) {
         const details=node('details');details.append(node('summary','Сохранённое объяснение расчёта'),node('p',explanation.stored));section.append(details);
       }
-      section.append(node('p',explanation.notice,'muted'));container.append(section);
+      container.append(section);
     }
     const diagnosis=plan.diagnostics?.unassigned_diagnostics?.[request.id];
     if(!visit && diagnosis) {

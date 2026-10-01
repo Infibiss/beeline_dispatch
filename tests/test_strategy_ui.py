@@ -713,6 +713,38 @@ state.dispatch_notifications=[{id:'applied',kind:'manual_applied',version:7,
 ''')
 
 
+def test_history_uses_structured_facts_instead_of_dense_model_prose():
+    client('''
+const detail=$('dispatch-notifications').querySelector('.notification-explanation');
+assert.ok(detail.querySelector('.explanation-card'));
+assert.match(detail.textContent,/Добавлено новых заявок: 1/);
+assert.match(detail.textContent,/Прежние исполнители и время визитов сохранены/);
+assert.match(detail.textContent,/Все рассчитанные варианты дали одинаковые назначения/);
+assert.doesNotMatch(detail.textContent,/P\\(SLA\\)|Получен один уникальный план|Сплошной технический текст/);
+assert.ok(detail.querySelector('ul'));
+''', before='''
+state.dispatch_notifications=[{id:'applied',kind:'manual_applied',version:7,
+  plan_explanation:'Сплошной технический текст P(SLA).',
+  created_request_ids:['request:new'],changed_request_ids:[],lost_request_ids:[],
+  explanation_card:{label:'Меньше изменений',summary:'Назначено 67 из 67 заявок.',
+    reasons:['Получен один уникальный план; отдельной альтернативы для сравнения нет.'],
+    tradeoffs:[],attention:[]}}];
+''')
+
+
+def test_history_lists_cancellation_separately_from_changed_assignments():
+    client('''
+const detail=$('dispatch-notifications').querySelector('.notification-explanation');
+assert.match(detail.textContent,/Отменено заявок: 1/);
+assert.doesNotMatch(detail.textContent,/Изменены назначения|Прежние исполнители/);
+''', before='''
+state.dispatch_notifications=[{id:'cancel',kind:'manual_applied',version:8,
+  changed_request_ids:['request:cancel'],cancelled_request_ids:['request:cancel'],
+  lost_request_ids:[],explanation_card:{label:'Меньше изменений',summary:'Назначено 66 из 66 заявок.',
+    reasons:[],tradeoffs:[],attention:[]}}];
+''')
+
+
 def test_application_keeps_verified_explanation_when_model_unavailable():
     client('''
 assert.match($('application-visual-explanation').textContent,/Почему выбран этот вариант/);

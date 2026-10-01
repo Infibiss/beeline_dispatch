@@ -264,6 +264,11 @@ summary { cursor: pointer; }
 .notification-explanation{margin-top:8px;padding:8px 10px;border-radius:8px;background:#f6f6f6;font-size:12px}
 .notification-explanation>summary{cursor:pointer;font-weight:650}
 .notification-explanation p{white-space:pre-line;overflow-wrap:anywhere;margin:7px 0}
+.notification-explanation .explanation-card{padding:6px 2px}
+.notification-explanation .explanation-card h4{font-size:14px;margin:8px 0}
+.notification-explanation .explanation-card .explanation-summary{font-size:13px}
+.notification-explanation .explanation-section{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.notification-explanation .explanation-section ul{margin:6px 0 0;padding-left:18px;display:grid;gap:6px}
 @media(max-width:800px){.application-metrics{grid-template-columns:1fr}.application-change>summary{align-items:flex-start;flex-direction:column}.application-change-heading{flex-wrap:wrap}.application-change-route{white-space:normal}.application-change-body{padding-left:0}}
 #panel-events .intake-panel{margin:10px 0}
 .replan-disclosure{margin:10px 0}
@@ -401,7 +406,7 @@ textarea{padding:10px;width:100%;resize:vertical}label{font-size:12px;font-weigh
 .technical-data{padding:18px;margin:16px 0}.technical-data pre{max-height:480px;overflow:auto;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 
 #panel-risk>.risk-heading{float:none;display:grid;grid-template-columns:minmax(0,1fr) auto;margin:0 0 12px}
-#panel-risk>.risk-heading>div:first-child{text-align:center}
+#panel-risk>.risk-heading>div:first-child{text-align:left}
 #panel-risk>.risk-section-label{clear:both}
 @media(max-width:900px){#panel-risk>.risk-heading{grid-template-columns:1fr}#panel-risk>.risk-heading>div:first-child{text-align:left}}
 #panel-settings>.page-heading,#panel-demo>.page-heading,#panel-technical>.page-heading{display:none}

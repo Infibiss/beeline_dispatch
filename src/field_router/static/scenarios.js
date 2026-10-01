@@ -590,9 +590,12 @@
             card.append(element('small',`В остатке дня назначено: ${before} → ${after}.`,'hint'));
           if(item.backlog_attempted_request_ids?.length)
             card.append(element('small',`Перепроверено ранее нераспределённых: ${item.backlog_attempted_request_ids.length}; назначено: ${item.recovered_request_ids?.length || 0}.`,'hint'));
-          if(item.plan_explanation){
+          if(item.explanation_card || item.plan_explanation){
             const detail=element('details',null,'notification-explanation');
-            detail.append(element('summary','Почему применён этот план'),element('p',item.plan_explanation));
+            detail.append(element('summary','Почему применён этот план'));
+            const content=element('div');
+            renderHistoryExplanation(content,item);
+            detail.append(content);
             detail.open=expanded.has(item.id);
             card.append(detail);
           }
@@ -922,11 +925,34 @@
     const candidate = data.candidates.find(c => c.id === id);
     return candidate?.duplicate_of ? data.candidates.find(c => c.id === candidate.duplicate_of) : candidate;
   }
-  function renderExplanationCard(target, card, {applied=false,ai=false,unavailable=false}={}) {
+  function renderHistoryExplanation(target,item) {
+    const saved=item.explanation_card;
+    if(!saved){
+      for(const paragraph of (item.plan_explanation || '').split('\n').filter(Boolean))
+        target.append(element('p',paragraph));
+      return;
+    }
+    const changes=[];
+    const changed=(item.changed_request_ids || []).filter(id=>!item.cancelled_request_ids?.includes(id));
+    if(item.created_request_ids?.length)changes.push(`Добавлено новых заявок: ${item.created_request_ids.length}.`);
+    if(changed.length)changes.push(`Изменены назначения у ${changed.length} прежних заявок.`);
+    else if(Array.isArray(item.changed_request_ids) && Array.isArray(item.lost_request_ids) &&
+            !item.lost_request_ids.length && !item.cancelled_request_ids?.length)
+      changes.push('Прежние исполнители и время визитов сохранены.');
+    if(item.cancelled_request_ids?.length)changes.push(`Отменено заявок: ${item.cancelled_request_ids.length}.`);
+    const reasons=(saved.reasons || []).map(text=>text.startsWith('Получен один уникальный план')
+      ? 'Все рассчитанные варианты дали одинаковые назначения.'
+      : text.replace('Предотвратимых смен исполнителя:', 'Смен исполнителя, которых можно избежать:'));
+    renderExplanationCard(target,{...saved,changes,reasons},{applied:true,history:true});
+  }
+  function renderExplanationCard(target, card, {applied=false,ai=false,unavailable=false,history=false}={}) {
     target.replaceChildren();
     const box=element('div',null,'explanation-card');
     box.append(element('h4',(applied?'Применён вариант':'Рекомендуем')+' «'+card.label+'»'),element('p',card.summary,'explanation-summary'));
-    for(const [key,label] of [['reasons','Почему'],['tradeoffs','Компромисс'],['attention',applied?'Требует внимания':'Перед применением']]) {
+    const sections=history
+      ? [['changes','Что изменилось'],['reasons','Почему выбран этот вариант'],['tradeoffs','Что пришлось изменить'],['attention','Что проверить']]
+      : [['reasons','Почему'],['tradeoffs','Компромисс'],['attention',applied?'Требует внимания':'Перед применением']];
+    for(const [key,label] of sections) {
       if(!card[key]?.length)continue;
       const section=element('div',null,'explanation-section'+(key==='attention'?' explanation-attention':''));
       section.append(element('strong',label));

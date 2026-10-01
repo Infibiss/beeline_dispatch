@@ -150,7 +150,16 @@ def test_gps_solver_failure_keeps_original_session_and_intake_still_works(make_s
     policy.failed(proposals)
     assert policy.collect(session,gps)==[]
     session.receive_requests({'requests':[{**incoming(key),'time':'10:00'} for key in ('one','two','three')]})
-    assert apply_autopilot(session,time_limit=.02)
+    # The old human trip still says five minutes remain. At 10:00 it already
+    # misses the published 10:00 start: intake cannot silently move that promise
+    # after a rejected GPS estimate. The dispatcher must resolve the facts.
+    before=deepcopy(session.dump())
+    with pytest.raises(ValueError,match='[Пп]ересч'):
+        apply_autopilot(session,time_limit=.02)
+    assert session.dump()==before
+    assert all(item['status']=='new' for item in session.incoming_requests)
+    batch=session.preview({'version':session.version,'event':{'id':'manual-repair','type':'replan','time':600}},time_limit=.02)
+    session.approve({'version':session.version,'batch_id':batch['id'],'candidate_id':'stable'})
     assert session.gps_travel_estimates=={}
 
 
@@ -210,6 +219,22 @@ def test_gps_batch_includes_new_requests_below_intake_threshold(make_scenario):
     batch,_=apply_autopilot(session,time_limit=.02,gps_proposals=proposals)
     assert batch['incoming_ids']==['new-job']
     assert session.incoming_requests[0]['status']!='new'
+
+
+def test_previously_applied_gps_estimate_does_not_waive_ordinary_intake_preservation(make_scenario, monkeypatch):
+    session=ready_session(make_scenario)
+    gps,policy,proposals=collect_ready(session)
+    apply_autopilot(session,time_limit=.02,gps_proposals=proposals)
+    assert session.gps_travel_estimates
+    session.set_planning_settings({'version':session.version,'mode':'autopilot',
+        'every_n_requests':1,'every_n_minutes':None})
+    session.receive_requests({'request':{**incoming('ordinary-after-gps'),'time':600}})
+    def forbidden(*args,**kwargs):
+        pytest.fail('An already applied GPS overlay is not a new operational trigger')
+    monkeypatch.setattr('field_router.replanning.get_solver',forbidden)
+    batch,_=apply_autopilot(session,time_limit=.02)
+    assert batch['insertion_policy']=='preserve_existing_assignments_and_starts'
+    assert next(v['start'] for r in batch['frozen'] for v in r['visits'] if v['request_id']=='a')==612
 
 
 def test_failure_diagnostic_preserves_plan_previews_and_intake_retry(make_scenario):

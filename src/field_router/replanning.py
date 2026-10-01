@@ -17,7 +17,7 @@ from .validation import require_valid
 from .objectives import objective_key, reference_visits, response_targets
 from .recommendation import LABELS, STRATEGY_ORDER, eligible_candidates
 from .solvers.selection import get_solver
-from .ordinary_insertion import PRESERVATION_ERROR, insertion_candidates
+from .ordinary_insertion import PRESERVATION_ERROR, batch_insertion_candidates
 from .assignment_diagnostics import annotate_unassigned
 from .completion import pending_completions
 from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_config,
@@ -1058,7 +1058,8 @@ class ScenarioSession:
                 excluded.pop(eid)
         return set(excluded)
 
-    def _residual(self,event,allow_redirect,preserve=True,activation_ids=(),activation_window=None):
+    def _residual(self,event,allow_redirect,preserve=True,activation_ids=(),activation_window=None,*,keep_promises=None):
+        if keep_promises is None:keep_promises=event.type=='new_request'
         s=self.scenario
         now=event.time
         if self.activated_off_duty_windows:
@@ -1120,7 +1121,7 @@ class ScenarioSession:
         prior_frozen=deepcopy(self.frozen)
         if self.statuses:s,routes,prior_frozen=apply_observations(self,s,routes,prior_frozen,now,
             allow_redirect=allow_redirect and event.type=='emergency')
-        if event.type=='new_request':
+        if keep_promises:
             # An observation may replace an old route with its current trip.
             # Keep that trip's promised service start before freezing it too.
             promised={v['request_id']:v['start'] for r in self.frozen for v in r['visits']}
@@ -1275,6 +1276,7 @@ class ScenarioSession:
         arrivals=([(event,None)] if event.type in ('emergency','new_request') else [])+[
             (Event.model_validate(item['event']),item) for item in self.incoming_requests
             if item['status']=='new']
+        arrival_keys=set()
         for arrival,incoming in arrivals:
             if arrival.anchor_id=='office':source_address=s.office_address
             elif incoming is not None:source_address=incoming['address']
@@ -1282,7 +1284,17 @@ class ScenarioSession:
             else:source_address=self.geo_locations[arrival.anchor_id].original_address or self.geo_locations[arrival.anchor_id].label
             key=('emergency:' if arrival.type=='emergency' else 'request:')+arrival.id
             if key in self.catalog:raise ValueError('ID новой заявки уже существует')
-            if key in points:raise ValueError('ID заявки пересекается с дорожной точкой')
+            # A successful road preview retains aliases for its saved variants.
+            # The same queued request may be previewed again or later admitted
+            # by autopilot; only reuse its matching generated alias, never a
+            # registered road point or another arrival in this batch.
+            reusable=(incoming is not None and self.geography is not None
+                and key not in self.geography.locations and key not in arrival_keys
+                and self.aliases.get(key)==self.aliases.get(arrival.anchor_id,arrival.anchor_id)
+                and self.aliases.get(key)!=key and points.get(key)==points[arrival.anchor_id])
+            if key in arrival_keys or (key in points and not reusable):
+                raise ValueError('ID заявки пересекается с дорожной точкой')
+            arrival_keys.add(key)
             points[key]=points[arrival.anchor_id]
             self._alias_location(key,arrival.anchor_id)
             if arrival.type=='emergency':
@@ -1337,6 +1349,34 @@ class ScenarioSession:
             # aliases behind in a subsequently persisted working day.
             self.aliases=aliases;self.geo_locations=locations
             raise
+
+    def _ordinary_intake_policy(self,event,protect_approved):
+        pending=[item for item in self.incoming_requests if item['status']=='new']
+        if event.type not in ('new_request','replan') or any(item['event']['type']=='emergency' for item in pending):
+            return False
+        if event.type=='new_request':return True
+        if not pending:return False
+        from .gps.autopilot import travel_estimate
+        estimates=[estimate for eid,fact in self.statuses.items()
+                   if (estimate:=travel_estimate(self,eid,fact,event.time)) is not None]
+        if estimates and (not protect_approved or any(estimate['version']==self.version for estimate in estimates)):
+            # A newly staged verified delay is independent of intake. Previously
+            # applied overlays do not authorize another automatic reshuffle.
+            return False
+        if protect_approved:return True
+        # The dispatcher may explicitly recalculate unresolved facts. Receiving
+        # ordinary JSON also sets needs_replanning, but is not itself such a fact.
+        if self.pending_report_ids:return False
+        promised={v['request_id']:v['start'] for r in self.frozen for v in r['visits']}
+        promised.update({v.request_id:v.start for r in self.plan.routes for v in r.visits})
+        if any(fact['status']=='traveling' and fact.get('request_id') in promised and
+               event.time+fact.get('remaining_minutes',0)>promised[fact['request_id']]
+               for fact in self.statuses.values()):
+            return False  # Explicit manual replan resolves the stale trip estimate.
+        for row in reversed(self.history):
+            if row.get('candidate_id') or row['event']['type']=='crew':break
+            if row['event']['type']!='planning_mode':return False
+        return True
 
     def _preview(self,payload,*,time_limit=1,solver='hybrid'):
         if payload.get('version')!=self.version:raise ValueError('Устаревшая версия плана; обновите состояние')
@@ -1411,14 +1451,15 @@ class ScenarioSession:
                 raise ValueError('Нельзя вызвать сотрудника в период подтверждённой недоступности')
         elif confirmation or escalation_reason or activation_window:
             raise ValueError('Выберите сотрудника для явной эскалации')
+        ordinary_intake=self._ordinary_intake_policy(event,protect_approved)
         s,frozen,inventory=self._residual(event,payload.get('allow_redirect',False),True,
-            activation_ids,activation_window)
+            activation_ids,activation_window,keep_promises=ordinary_intake)
         travel=self._travel(s)
         ref_routes={r.engineer_id:r for r in self.plan.routes}
         for frozen_route in self.frozen:
             eid=frozen_route['engineer_id']
             visits=[Visit.model_validate({k:v[k] for k in Visit.model_fields}) for v in frozen_route['visits']
-                    if event.type!='new_request' or not v.get('fact_id')]
+                    if not ordinary_intake or not v.get('fact_id')]
             if eid in ref_routes:
                 ref_routes[eid]=ref_routes[eid].model_copy(update={'visits':visits+ref_routes[eid].visits})
             else:
@@ -1442,13 +1483,16 @@ class ScenarioSession:
             application_risk_config(risk_seed),
             service_observations=duration_evidence.observations,
             service_group_key=duration_evidence.group_key(self))
-        if event.type=='new_request':
-            pool=insertion_candidates(s,travel,reference,'request:'+event.id)
+        if ordinary_intake:
+            new_ids={r.id for r in s.requests}-set(self.catalog)
+            insertion_targets=new_ids | ({u.request_id for u in reference.unassigned if u.request_id in {r.id for r in s.requests}}
+                               if event.type=='replan' else set())
+            pool=batch_insertion_candidates(s,travel,reference,insertion_targets)
         else:
             backend=get_solver(solver)
             pool=[backend.solve(s,travel,time_limit_seconds=time_limit,profile=p,reference=reference,focus_request_id=focus) for p in ('sla','stable','cost')]
         protected=set()
-        if event.type=='replan':
+        if event.type=='replan' and not ordinary_intake:
             # All residual jobs, including previously unassigned requests and
             # the whole new intake batch, are considered by the solvers above.
             # Their coverage-first objective can nevertheless evict a visit
@@ -1567,9 +1611,9 @@ class ScenarioSession:
         for candidate in batch['candidates']:
             candidate['explanation_card']=build_card(batch,candidate)
         batch['response_focus_request_id']=focus
-        if event.type=='new_request':
+        if ordinary_intake:
             batch['insertion_policy']='preserve_existing_assignments_and_starts'
-            batch['notice']+=' Обычная новая заявка добавляется только в свободный интервал; владельцы, порядок и начало прежних работ сохраняются.'
+            batch['notice']+=' Обычные заявки добавляются только в свободные интервалы; владельцы, порядок и начало прежних работ сохраняются.'
         if event.type=='emergency':
             batch['notice']+=' 120 минут от поступления до начала работ — ориентир реакции; превышение показано и не запрещает назначение.'
             if activation_ids:

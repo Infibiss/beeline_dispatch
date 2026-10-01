@@ -1,6 +1,6 @@
-"""Insert one ordinary arrival without changing existing appointment promises."""
+"""Insert ordinary arrivals without changing existing appointment promises."""
 from .models import Equipment, Metrics, Plan, Route, Unassigned, Visit
-from .planning import compatible
+from .planning import compatible, explain_unassigned
 from .validation import require_valid
 
 
@@ -47,9 +47,14 @@ def _fixed_route(engineer, ids, jobs, starts, travel):
 def _plan(scenario, routes, old_unassigned, new_id, *, assigned):
     unassigned = list(old_unassigned)
     if not assigned:
-        unassigned.append(Unassigned(request_id=new_id, code='NO_FREE_GAP',
+        request=next(r for r in scenario.requests if r.id==new_id)
+        # Preserve proven skill/transport/availability codes. With no compatible
+        # crew explain_unassigned stops before any travel-dependent search.
+        unresolved=(explain_unassigned(request,scenario,None) if not any(
+            compatible(request,e) for e in scenario.engineers) else Unassigned(request_id=new_id, code='NO_FREE_GAP',
             reason='Нет допустимого свободного интервала с нужным навыком и выданными устройствами '
                    'при сохранении владельцев, порядка и начала прежних работ.'))
+        unassigned.append(unresolved)
     return Plan(solver='ordinary_gap_insertion', status='feasible', scenario_id=scenario.id,
         routes=routes, unassigned=unassigned,
         metrics=Metrics(assigned=sum(len(r.visits) for r in routes), unassigned=len(unassigned),
@@ -79,7 +84,7 @@ def insertion_candidates(scenario, travel, reference, new_id):
         if fixed is None:
             raise ValueError(PRESERVATION_ERROR)
         sequences[engineer.id], routes[engineer.id] = ids, fixed
-    old_unassigned = [u for u in reference.unassigned if u.request_id in jobs]
+    old_unassigned = [u for u in reference.unassigned if u.request_id in jobs and u.request_id != new_id]
     baseline = _plan(scenario, list(routes.values()), old_unassigned, new_id, assigned=False)
     try:
         require_valid(scenario, travel, baseline)
@@ -97,3 +102,46 @@ def insertion_candidates(scenario, travel, reference, new_id):
             plan = _plan(scenario, list(changed.values()), old_unassigned, new_id, assigned=True)
             candidates.append(require_valid(scenario, travel, plan))
     return candidates
+
+
+def batch_insertion_candidates(scenario, travel, reference, target_ids, *, beam_width=12):
+    """Bounded gap search; every path keeps the published owners/order/starts.
+
+    Retry backlog alongside new arrivals, in priority then input order. Each
+    stage fixes the arrivals already placed on that path. Retain distinct best
+    paths across all three profiles; this is a heuristic, not an optimality
+    certificate. Future targets are absent from staged validation, then every
+    final candidate is validated against the complete scenario.
+    """
+    from .objectives import objective_key
+    if beam_width < 3:
+        raise ValueError('Gap search needs at least three retained paths')
+    requested = set(target_ids)
+    priority = {'urgent': 0, 'high': 1, 'normal': 2}
+    targets = sorted((r for r in scenario.requests if r.id in requested), key=lambda r: priority[r.priority])
+    if {r.id for r in targets} != requested:
+        raise ValueError('Unknown insertion target')
+    beam = [reference]
+    included = {r.id for r in scenario.requests if r.id not in requested}
+    profiles = ('sla', 'stable', 'cost')
+    for request in targets:
+        included.add(request.id)
+        stage = scenario.model_copy(update={'requests': [r for r in scenario.requests if r.id in included]})
+        distinct = {}
+        for previous in beam:
+            for plan in insertion_candidates(stage, travel, previous, request.id):
+                signature = tuple(sorted((r.engineer_id, tuple((v.request_id, v.start) for v in r.visits))
+                                         for r in plan.routes))
+                distinct.setdefault(signature, plan)
+        ranked = [sorted(distinct.values(), key=lambda p: objective_key(p, stage, profile=profile, reference=reference))
+                  for profile in profiles]
+        beam, seen = [], set()
+        for choices in zip(*ranked):
+            for plan in choices:
+                if id(plan) not in seen:
+                    beam.append(plan); seen.add(id(plan))
+                    if len(beam) == beam_width:
+                        break
+            if len(beam) == beam_width:
+                break
+    return [require_valid(scenario, travel, plan) for plan in beam]

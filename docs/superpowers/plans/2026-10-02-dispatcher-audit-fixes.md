@@ -45,10 +45,10 @@ Verification: full check 1109 passed, 1 skipped; JS syntax and wheel resources p
 
 Files: `ordinary_insertion.py`, `replanning.py`, intake tests and insertion tests; operational contract documentation.
 
-- [ ] Write failing tests for manual and automatic ordinary batches, several arrivals, impossible arrivals, and batches mixed with a new emergency. Check every candidate, not only the recommendation. Include changed facts/absence and restore/atomic approval boundaries.
-- [ ] Classify pending ordinary arrivals in the existing preview flow. With only ordinary arrivals and no operational changes requiring an independent replan, enumerate feasible insertions in deterministic input order; preserve all previously assigned engineers, relative order and start minutes, and retain unassigned reasons. Carry the newly assigned arrivals into the reference for subsequent insertion. Bound retained candidates rather than creating an unbounded Cartesian product; document heuristic coverage, never claim global optimality.
-- [ ] If actual facts make the old promises infeasible, require an explicit ordinary replan instead of silently moving promises just to accept the batch. New emergencies and explicit cancellation/unavailability remain eligible for full remaining-day replanning; started work remains protected. Do not weaken current constraints or approval version checks.
-- [ ] Run focused tests and the real East reproduction from the audit at useful budgets, validate all results, then rerun the full check. Review and commit this fix separately after Task 1.
+- [x] Write failing tests for manual and automatic ordinary batches, several arrivals, impossible arrivals, and batches mixed with a new emergency. Check every candidate, not only the recommendation. Include changed facts/absence and restore/atomic approval boundaries.
+- [x] Classify pending ordinary arrivals in the existing preview flow. With only ordinary arrivals and no operational changes requiring an independent replan, enumerate feasible insertions in priority then deterministic input order; preserve all previously assigned engineers, relative order and start minutes, and retain unassigned reasons. Carry the newly assigned arrivals into the reference for subsequent insertion. Bound retained candidates rather than creating an unbounded Cartesian product; document heuristic coverage, never claim global optimality.
+- [x] If actual facts make the old promises infeasible, require an explicit ordinary replan instead of silently moving promises just to accept the batch. New emergencies and explicit cancellation/unavailability remain eligible for full remaining-day replanning; started work remains protected. Do not weaken current constraints or approval version checks.
+- [x] Run focused tests and the real East reproduction from the audit at useful budgets, validate all results, then rerun the full check. Review and commit this fix separately after Task 1.
 
 Essential preservation assertion:
 
@@ -64,9 +64,11 @@ for candidate in batch['candidates']:
     assert {key: after[key] for key in old} == old
 ```
 
+Verification: full check 1127 passed, 1 skipped; JS and wheel resources passed. Native browser: manual JSON preview followed by persisted autopilot approval changed 66 to 67 assigned with zero old owner/start/order changes. Repeat-preview road aliases are reused only for the matching queued arrival; registered point collisions remain rejected. Spec and quality reviews passed, including the GPS and emergency-response regressions. Final prose cleanup: 30 focused LLM tests passed.
+
 ### Task 3 — Integration and deployment verification
 
-- [ ] Spec review, then quality review; fix findings and rerun the affected checks.
+- [x] Spec review, then quality review; fix findings and rerun the affected checks.
 - [ ] Confirm exactly ordered commits, clean status, no secrets/state in commits, and latest origin/main before integration.
 - [ ] Fast-forward main after verification and push only the approved GitHub origin. Verify Actions, deployment and visible public behavior; a published image alone is not proof of a working site.
 - [ ] Report both commits, what passed locally/publicly, what the risk percentages mean, and remaining material limitations (uncalibrated forecasts, new-day workflow, shared ephemeral demo and deployment credentials expiry).

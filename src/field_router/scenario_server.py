@@ -221,7 +221,7 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     log.dispatch_notifications.append({'id':uuid4().hex,'kind':'explanation_ready',
                         'time':datetime.now(timezone.utc).isoformat(),'version':version,
                         'title':f'Готово пояснение к плану №{version}',
-                        'text':'YandexGPT выделила важные компромиссы. Индивидуальные факты назначений и риски доступны в журнале решений.',
+                        'text':'Пояснение к выбранному варианту доступно в журнале решений.',
                         'request_ids':affected})
                 try:persist(region_key,context,log)
                 except OSError:pass
@@ -484,7 +484,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     if route.path=='/dispatcher':
                         document=render_dispatcher(payload).replace('href="report.html"',f'href="/report?version={selected_version}"',1)
                     else:
-                        document=render_report(Scenario.model_validate(payload['scenario']),[Plan.model_validate(p) for p in payload['plans']])
+                        document=render_report(Scenario.model_validate(payload['scenario']),[Plan.model_validate(p) for p in payload['plans']],
+                            baseline_comparison=payload.get('baseline_comparison'),request_labels=payload.get('request_labels'))
                     return self.reply(200,document.encode('utf-8'),'text/html; charset=utf-8',rendered=True)
                 except (ValueError,KeyError,TypeError) as exc:
                     return self.reply(409 if 'перезапущен' in str(exc) else 400,{'error':str(exc)})
@@ -499,7 +500,8 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                     if route.path=='/crew-plan':
                         report_url='/crew-report?id='+query['id'][0]+'&amp;version='+str(int(query['version'][0]))
                         document=render_dispatcher(preview).replace('href="report.html"','href="'+report_url+'"',1)
-                    else:document=render_report(candidate.scenario,[candidate.plan])
+                    else:document=render_report(candidate.scenario,[candidate.plan],
+                        baseline_comparison=preview.get('baseline_comparison'),request_labels=preview.get('request_labels'))
                     return self.reply(200,document.encode(),'text/html; charset=utf-8',rendered=True)
                 except (ValueError,KeyError,TypeError) as exc:return self.reply(400,{'error':str(exc)})
             if self.path=='/api/state':
@@ -511,16 +513,11 @@ def create_server(session,state_path,*,port=8766,time_limit=1,address_service=No
                 if route.query:return self.reply(400,{'error':'Неизвестные параметры запроса'})
                 with lock:
                     current=holder['session']
-                    last_applied=next((row for row in reversed(current.history) if row.get('candidate_id')),None)
                     self.reply(200,{'version':current.version,**demo_fields(self.region_key),'planning_settings':current.planning_settings,
                         'incoming_requests':current.incoming_requests[-200:],
                         'dispatch_notifications':current.dispatch_notifications[-100:],
-                        'decision_log':current.decision_log[-300:],
-                        'last_applied':({'version':last_applied['version'],
-                            'automatic':last_applied.get('automatic'),
-                            'incoming_count':len(last_applied.get('incoming_ids',[])),
-                            'changed_count':len(last_applied.get('changed_request_ids',[]))}
-                            if last_applied else None)})
+                        'decision_log':current.decision_log[-300:],'request_labels':current.request_labels(),
+                        'last_applied':current.last_applied()})
                 return
             files={'/':('scenarios.html','text/html; charset=utf-8'),'/scenarios.js':('scenarios.js','text/javascript; charset=utf-8'),'/scenarios.css':('scenarios.css','text/css; charset=utf-8')}
             files['/time-input.js']=('time-input.js','text/javascript; charset=utf-8')

@@ -112,6 +112,10 @@ def render_dispatcher(payload: dict) -> str:
     css = (_STATIC / 'dispatcher.css').read_text(encoding='utf-8')
     brand_symbol = (_STATIC / 'brand/beeline-symbol.svg').read_text(encoding='utf-8').split('?>')[-1].strip()
     js = (_STATIC / 'dispatcher.js').read_text(encoding='utf-8')
+    from .baseline_comparison import render_baseline_comparison
+    from .models import Engineer
+    comparison=None if payload.get('operations',{}).get('needs_replanning') else payload.get('baseline_comparison')
+    baseline_comparison=render_baseline_comparison(comparison,[Engineer.model_validate(e) for e in payload.get('scenario',{}).get('engineers',[])])
     return '''<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -128,7 +132,7 @@ def render_dispatcher(payload: dict) -> str:
 <span id="plan-status" class="muted"></span></div></section>
 <div id="notice" class="notice" role="status">Проверка источников географии…</div>
 <section id="metrics" class="metrics" aria-label="Показатели плана"></section>
-<section class="toolbar" aria-label="Фильтры"><div><label for="engineer-select">Инженер</label><select id="engineer-select"><option value="">Все инженеры</option></select></div>
+''' + baseline_comparison + '''<section class="toolbar" aria-label="Фильтры"><div><label for="engineer-select">Инженер</label><select id="engineer-select"><option value="">Все инженеры</option></select></div>
 <div class="search"><label for="request-search">Поиск заявки</label><input id="request-search" type="search" placeholder="Адрес, номер заявки или инженер" autocomplete="off"></div>
 <button id="reset-filters" class="quiet-button" type="button">Сбросить фильтры</button><span id="filter-summary" class="muted" aria-live="polite"></span></section>
 <section class="workspace" aria-label="Заявки и карта">

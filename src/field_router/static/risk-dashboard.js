@@ -426,7 +426,7 @@
       pending:'Обновляем оценку текущего плана…',
       stale:'Прогноз устарел. Нужна оценка текущей версии плана.'};
     $('risk-model-status').textContent = usable
-      ? (demo ? 'Учебный пример — только в разделе «Ресурсы и расчёт». Список ситуаций относится к вашему плану. ' : '') + 'Прогнозы не откалиброваны на фактических исходах. Факты, расчёт по плану и прогнозы отмечены отдельно.'
+      ? (demo ? 'Учебный пример — только в разделе «Ресурсы и расчёт». Список ситуаций относится к вашему плану. ' : '') + 'Факты, расчёт по плану и прогнозы отмечены отдельно.'
       : forecast.status === 'ready' ? notices.stale : notices[forecast.status] || notices.error;
     if (currentAttention()?.gps_available === false) $('risk-model-status').textContent += ' GPS-сигналы для плана недоступны.';
     const risks = modern ? engineRisks(forecast) : legacyResults(forecast, usable);
@@ -484,7 +484,7 @@
       for(const item of result.items){const row=text('li');row.append(text('strong',item.title),text('span',item.detail));list.append(row);}
       const action=text('p',null,'risk-summary-action');action.append(text('strong','Следующий шаг: '),text('span',result.action));
       box.replaceChildren(text('h3',result.title),list,action);
-      if(result.notice)box.append(text('p',boundedText(result.notice,300)||'','risk-summary-notice'));
+      if(result.source==='template' && result.notice)box.append(text('p','Не удалось получить пояснение с ИИ. Показано объяснение по расчёту.','risk-summary-notice'));
     }catch(error){
       if(current===summarySequence)box.replaceChildren(text('p',signal.aborted?'ИИ не ответил вовремя. Можно повторить запрос.':error.message));
     }finally{

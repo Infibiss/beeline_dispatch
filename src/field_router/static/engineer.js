@@ -8,6 +8,7 @@
     if (!Number.isInteger(value)) return '—';
     return String(Math.floor(value / 60)).padStart(2, '0') + ':' + String(value % 60).padStart(2, '0');
   }
+  function taskLabel(task) { return task.display_label || ('№ ' + task.id); }
   function minute(value) {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('Укажите время в пределах рабочего дня.');
     return Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
@@ -63,7 +64,7 @@
     if (currentMinute != null && reportTime < currentMinute) throw new Error('Время сообщения не может быть раньше текущего времени плана.');
     return {version, engineer_id:engineerId, request_id:requestId, time:reportTime, comment};
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {time, minute, actionPayload, unavailabilityPayload, declinePayload};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {time, minute, taskLabel, actionPayload, unavailabilityPayload, declinePayload};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id);
   const appFetch = (...args) => window.FieldRouter ? window.FieldRouter.fetch(...args) : fetch(...args);
@@ -150,11 +151,11 @@
   function taskCard(task) {
     const card = button('', 'task-card', () => openTask(task.id));
     const status = taskStatus(task);
-    card.setAttribute('aria-label', 'Заявка ' + task.id + ', ' + task.address + ', ' + (labels[status] || status));
+    card.setAttribute('aria-label', taskLabel(task) + ', ' + task.address + ', ' + (labels[status] || status));
     const timing = el('div', time(task.visit && task.visit.start), 'task-time');
     timing.append(el('small', task.duration_minutes + ' мин'));
     const info = el('div', null, 'task-info'), top = el('div', null, 'task-top');
-    top.append(el('span', '№ ' + task.id, 'task-id'), el('span', labels[status] || status, 'pill ' + status));
+    top.append(el('span', taskLabel(task), 'task-id'), el('span', labels[status] || status, 'pill ' + status));
     if (task.priority !== 'normal') top.append(el('span', task.priority === 'urgent' ? 'Авария' : 'Приоритет', 'priority'));
     info.append(top, el('strong', task.address), el('div', taskType(task), 'task-meta'), el('div', 'Окно: ' + windows(task), 'task-meta'));
     card.append(timing, info, el('span', '›', 'chevron')); return card;
@@ -173,7 +174,7 @@
     if (!task || unavailableNow()) return;
     const top = el('div', null, 'next-top');
     top.append(el('span', active ? 'ТЕКУЩАЯ ЗАДАЧА' : 'СЛЕДУЮЩИЙ ВЫЕЗД', 'eyebrow'), el('span', labels[task.status], 'pill'));
-    node.append(top, el('h2', task.address), el('p', '№ ' + task.id + ' · ' + taskType(task)), el('p', 'Начало по плану ' + time(task.visit && task.visit.start) + ' · окно ' + windows(task)));
+    node.append(top, el('h2', task.address), el('p', taskLabel(task) + ' · ' + taskType(task)), el('p', 'Начало по плану ' + time(task.visit && task.visit.start) + ' · окно ' + windows(task)));
     node.append(button('Открыть заявку →', 'primary', () => openTask(task.id)));
   }
   function renderShift() {
@@ -283,7 +284,7 @@
   }
   function renderDetail() {
     const task = currentTask(); if (!task) return;
-    $('dialog-kicker').textContent = 'ЗАЯВКА № ' + task.id;
+    $('dialog-kicker').textContent = taskLabel(task);
     $('dialog-title').textContent = task.address;
     const content = $('task-detail'); content.replaceChildren();
     const status = taskStatus(task);

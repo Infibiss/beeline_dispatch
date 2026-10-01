@@ -116,7 +116,7 @@
   let demoEpoch=0, streamGeneration=0, demoResetting=false, streamLoading=false;
   const strategyNames = {sla:'Быстрее к аварии', stable:'Меньше изменений', cost:'Меньше дороги'};
   function strategyName(c) { return strategyNames[c.id] || c.label; }
-  function requestName(id) { return ((batch && batch.request_labels) || (state && state.request_labels) || {})[id] || id || '—'; }
+  function requestName(id) { return batch?.request_labels?.[id] || inboxSnapshot?.request_labels?.[id] || state?.request_labels?.[id] || id || '—'; }
   const strategies = {sla:'Раньше начать аварийные работы', stable:'Сохранить назначения и клиентское время', cost:'Сократить оставшиеся минуты дороги'};
   function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -454,14 +454,14 @@
     const event=[...(data.dispatch_notifications || [])].reverse().find(item=>
       item.version===applied.version && ['auto_applied','manual_applied'].includes(item.kind));
     const rows=(data.decision_log || []).filter(item=>item.version===applied.version);
-    const newIds=new Set(event?.request_ids || []);
+    const newIds=new Set(event?.created_request_ids || event?.request_ids || []);
     const isAuto=applied.automatic===true;
     $('application-visual-title').textContent=isAuto?'Автопилот обновил план':'Что изменилось после применения';
     $('application-visual-version').textContent=`План №${applied.version}`;
     const stale=data.version!==state?.version;
     $('application-visual-context').textContent=stale
       ? 'План уже применён на сервере. Нажмите «Загрузить изменения», чтобы увидеть его на карте и в плане дня.'
-      : `${isAuto?'Применён автоматически':'Утверждён диспетчером'} · время плана ${time(state.time)}. Ниже только изменения этого применения, без полной ленты событий.`;
+      : `${isAuto?'Применён автоматически':'Утверждён диспетчером'} · время плана ${time(applied.time ?? data.history?.find(row=>row.version===applied.version && row.candidate_id)?.event?.time)}. Ниже только изменения этого применения, без полной ленты событий.`;
     const retried=event?.backlog_attempted_request_ids?.length;
     if(retried) $('application-visual-context').textContent+=
       ` Ранее оставшихся без исполнителя перепроверено ${retried}; назначено ${event.recovered_request_ids?.length || 0}.`;
@@ -477,10 +477,11 @@
     addMetric('Новых обработано',String(applied.incoming_count ?? newIds.size));
     addMetric('Изменений в плане',String(applied.changed_count ?? event?.changed_request_ids?.length ?? 0));
     if(event?.cancelled_request_ids?.length)addMetric('Отменено',String(event.cancelled_request_ids.length));
-    const assignedBefore=event?.before_effective_assigned_count ?? event?.before_assigned_count,assignedAfter=event?.after_assigned_count;
+    const comparison=event?.assignment_comparison;
+    const assignedBefore=comparison?.before_assigned,assignedAfter=comparison?.after_assigned;
     if(assignedBefore != null && assignedAfter != null)
       addMetric('Назначено',`${assignedBefore} → ${assignedAfter}`);
-    const before=event?.before_requires_assignment_count ?? event?.before_unassigned_count,after=event?.after_unassigned_count;
+    const before=comparison?.before_requires_assignment,after=comparison?.after_requires_assignment;
     const unresolved=after ?? event?.unassigned_request_ids?.length ?? (data.version===state?.version ? state.plan?.unassigned?.length : null);
     addMetric('Требуют назначения',before != null && unresolved != null ? `${before} → ${unresolved}` : String(unresolved ?? '—'),unresolved>0);
     $('application-visual-metrics').replaceChildren(...metrics);
@@ -493,23 +494,20 @@
     if(event?.explanation_card){
       renderExplanationCard(explainer,event.explanation_card,{applied:true,ai:!!llm,unavailable:event.llm_status==='unavailable'});
     }else if(explanation){
-      explainer.append(element('strong',llm?'YandexGPT расставила акценты · проверенные показатели':'Почему выбран этот вариант · проверенные показатели'),
-        element('p',explanation.plan_explanation));
-      if(!llm)explainer.append(element('small',event?.llm_status==='unavailable' ?
-        event.llm_notice || 'YandexGPT сейчас недоступна; решение и показатели проверены алгоритмом.' :
-        'Пояснение YandexGPT для этого применения пока не сохранено; решение и показатели проверены алгоритмом.','hint'));
+      explainer.append(element('strong','Почему выбран этот вариант'),element('p',explanation.plan_explanation));
     }else explainer.append(element('p',event?.llm_status==='unavailable' ?
-      event.llm_notice || 'YandexGPT сейчас недоступна; назначения видны в плане дня.' :
+      'Не удалось получить пояснение. Назначения видны в плане дня.' :
       'Подробное пояснение для этого применения пока не сохранено; назначения уже видны в плане дня.','hint'));
-    const ordered=[...rows].sort((a,b)=>Number(newIds.has(b.id))-Number(newIds.has(a.id)) ||
+    const newRow=item=>item.kind==='new' || newIds.has(item.request_id) || newIds.has(item.id);
+    const ordered=[...rows].sort((a,b)=>Number(newRow(b))-Number(newRow(a)) ||
       Number(a.status==='assigned')-Number(b.status==='assigned'));
     const changeCard=item=>{
-      const isNew=newIds.has(item.id);
+      const isNew=newRow(item);
       const cancelled=item.status==='cancelled' || item.change_type==='cancelled';
       const beforeName=item.previous_engineer_id ? `${engineerName(item.previous_engineer_id)} · ${time(item.previous_start)}` :
         isNew ? 'Новая заявка' : item.previous_engineer_id===null ? 'Без назначения' : 'До применения: нет данных';
       const afterName=cancelled?'Удалена из плана':item.engineer_id ? `${engineerName(item.engineer_id)} · ${time(item.start)}` : 'Без исполнителя';
-      const label=cancelled?'Отменена':item.change_type==='lost_assignment'?'Потеря назначения':
+      const label=cancelled?'Отменена':isNew?'Новая заявка':item.change_type==='lost_assignment'?'Потеря назначения':
         item.change_type==='recovered'?'Снова назначена':
         item.status==='unassigned'?'Требует внимания':isNew?'Новая заявка':
         item.previous_engineer_id===item.engineer_id?'Сдвиг времени':'Переназначение';
@@ -518,7 +516,7 @@
       const summary=element('summary');
       const heading=element('span',null,'application-change-heading');
       heading.append(element('span',label,'application-change-kind'),
-        element('strong',`${item.id} · ${item.address || requestName(item.request_id)}`));
+        element('strong',`${requestName(item.request_id || item.id)} · ${item.address || 'Адрес не указан'}`));
       summary.append(heading,element('span',`${beforeName} → ${afterName}`,'application-change-route'));
       card.append(summary);
       const body=element('div',null,'application-change-body');
@@ -578,26 +576,18 @@
         element('small',`${item.time ? new Date(item.time).toLocaleString('ru-RU') : 'Время не указано'} · план №${item.version ?? '—'}`,'hint'));
       card.append(head,element('strong',item.title || 'Событие'),element('p',item.text || ''));
       if(['auto_applied','manual_applied'].includes(item.kind)){
-        const before=item.before_effective_assigned_count ?? item.before_assigned_count,after=item.after_assigned_count;
+        const before=item.assignment_comparison?.before_assigned,after=item.assignment_comparison?.after_assigned;
         if(before!=null && after!=null)
-          card.append(element('small',`В основном плане назначено: ${before} → ${after}.`,'hint'));
+          card.append(element('small',`В остатке дня назначено: ${before} → ${after}.`,'hint'));
         if(item.backlog_attempted_request_ids?.length)
           card.append(element('small',`Перепроверено ранее нераспределённых: ${item.backlog_attempted_request_ids.length}; назначено: ${item.recovered_request_ids?.length || 0}.`,'hint'));
         if(item.plan_explanation){
           const detail=element('details',null,'notification-explanation');
-          detail.append(element('summary',item.llm_status==='ready' ?
-              'Почему применён этот план · YandexGPT выделила главное' :
-              'Почему применён этот план · проверенные показатели'),
-            element('p',item.plan_explanation),
-            element('small',item.llm_status==='ready' ?
-              'YandexGPT выбрала акценты; факты и числа подставлены из проверенного расчёта.' :
-              'Показатели проверены расчётом; модель не формирует назначения.','hint'));
+          detail.append(element('summary','Почему применён этот план'),element('p',item.plan_explanation));
           card.append(detail);
         }
         if(item.llm_status==='unavailable')
-          card.append(element('small',item.llm_notice || 'YandexGPT недоступна; назначения рассчитаны и применены без неё.','hint'));
-        else if(item.llm_status==null && !item.plan_explanation)
-          card.append(element('small','Пояснение YandexGPT для этого применения пока не сохранено.','hint'));
+          card.append(element('small','Не удалось получить пояснение с ИИ.','hint'));
       }
       const left=(item.unassigned_request_ids || []).length;
       if(left)card.append(element('p',`После этого решения без исполнителя: ${left}`,'notification-attention'));
@@ -635,7 +625,7 @@
       const label=actual==='cancelled'?'Отменена':actual==='assigned'?'Сейчас назначена':actual==='unassigned'?'Сейчас без исполнителя':'Историческое решение';
       const card=element('details',null,'decision-card');
       const summary=element('summary');
-      summary.append(element('strong',item.id+' · '+(item.address || requestName(item.request_id))),
+      summary.append(element('strong',requestName(item.request_id || item.id)+' · '+(item.address || 'Адрес не указан')),
         element('span',label,actual==='unassigned'?'decision-status attention':'decision-status'));
       card.append(summary);
       const body=element('div',null,'decision-body');
@@ -650,7 +640,7 @@
       body.append(element('p',item.llm_explanation ? `Подробности расчёта: ${item.llm_explanation}` :
         item.explanation || 'Объяснение не сохранено.',item.llm_explanation?'application-llm-note':null));
       if(item.plan_explanation){const detail=element('details');detail.append(element('summary','Компромисс плана №'+item.version),
-        element('p',item.plan_explanation));if(item.llm_notice)detail.append(element('small',item.llm_notice,'hint'));body.append(detail);}
+        element('p',item.plan_explanation));body.append(detail);}
       card.append(body);return card;
     }) : [element('p',decisions.length?'По этому фильтру решений нет.':'Решений по заявкам пока нет.','hint')]));
   }
@@ -932,8 +922,7 @@
       for(const text of card[key])list.append(element('li',text));
       section.append(list);box.append(section);
     }
-    if(card.note)box.append(element('small',card.note,'explanation-note'));
-    box.append(element('small',ai?'Пояснение с ИИ · показатели проверены':unavailable?'ИИ недоступен · объяснение по расчёту':'Объяснение по расчёту','explanation-source'));
+    if(unavailable)box.append(element('small','Не удалось получить пояснение с ИИ.','hint'));
     target.append(box);
   }
   function renderRecommendation() {
@@ -942,7 +931,7 @@
     $('ai-panel').hidden = !batch.candidates.length || (!batch.llm_enabled && !recommendation);
     $('ai-recommend').hidden = !batch.llm_enabled;
     $('ai-result').textContent = recommendationPending ? 'Сравниваем варианты…' : choice
-      ? 'Рекомендуем «' + strategyName(choice) + '». ' + [recommendation.notice, recommendation.text].filter(Boolean).join(' ')
+      ? 'Рекомендуем «' + strategyName(choice) + '». ' + recommendation.text
       : recommendation?.error || 'Сравните варианты самостоятельно или запросите объяснение с ИИ.';
     if(!recommendationPending && choice && recommendation?.card)
       renderExplanationCard($('ai-result'),recommendation.card,{ai:recommendation.source==='yandexgpt',unavailable:recommendation.source!=='yandexgpt'});
@@ -1041,7 +1030,6 @@
     if (data.insertion_policy) notes.push('Новая заявка добавляется без изменения прежних назначений и времени начала.');
     if (merged) notes.push(ordered.length === 1 ? 'Один уникальный план: все стратегии нашли одинаковые маршруты и время.' : 'Совпавшие планы объединены в одну карточку.');
     if (!newEmergency && !responseTargets && merged) notes.push('Аварий в остатке дня нет: «Быстрее к аварии» совпадает с «Меньше изменений».');
-    if (riskReady) notes.push('Прогнозные риски — оценка, а не гарантия.');
     if (data.local_scope?.engineer_ids?.length) notes.push('Локальный приоритет: сначала минимизируются изменения вокруг ' + data.local_scope.engineer_ids.map(engineerName).join(', ') + '; изменения вне контура явно посчитаны.');
     $('variants-note').textContent = notes.join(' ');
     const table = element('table'), head = element('tr');
@@ -1097,7 +1085,7 @@
       const extraMetrics = [['Из них предотвратимые', f.avoidable_reassigned], ['Сдвиги начала, мин', f.time_shift_minutes], ['Расстояние, км', f.distance_m == null ? '—' : (f.distance_m / 1000).toFixed(1)]];
       const risk = candidate.risk?.status === 'ready' && candidate.risk.summary ? candidate.risk : null;
       if (risk) metrics.unshift(
-        ['Риск нарушения срока', (risk.summary.p_sla_breach * 100).toFixed(0) + '%'],
+        ['Хотя бы одно нарушение срока', (risk.summary.p_sla_breach * 100).toFixed(0) + '%'],
         ['Изменено обещаний', risk.affected_clients]);
 
       if (f.lost_assignments) metrics.unshift(['Потеряно назначений', f.lost_assignments]);
@@ -1172,7 +1160,7 @@
       offDutyWindowStart:$('call-off-duty-window-start').value, offDutyWindowEnd:$('call-off-duty-window-end').value,
       localScopeEngineerIds}); }
     catch (error) { $('error').textContent = error.message; $('error').hidden = false; return; }
-    resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Расчёт может занять несколько секунд…';
+    resetCandidates('Расчёт допустимых вариантов…'); busy = true; controls(); $('error').hidden = true; $('status').textContent = 'Ищем допустимые маршруты и проверяем прогнозы. Расчёт может занять несколько минут…';
     try { renderBatch(await request('/api/preview', payload)); $('status').textContent = 'Расчёт завершён. Выберите вариант и проверьте изменения.'; $('comparison-panel').scrollIntoView({block:'start'}); $('comparison-panel').focus(); }
     catch (error) { failure(error); $('error').scrollIntoView({block:'center'}); }
     finally { busy = false; controls(); }

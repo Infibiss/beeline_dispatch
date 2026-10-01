@@ -222,7 +222,6 @@ def test_selected_candidate_explanation_is_detailed_but_does_not_claim_preview_a
  assert 'Вариант' in result['text'] and 'P(SLA)' in result['text']
  assert 'Почему этот вариант:' in result['text']
  assert 'Что проверить диспетчеру:' in result['text']
- assert 'не откалиброваны' in result['text']
  assert 'Применён вариант' not in result['text']
 
 
@@ -259,7 +258,7 @@ def test_per_visit_detail_uses_only_verified_quantiles_and_risk():
  text=decision_detail({'request_id':'request:x','explanation':'Назначено инженеру.'},candidate)
  assert 'Назначено инженеру.' in text
  assert 'P50 — 30, P80 — 45, P90 — 60' in text
- assert '12.5%' in text and '20%' in text and 'не откалиброваны' in text
+ assert '12.5%' in text and '20%' in text
  candidate['risk']['routes'][0]['visits'][0]['p_sla_breach']=float('nan')
  assert 'риск нарушения' not in decision_detail({'request_id':'request:x','explanation':'Назначено.'},candidate)
 

@@ -193,13 +193,17 @@ def explanation(facts):
 
 
 class ScenarioSession:
-    def __init__(self,scenario,plan,geography=None):
+    def __init__(self,scenario,plan,geography=None,*,planning_scenario=None):
         self.geography=GeographyBundle.model_validate(geography) if geography else None
         self.geo_locations=dict(self.geography.locations) if self.geography else {}
         self.aliases={key:key for key in self.geo_locations}
         if self.geography:scenario=attach_geography(scenario,self.geography)
         self.scenario=scenario
         require_valid(scenario,self._travel(scenario),plan)
+        from .baseline_comparison import compare_baseline
+        planning_scenario=planning_scenario or scenario
+        self.baseline_comparison=compare_baseline(planning_scenario,self._travel(planning_scenario),plan,
+            version=1,time=min(e.shift.start for e in scenario.engineers))
         routes={r.engineer_id:r for r in plan.routes}
         # Morning issue is based on the published plan. An idle engineer does not
         # acquire arbitrary warehouse stock when a new request appears later.
@@ -255,7 +259,9 @@ class ScenarioSession:
         if not self.needs_replanning and getattr(self,'_diagnosis_context',None)!=context:
             self.plan=annotate_unassigned(self.scenario,self._travel(self.scenario),self.plan)
             self._diagnosis_context=(id(self.scenario),id(self.plan),id(self.geography))
-        payload={'scenario':self.scenario.model_dump(mode='json'),'plans':[self.plan.model_dump(mode='json')],
+        comparison=deepcopy(getattr(self,'baseline_comparison',None)) if not self.needs_replanning else None
+        if comparison:comparison.update(version=self.version)
+        payload={'baseline_comparison':comparison,'scenario':self.scenario.model_dump(mode='json'),'plans':[self.plan.model_dump(mode='json')],
             'operations':{'version':self.version,'time':self.time,'label':label,'frozen':deepcopy(self.frozen),
                 'needs_replanning':self.needs_replanning,'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values())),
                 'assignment_summary':self.assignment_summary()},
@@ -293,6 +299,7 @@ class ScenarioSession:
             # Old saved views predate operational assignment counters. Derive
             # the current view from facts; never rewrite historical snapshots.
             payload['operations']['assignment_summary']=self.assignment_summary()
+            if self.needs_replanning:payload['baseline_comparison']=None
         return payload
 
     def record_fact(self,payload):
@@ -1003,13 +1010,18 @@ class ScenarioSession:
                 owners.update((v['request_id'],route['engineer_id']) for v in route['visits'])
         return [{'id':key,'address':self.catalog[key].address,'engineer_id':eid} for key,eid in sorted(owners) if key in self.catalog]
 
+    def last_applied(self):
+        row=next((row for row in reversed(self.history) if row.get('candidate_id')),None)
+        if row is None:return None
+        return {'version':row['version'],'time':row.get('application_time',row['event'].get('time')),
+            'automatic':row.get('automatic'),
+            'incoming_count':len(row.get('created_request_ids',row.get('incoming_ids',[]))),
+            'changed_count':len(row.get('changed_request_ids',[]))}
+
     def state(self):
-        last_applied=next((row for row in reversed(self.history) if row.get('candidate_id')),None)
         return {'pending_completions':pending_completions(self),'historical_requests':self.historical_requests(),'fact_journal':deepcopy(self.fact_log),'fact_audit':deepcopy(self.fact_audit),'execution_mode':self.execution_mode,'version':self.version,'time':self.time,'region':self.scenario.region,'date':self.scenario.date,'approximate_locations':sum(p.quality=='approximate' for p in self.geography.locations.values()) if self.geography else 0,'simulation':not bool(self.statuses),'geography_mode':'road' if self.geography else 'synthetic',
             'mode':self.mode(),'statuses':deepcopy(list(self.statuses.values())),'needs_replanning':self.needs_replanning,
-            'last_applied':({'version':last_applied['version'],'automatic':last_applied.get('automatic'),
-                'incoming_count':len(last_applied.get('incoming_ids',[])),
-                'changed_count':len(last_applied.get('changed_request_ids',[]))} if last_applied else None),
+            'last_applied':self.last_applied(),
             'unavailability':deepcopy(self.unavailability),'declined_assignments':deepcopy(self.declined_assignments),
             'replanning_pool':self.replanning_pool(),
             'assignment_summary':self.assignment_summary(),
@@ -1537,7 +1549,7 @@ class ScenarioSession:
             'risk_model':{'version':RISK_MODEL_VERSION,'method':'monte_carlo','calibrated':False,
                 'loss_unit':'условные единицы','iterations':risk_engine.config.iterations,
                 'seed_fingerprint':risk_seed,'duration_evidence':duration_evidence.metadata()},
-            'notice':('Дорожные матрицы. ' if self.geography else 'Условная география. ')+('Ручные статусы и симуляция остальных инженеров. ' if self.statuses else 'Исполнение плана моделируется. ')+'Показатели относятся к остатку дня; текущие закрепленные работы показаны отдельно. Базовое объяснение сформировано по проверенным фактам. Риски оценены Монте-Карло по априорным распределениям'+(f" и {duration_evidence.observation_count} подтверждённым длительностям" if duration_evidence.observation_count else '')+'; калибровка вероятностей на независимой истории исходов пока не подтверждена, потери — условные единицы.'}
+            'notice':'Показатели относятся к остатку дня; закреплённые работы показаны отдельно.'}
         from .gps.autopilot import travel_estimate
         gps_estimates=[estimate for eid,fact in self.statuses.items()
                        if (estimate:=travel_estimate(self,eid,fact,event.time)) is not None]
@@ -1581,12 +1593,24 @@ class ScenarioSession:
         if candidate is None:raise ValueError('Неизвестный вариант')
         plan=Plan.model_validate(candidate['plan'])
         require_valid(stored['scenario'],self._travel(stored['scenario']),plan)
-        previous_assignments={visit.request_id:(route.engineer_id,visit.start)
-            for route in self.plan.routes for visit in route.visits}
+        previous_assignments={visit['request_id']:(route['engineer_id'],visit['start'])
+            for route in self.frozen for visit in route['visits']}
+        previous_assignments.update({visit.request_id:(route.engineer_id,visit.start)
+            for route in self.plan.routes for visit in route.visits})
         previous_unassigned={row.request_id for row in self.plan.unassigned}
         before_assigned_count=self.plan.metrics.assigned
         before_unassigned_count=self.plan.metrics.unassigned
         before_assignment_summary=self.assignment_summary()
+        residual_ids={r.id for r in stored['scenario'].requests}
+        created_request_ids=sorted(residual_ids-set(self.catalog))
+        pending=set(self.pending_reassignment_ids())
+        before_residual_assigned=(set(previous_assignments)&residual_ids)-pending
+        before_residual_requires=(residual_ids-set(created_request_ids))-before_residual_assigned
+        assignment_comparison={'time':batch['event']['time'],
+            'before_assigned':len(before_residual_assigned),'after_assigned':plan.metrics.assigned,
+            'before_requires_assignment':len(before_residual_requires),
+            'after_requires_assignment':plan.metrics.unassigned,
+            'frozen_count':len({v['request_id'] for r in batch['frozen'] for v in r['visits']})}
         escalation=stored['policy'].get('off_duty_escalation') or {}
         requested=set(escalation.get('engineer_ids',[]))
         used={r.engineer_id for r in plan.routes if r.visits} & requested
@@ -1616,7 +1640,8 @@ class ScenarioSession:
             policy['off_duty_escalation']['activated_ids']=sorted(used)
             policy['off_duty_escalation']['not_required_ids']=sorted(requested-used)
         self.history.append({'event':batch['event'],'candidate_id':candidate['id'],'version':self.version,
-            'policy':policy,'automatic':automatic,'incoming_ids':list(batch.get('incoming_ids',[]))})
+            'policy':policy,'automatic':automatic,'incoming_ids':list(batch.get('incoming_ids',[])),
+            'application_time':self.time,'created_request_ids':created_request_ids})
         cancelled_request_ids=([batch['event']['request_id']]
             if batch['event']['type']=='cancel' else [])
         if cancelled_request_ids:
@@ -1664,6 +1689,11 @@ class ScenarioSession:
             after=current_assignments.get(key)
             if before==after and (before is not None or key in previous_unassigned):
                 continue
+            if key in created_request_ids:
+                from .intake import decision_entry
+                self.decision_log.append(decision_entry(self,candidate,{'id':key.split(':',1)[-1],
+                    'event':batch['event'],'address':self.catalog[key].address},automatic))
+                continue
             changed.append(key)
             self.decision_log.append(reassignment_entry(self,candidate,key,before,automatic))
         self.history[-1]['changed_request_ids']=changed
@@ -1675,7 +1705,7 @@ class ScenarioSession:
         self.history[-1]['lost_request_ids']=lost_request_ids
         self.history[-1]['recovered_request_ids']=recovered_request_ids
         title=(('Автопилот применил план' if automatic else 'Диспетчер применил план')+
-               f' №{self.version} · новых {len(batch.get("incoming_ids",[]))} · изменено назначений {len(changed)}')
+               f' №{self.version} · новых {len(created_request_ids)} · изменено назначений {len(changed)}')
         if unresolved:title+=f' · без исполнителя {len(unresolved)}'
         if cancelled_request_ids:
             detail='Отменённая заявка исключена из активного плана и не входит в список без исполнителя. '
@@ -1696,6 +1726,7 @@ class ScenarioSession:
             'plan_explanation':candidate.get('explanation',''),
             'explanation_card':candidate.get('explanation_card'),
             'request_ids':list(batch.get('incoming_ids',[])), 'changed_request_ids':changed,
+            'created_request_ids':created_request_ids,'assignment_comparison':assignment_comparison,
             'cancelled_request_ids':cancelled_request_ids,
             'unassigned_request_ids':unresolved,
             'unassigned_details':deepcopy(candidate['unassigned_details']),
@@ -1710,11 +1741,14 @@ class ScenarioSession:
         self.pending_report_ids.clear()
         self.needs_replanning=False
         self._refresh_inventory_dispatchability()
+        from .baseline_comparison import compare_baseline
+        self.baseline_comparison=compare_baseline(self.scenario,self._travel(self.scenario),plan,
+            version=self.version,time=self.time)
         self._save_view('Утвержден '+candidate['label'])
         return self.state()
 
     def dump(self):
-        return {'execution_mode':self.execution_mode,'fact_audit':self.fact_audit,'initial_engineers':{k:v.model_dump(mode='json') for k,v in self.initial_engineers.items()},'geography':self.geography.model_dump(mode='json') if self.geography else None,'aliases':self.aliases,'geo_locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},'statuses':self.statuses,'fact_log':self.fact_log,'needs_replanning':self.needs_replanning,'views':self.views,'scenario':self.scenario.model_dump(mode='json'),'plan':self.plan.model_dump(mode='json'),
+        return {'baseline_comparison':getattr(self,'baseline_comparison',None),'execution_mode':self.execution_mode,'fact_audit':self.fact_audit,'initial_engineers':{k:v.model_dump(mode='json') for k,v in self.initial_engineers.items()},'geography':self.geography.model_dump(mode='json') if self.geography else None,'aliases':self.aliases,'geo_locations':{k:v.model_dump(mode='json') for k,v in self.geo_locations.items()},'statuses':self.statuses,'fact_log':self.fact_log,'needs_replanning':self.needs_replanning,'views':self.views,'scenario':self.scenario.model_dump(mode='json'),'plan':self.plan.model_dump(mode='json'),
             'planning_settings':self.planning_settings,'incoming_requests':self.incoming_requests,
             'dispatch_notifications':self.dispatch_notifications,'decision_log':self.decision_log,
             'autopilot_last_failure_at':self.autopilot_last_failure_at,
@@ -1737,6 +1771,7 @@ class ScenarioSession:
         obj.scenario=Scenario.model_validate(payload['scenario']);obj.plan=Plan.model_validate(payload['plan'])
         require_valid(obj.scenario,obj._travel(obj.scenario),obj.plan)
         obj.batches={}
+        obj.baseline_comparison=deepcopy(payload.get('baseline_comparison'))
         obj.version=payload['version'];obj.time=payload['time'];obj.history=payload['history'];obj.frozen=payload['frozen']
         obj.catalog={k:Request.model_validate(v) for k,v in payload['catalog'].items()}
         obj.initial_stock={k:Equipment.model_validate(v) for k,v in payload['initial_stock'].items()}

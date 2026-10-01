@@ -22,7 +22,6 @@ def test_card_exposes_actual_risk_tradeoff_without_claiming_faster_emergency():
     assert 'Оценка последствий задержек ниже' in text
     assert 'усл. ед.' not in text
     assert '92' in text and '333' in text and '5' in text
-    assert 'не откалиброван' in text
     assert 'раньше' not in text
     assert len(card['reasons'])<=2
 

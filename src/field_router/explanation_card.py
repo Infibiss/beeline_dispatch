@@ -83,4 +83,4 @@ def build_card(batch, choice, emphasis=()):
         reasons=[reasons[0],reasons[secondary[0]]]
     return {'candidate_id':choice['id'],'label':LABELS.get(choice['id'],'Вариант'),
         'summary':summary,'reasons':reasons[:2],'tradeoffs':tradeoffs,
-        'attention':attention,'note':'Риски — модельная оценка; вероятности пока не откалиброваны.' if risk_metrics(choice) else ''}
+        'attention':attention,'note':''}

@@ -164,9 +164,6 @@ def selected_plan_text(batch, choice, emphasis):
         next_step=f'Что проверить диспетчеру: {unassigned} заявок остаются без исполнителя; они не исчезли из плана и будут повторно рассмотрены при следующем событии.'
     else:
         next_step='Что проверить диспетчеру: все заявки остатка дня получили исполнителя; проверьте изменения клиентского времени перед публикацией.'
-    if risk_metrics(choice) is not None:
-        next_step+=' Риски получены Монте-Карло и пока не откалиброваны на независимой истории.'
-    next_step+=' Назначения рассчитаны алгоритмом с проверкой ограничений; их применяет диспетчер или настроенный автопилот.'
     return opening+'\n'+why+'\n'+next_step
 
 
@@ -190,7 +187,6 @@ def decision_detail(entry, candidate):
         if type(p_late) in (int,float) and math.isfinite(p_late) and 0<=p_late<=1:
             detail+='; риск позднего начала — '+_percent(p_late)
         parts.append(detail+'.')
-    if len(parts)>1:parts.append('Эти вероятности пока не откалиброваны на независимой истории.')
     return ' '.join(parts)
 
 

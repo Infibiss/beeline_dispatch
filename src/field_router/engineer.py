@@ -71,6 +71,7 @@ def engineer_state(session, engineer_id, *, current_minute=None, clock=None):
         if fact['status'] in ('completed', 'completion_pending'):
             visits.setdefault(fact['request_id'], None)
     tasks = []
+    request_labels = session.request_labels()
     for key, visit in visits.items():
         job = session.catalog[key]
         history = [f for f in facts if f.get('request_id') == key]
@@ -100,6 +101,7 @@ def engineer_state(session, engineer_id, *, current_minute=None, clock=None):
                             if f.get('request_id') == key) for device in ('router', 'tv_box')}
         tasks.append({
             **job.model_dump(mode='json'),
+            'display_label':request_labels.get(key,key),
             'visit': visit,
             'status': status,
             'completed_at': completed['time'] if completed else None,

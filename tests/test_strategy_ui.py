@@ -248,7 +248,8 @@ assert.deepEqual(row('Клиентов с изменённым обещание�
 assert.doesNotMatch(cards()[0].textContent,/Risk Engine|усл. ед.|Ожидаемо под SLA/);
 assert.doesNotMatch(cards()[0].textContent,/калибр/);
 assert.doesNotMatch($('variants-note').textContent,/Монте-Карло/);
-assert.match($('variants-note').textContent,/оценка, а не гарантия/);
+assert.match($('forecast-help').textContent,/хотя бы одного нарушения/);
+assert.doesNotMatch($('variants-note').textContent,/оценка, а не гарантия/);
 ''', before='''
 preview.risk_model={version:'risk-engine-v1.1',iterations:600,calibrated:false};
 const values={stable:[.20,3,3,.4,.25],sla:[.12,1.8,2,.3,.18],cost:[.08,1.2,1,.2,.11]};
@@ -656,12 +657,12 @@ assert.match($('application-visual-title').textContent,/Автопилот об�
 assert.match($('application-visual-metrics').textContent,/12 → 13/);
 assert.match($('application-visual-changes').textContent,/e1 · 10:00 → e2 · 11:00/);
 assert.match($('application-visual-changes').textContent,/Подробности расчёта: Мастер ближе к следующей точке/);
-assert.match($('application-visual-explanation').textContent,/YandexGPT расставила акценты/);
+assert.match($('application-visual-explanation').textContent,/Почему выбран этот вариант/);
 ''', before='''
 state.last_applied={version:7,automatic:true,incoming_count:3,changed_count:1};
 state.dispatch_notifications=[{id:'applied',kind:'auto_applied',version:7,
   request_ids:['client-1'],changed_request_ids:['request:client-2'],
-  before_unassigned_count:12,after_unassigned_count:13,unassigned_request_ids:Array(13).fill('x')}];
+  assignment_comparison:{before_requires_assignment:12,after_requires_assignment:13},before_unassigned_count:12,after_unassigned_count:13,unassigned_request_ids:Array(13).fill('x')}];
 state.decision_log=[{id:'client-2',request_id:'request:client-2',address:'Москва, дом 2',status:'assigned',automatic:true,version:7,
   previous_engineer_id:'e1',previous_start:600,engineer_id:'e2',start:660,
   explanation:'Проверены окно и квалификация.',llm_explanation:'Мастер ближе к следующей точке',
@@ -672,7 +673,7 @@ state.decision_log=[{id:'client-2',request_id:'request:client-2',address:'Мос
 def test_application_explanation_can_arrive_without_changed_decisions():
     client('''
 assert.equal($('application-visual').hidden,false);
-assert.match($('application-visual-explanation').textContent,/YandexGPT расставила акценты/);
+assert.match($('application-visual-explanation').textContent,/Почему выбран этот вариант/);
 assert.match($('application-visual-explanation').textContent,/Применён стабильный план/);
 assert.match($('dispatch-notifications').textContent,/Почему применён этот план/);
 ''', before='''
@@ -688,7 +689,7 @@ def test_application_keeps_verified_explanation_when_model_unavailable():
     client('''
 assert.match($('application-visual-explanation').textContent,/Почему выбран этот вариант/);
 assert.match($('application-visual-explanation').textContent,/Охват проверен/);
-assert.match($('dispatch-notifications').textContent,/Почему применён этот план · проверенные показатели/);
+assert.match($('dispatch-notifications').textContent,/Почему применён этот план/);
 ''', before='''
 state.last_applied={version:9,automatic:true,incoming_count:0,changed_count:0};
 state.dispatch_notifications=[{id:'applied-9',kind:'auto_applied',version:9,
@@ -719,3 +720,32 @@ def test_default_sort_does_not_imply_risk_recommendation():
     """, before="""
       for(const c of preview.candidates)c.risk={status:'ready',affected_clients:0,summary:{p_sla_breach:c.id==='cost'?.1:.9,expected_loss:1,expected_affected_customers:1,p_late_start:0,p_overtime:0}};
     """)
+
+
+def test_application_uses_residual_comparison_immutable_time_and_manual_new_labels():
+    client(r'''
+state.time=720;
+state.request_labels={'request:uuid-manual':'Локальная проблема №1'};
+state.last_applied={version:7,time:590,automatic:false,incoming_count:1,changed_count:0};
+state.dispatch_notifications=[{kind:'manual_applied',version:7,request_ids:[],created_request_ids:['request:uuid-manual'],
+  before_assigned_count:67,after_assigned_count:52,
+  assignment_comparison:{time:590,before_assigned:53,after_assigned:52,before_requires_assignment:0,after_requires_assignment:1,frozen_count:14}}];
+state.decision_log=[{id:'uuid-manual',request_id:'request:uuid-manual',kind:'new',change_type:'new_assignment',
+  status:'assigned',previous_engineer_id:null,engineer_id:'e1',start:700,address:'Новый адрес',version:7}];
+state.decision_log.unshift({id:'old',request_id:'old',kind:'changed',status:'assigned',previous_engineer_id:'e1',engineer_id:'e2',version:7});
+await $('reload').dispatch('click');await settle();
+assert.match($('application-visual-context').textContent,/09:50/);
+assert.equal($('application-visual-changes').querySelector('.application-change').dataset.requestId,'request:uuid-manual');
+assert.doesNotMatch($('application-visual-context').textContent,/12:00/);
+assert.match($('application-visual-metrics').textContent,/53 → 52/);
+assert.doesNotMatch($('application-visual-metrics').textContent,/67 → 52/);
+assert.match($('application-visual-changes').textContent,/Новая заявка/);
+assert.match($('application-visual-changes').textContent,/Локальная проблема №1/);
+assert.doesNotMatch($('application-visual-changes').textContent,/uuid-manual|Снова назначена/);
+assert.match($('decision-log').textContent,/Локальная проблема №1/);
+assert.doesNotMatch($('decision-log').textContent,/uuid-manual/);
+state.dispatch_notifications[0].assignment_comparison=undefined;
+await $('reload').dispatch('click');await settle();
+assert.doesNotMatch($('application-visual-metrics').textContent,/67 → 52/);
+assert.doesNotMatch($('dispatch-notifications').textContent,/67 → 52/);
+''')

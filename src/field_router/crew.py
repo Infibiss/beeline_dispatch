@@ -279,6 +279,7 @@ class CrewService:
             travel=bundle_travel(geo)
         else:travel=synthetic_travel(scenario)
         plan=get_solver(solver).solve(scenario,travel,time_limit_seconds=time_limit)
+        planning_scenario=scenario
         loads={r.engineer_id:r.loadout for r in plan.routes}
         issued=[]
         for row,e in zip(request.engineers,engineers):
@@ -287,7 +288,7 @@ class CrewService:
             issued.append(e.model_copy(update={'stock':stock}))
         scenario=scenario.model_copy(update={'engineers':issued,'metadata':{**scenario.metadata,'crew_inputs':inputs,
             'crew_assumptions':'Домашний старт после утренней выдачи; склад достаточен. Резерв — параметры диспетчера.'}})
-        candidate=ScenarioSession(scenario,plan,geo.model_dump() if geo else None)
+        candidate=ScenarioSession(scenario,plan,geo.model_dump() if geo else None,planning_scenario=planning_scenario)
         candidate.version=session.version+1;candidate.execution_mode=session.execution_mode
         candidate.views=deepcopy(session.views);candidate.history=deepcopy(session.history)+[{'version':candidate.version,'event':{'type':'crew','id':'crew:'+uuid4().hex,'time':candidate.time}}]
         candidate._save_view('Бригады, старты и утренняя выдача')

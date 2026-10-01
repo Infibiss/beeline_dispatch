@@ -56,8 +56,10 @@ window.addEventListener('afterprint',()=>document.querySelectorAll('details').fo
 """
 
 
-def render_report(scenario: Scenario, plans: list[Plan]) -> str:
+def render_report(scenario: Scenario, plans: list[Plan], *, baseline_comparison=None, request_labels=None) -> str:
     """Return an autonomous UTF-8 HTML document without network dependencies."""
+    from .baseline_comparison import render_baseline_comparison
+    request_labels=request_labels or {}
     real = scenario.metadata.get("geography") == "wgs84"
     geo_notice = ('<aside class="notice"><strong>Реальные координаты; время поездок рассчитано моделью.</strong><p>Дорожные профили без актуальных пробок. Общественный транспорт — явно обозначенная оценка без расписаний. Источники и параметры сохранены ниже.</p></aside>' if real else
         '<aside class="notice"><strong>Синтетические координаты. Время и расстояния приблизительные.</strong><p>Демонстрационная модель передвижения: это не реальные дорожные маршруты Москвы. Пробки, расписания общественного транспорта и актуальная дорожная сеть не подтверждены. Параметры расчёта приведены в разделе допущений.</p></aside>')
@@ -70,6 +72,7 @@ def render_report(scenario: Scenario, plans: list[Plan]) -> str:
              '<h1>Рабочий день под контролем</h1><p>' + _e(scenario.region) + ' · ' + _e(scenario.date) + '</p>',
              '<p class="muted">Сценарий ' + _e(scenario.id) + ' · Офис: ' + _e(scenario.office_address) + '</p></header>',
              geo_notice,
+             render_baseline_comparison(baseline_comparison,scenario.engineers),
              f'<div class="grid"><div class="stat"><b>{len(scenario.requests)}</b>заявок в сценарии</div>'
              f'<div class="stat"><b>{len(scenario.engineers)}</b>доступных инженеров</div>'
              f'<div class="stat"><b>{len(plans)}</b>вариантов плана</div></div>',
@@ -128,7 +131,7 @@ def render_report(scenario: Scenario, plans: list[Plan]) -> str:
                 windows = ', '.join(f'{_time(w.start)}–{_time(w.end)}' for w in req.windows) if req else '—'
                 address = req.address if req else 'Заявка отсутствует в сценарии'
                 duration = f'{req.duration_minutes} мин' if req else '—'
-                parts.append(f'<tr><td>{number}. {_e(visit.request_id)}</td><td>{_e(address)}<br><small>{windows}</small>'
+                parts.append(f'<tr><td>{number}. {_e(request_labels.get(visit.request_id,visit.request_id))}</td><td>{_e(address)}<br><small>{windows}</small>'
                              f'<br><small>{_e(visit.explanation)}</small></td><td>{visit.travel_minutes} мин<br>'
                              f'<small>{visit.distance_m / 1000:.2f} км</small></td><td>{_time(visit.arrival)}</td>'
                              f'<td>{_time(visit.start)}–{_time(visit.end)}</td><td>{duration}</td></tr>')
@@ -140,7 +143,7 @@ def render_report(scenario: Scenario, plans: list[Plan]) -> str:
             parts.append('<div class="card scroll"><table><thead><tr><th>Заявка / адрес</th><th>Причина</th></tr></thead><tbody>')
             for item in plan.unassigned:
                 req = requests.get(item.request_id)
-                parts.append(f'<tr><td>{_e(item.request_id)}<br>{_e(req.address if req else "—")}</td>'
+                parts.append(f'<tr><td>{_e(request_labels.get(item.request_id,item.request_id))}<br>{_e(req.address if req else "—")}</td>'
                              f'<td>{_e(item.reason)}<br><small>{_e(item.code)}</small></td></tr>')
             parts.append('</tbody></table></div>')
         parts.append('<details class="card"><summary>Диагностика алгоритма</summary><div class="pad"><pre>'
@@ -152,7 +155,7 @@ def render_report(scenario: Scenario, plans: list[Plan]) -> str:
                  + '</pre><h3>Метаданные сценария</h3><pre>' + _json(scenario.metadata) + '</pre></div>')
     parts.append('<details class="card"><summary>Источники и параметры заявок</summary><div class="pad">')
     for req in scenario.requests:
-        parts.append(f'<h3>{_e(req.id)} · {_e(req.address)}</h3><p>Исходная строка: {_e(req.source_line if req.source_line is not None else "не указана")} · '
+        parts.append(f'<h3>{_e(request_labels.get(req.id,req.id))} · {_e(req.address)}</h3><p>Исходная строка: {_e(req.source_line if req.source_line is not None else "не указана")} · '
                      f'Навык: {_e(req.skill.value)} · Приоритет: {_e(_PRIORITY.get(req.priority, req.priority))}</p><pre>{_json(req.provenance)}</pre>')
     parts.append('</div></details><footer>Автономный отчёт · Все времена указаны в пределах рабочего дня. '
                  'Возвращение в офис не включено в маршруты MVP. Путь приведён только по рассчитанным участкам до заявок.</footer>'

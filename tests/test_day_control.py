@@ -179,7 +179,7 @@ def test_near_unassigned_job_precedes_evening_overtime_even_on_urgent_route(make
             'visits': [{'request_id': 'a', 'p_sla_breach': 0}]}
     result = control(session, [risk])
     assert result['items'][0]['id'] == 'unassigned-b'
-    assert next(r for r in result['items'] if r['kind'] == 'overtime')['severity'] == 'medium'
+    assert next(r for r in result['items'] if r['kind'] == 'overtime')['tier'] == 'watch'
 
 
 def test_route_deviations_group_but_keep_request_evidence(make_scenario):

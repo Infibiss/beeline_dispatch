@@ -41,12 +41,23 @@
     return forecast.routes.flatMap(route => Array.isArray(route?.visits) ? route.visits : []).filter(item => item && typeof item === 'object').slice(0, 500);
   }
 
-  // Review threshold, not an expected count or a confirmed late arrival.
+  // The server uses the same rules and eligible visits as the attention list.
   function forecastCounts(forecast) {
-    const visits=collectVisits(forecast),routes=Array.isArray(forecast?.routes)?forecast.routes:[];
-    const count=(rows,field)=>rows.length && rows.every(row=>probability(row?.[field]))
-      ? {count:rows.filter(row=>row[field]>=.2).length,total:rows.length} : null;
-    return {sla:count(visits,'p_sla_breach'),late:count(visits,'p_late_start'),overtime:count(routes,'p_overtime')};
+    return Object.fromEntries(['sla','late','overtime'].map(key=>{
+      const row=forecast?.review?.[key];
+      return [key,row && Number.isInteger(row.count) && Number.isInteger(row.total)
+        && row.count>=0 && row.count<=row.total ? row : null];
+    }));
+  }
+
+  function simulationFrequency(value, iterations) {
+    if(!probability(value))return 'Нет оценки';
+    const rounded=Math.round(value*100);
+    const percent=value>0 && rounded===0 ? '<1' : value<1 && rounded===100 ? '>99' : String(rounded);
+    const count=value*iterations;
+    const sample=Number.isInteger(iterations) && iterations>0 && Math.abs(count-Math.round(count))<1e-6
+      ? ' · '+Math.round(count)+' из '+iterations : '';
+    return percent+'% сценариев'+sample;
   }
 
   function derivedReasons(kind, forecast) {
@@ -96,15 +107,16 @@
     return unit.replaceAll('_', ' ');
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = {forecastCounts,isEngineForecast, engineRisks, collectVisits, lossUnitLabel};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {forecastCounts,simulationFrequency,isEngineForecast, engineRisks, collectVisits, lossUnitLabel};
   if (typeof document === 'undefined') return;
 
   const $ = id => document.getElementById(id);
   if (!$('panel-risk')) return;
   let snapshot = null, active = false, demo = false, version = null, demoRunId = null, sequence = 0, controller = null, planningBusy = false, planTime = null;
   let summarySequence=0,summaryController=null;
-  let attentionFilter = 'all', attentionLimit = 6;
+  let attentionFilter = 'all';
   const expandedIssues = new Set();
+  const expandedTiers = new Map(), tierLimits = new Map();
   const text = (tag, value, cls) => { const el = document.createElement(tag); if (value != null) el.textContent = value; if (cls) el.className = cls; return el; };
   const percent = value => value == null ? '—' : new Intl.NumberFormat('ru-RU', {maximumFractionDigits:1}).format(value) + '%';
   const number = value => isFiniteNumber(value) ? new Intl.NumberFormat('ru-RU', {maximumFractionDigits:2}).format(value) : '—';
@@ -138,7 +150,7 @@
   }
 
   const attentionFilters = [
-    ['unassigned','Без исполнителя','заявок'], ['tight','Малый запас окна','визитов'],
+    ['unassigned','Без исполнителя','заявок'], ['deadline','Риск нарушения срока','визитов'], ['tight','Малый запас окна','визитов'],
     ['verify','Проверить факты','инженеров'], ['overtime','Риск переработки','инженеров']
   ];
   const evidenceLabels = {fact:'Факт', plan:'По плану', forecast:'Прогноз', unknown:'Нужно уточнить'};
@@ -155,14 +167,15 @@
   }
   function attentionAction(item) {
     if (item.action === 'resources') {
-      const link = text('a', 'Уточнить ресурсы', 'risk-resource-link');
+      const link = text('a', item.kind==='equipment'?'Проверить оборудование':'Проверить транспорт', 'risk-resource-link');
       link.href = window.FieldRouter ? window.FieldRouter.url('/crew') : '/crew';
       return link;
     }
     const button = previewButton({id:item.id, action:['preview','completions'].includes(item.action) ? item.action : 'facts',
       planVersion:item.plan_version, riskId:item.kind, engineerId:item.engineer_id,
-      requestId:item.requests?.[0]?.request_id || null});
-    button.textContent = item.action === 'preview' ? 'Рассмотреть варианты' : item.action === 'completions' ? 'Проверить результат' : item.kind === 'data' ? 'Связаться / уточнить' : 'Уточнить факт';
+      requestId:item.focus_request_id || item.requests?.[0]?.request_id || null});
+    button.textContent = item.action === 'preview' ? 'Рассмотреть варианты' : item.action === 'completions' ? 'Проверить результат'
+      : ['data','gps'].includes(item.kind) ? 'Связаться с инженером' : item.kind==='delay'?'Уточнить окончание':'Уточнить факт';
     return button;
   }
   function renderAttention() {
@@ -174,7 +187,7 @@
       button.setAttribute('aria-pressed', String(attentionFilter === key));
       button.disabled = !control;
       button.append(text('span', label), text('strong', Number.isInteger(count) ? count : '—'), text('small', unit));
-      button.onclick = () => {attentionFilter = attentionFilter === key ? 'all' : key; attentionLimit = 6; renderAttention();};
+      button.onclick = () => {attentionFilter = attentionFilter === key ? 'all' : key; tierLimits.clear(); renderAttention();};
       return button;
     }));
     $('risk-attention-all').setAttribute('aria-pressed', String(attentionFilter === 'all'));
@@ -182,34 +195,73 @@
     const items = (control?.items || []).filter(item => (attentionFilter === 'all' || item.categories.includes(attentionFilter))
       && (!query || [item.title,item.engineer_name,item.engineer_id,...(item.requests || []).flatMap(r => [r.request_id,r.address])].join(' ').toLocaleLowerCase('ru').includes(query)));
     $('risk-attention-count').textContent = control ? 'Ситуаций: ' + items.length : '';
-    $('risk-attention-more').hidden = items.length <= attentionLimit;
-    $('risk-attention-more').textContent = 'Показать ещё · осталось ' + Math.max(0, items.length - attentionLimit);
     if (!items.length) {
       list.replaceChildren(text('p', !control ? 'Список ситуаций пока недоступен. Обновите данные; отсутствие списка не означает отсутствие рисков.'
         : query || attentionFilter !== 'all' ? 'По этому фильтру ситуаций нет. Посмотрите остальные категории.'
-        : 'По доступным данным ситуаций для вмешательства не найдено. Это не гарантирует отсутствие рисков при неполных данных.', 'risk-empty'));
-    } else list.replaceChildren(...items.slice(0, attentionLimit).map(item => {
+        : 'В утверждённом плане ситуаций для вмешательства не найдено. Это не гарантирует отсутствие рисков при неполных данных.', 'risk-empty'));
+    } else {
+      const tierOf=item=>['now','prepare','watch'].includes(item.tier)?item.tier:'prepare';
+      const nowCount=items.filter(item=>tierOf(item)==='now').length;
+      const groups=[['now','Действовать сейчас','Ближайшие сроки, препятствия и сообщения, требующие решения.'],
+        ['prepare','Проверить заранее','Есть время уточнить данные и подготовить решение.'],
+        ['watch','Наблюдать','Отдалённые или только модельные сигналы. Фактическая задержка не подтверждена.']];
+      list.replaceChildren(...groups.map(([tier,title,description])=>{
+        const group=items.filter(item=>tierOf(item)===tier),limit=tierLimits.get(tier)||6;
+        const section=text(tier==='now'?'section':'details',null,'risk-tier');section.dataset.tier=tier;
+        const heading=text(tier==='now'?'h3':'summary',null,'risk-tier-heading');
+        heading.append(text('span',title),text('strong',group.length));section.append(heading);
+        if(tier!=='now'){
+          section.open=Boolean(query || attentionFilter!=='all') && group.length>0
+            || (expandedTiers.has(tier)?expandedTiers.get(tier):tier==='prepare' && !nowCount && group.length>0);
+          section.addEventListener('toggle',()=>expandedTiers.set(tier,section.open));
+        }
+        if(group.length)section.append(text('p',description,'risk-tier-description'));
+        if(!group.length)section.append(text('p',tier==='now'?'В текущем списке нет срочных ситуаций.':'В этой группе ситуаций нет.','risk-empty'));
+        else section.append(...group.slice(0,limit).map(renderIssue));
+        if(group.length>limit){
+          const more=text('button','Показать ещё · осталось '+(group.length-limit),'secondary risk-tier-more');more.type='button';
+          more.onclick=()=>{tierLimits.set(tier,limit+6);expandedTiers.set(tier,true);renderAttention();};section.append(more);
+        }
+        return section;
+      }));
+    }
+    const incoming=$('risk-incoming'),queue=control?.incoming;
+    if(incoming){
+      incoming.replaceChildren();incoming.hidden=!(queue?.new>0);
+      if(!incoming.hidden){
+        incoming.append(text('p','Во входящей очереди: '+queue.new+' новых заявок'+(queue.emergency?' · аварий: '+queue.emergency:'')+'. Они ещё не включены в утверждённый план.'));
+        const open=previewButton({action:'replan',planVersion:control.plan_version});open.textContent='Открыть очередь';incoming.append(open);
+      }
+    }
+    $('risk-data-notices').replaceChildren(...(control?.notices || []).map(notice => text('p', notice)));
+  }
+
+  function renderIssue(item) {
       const card = text('article', null, 'risk-issue'); card.dataset.issue = item.id; card.dataset.severity = item.severity;
       const body = text('div', null, 'risk-issue-body'), top = text('div', null, 'risk-issue-heading');
       const badge = text('span', evidenceLabels[item.evidence] || 'Нужно уточнить', 'risk-evidence'); badge.dataset.evidence = item.evidence;
       top.append(badge, text('h3', item.title)); body.append(top);
       const requests = Array.isArray(item.requests) ? item.requests : [], single = requests.length === 1 ? requests[0] : null;
+      const focus=requests.find(request=>request.request_id===item.focus_request_id) || requests[0];
       if (single) body.append(text('p', single.priority_label + ' · ' + single.request_id + ' · ' + single.address, 'risk-issue-subject'));
-      else if (requests.length) body.append(text('p', 'Затронуто заявок: ' + requests.length, 'risk-issue-subject'));
+      else if (requests.length) body.append(text('p', 'Затронуто заявок: ' + requests.length + ' · проверить: '+focus.request_id+' · '+focus.address, 'risk-issue-subject'));
       const meta = text('p', null, 'risk-issue-meta');
       if (single && item.engineer_name) meta.append(text('span', item.engineer_name));
       if (single) meta.append(text('span', 'Окна: ' + single.windows.map(w => clock(w.start) + '–' + clock(w.end)).join(' / ')));
       if (isFiniteNumber(item.buffer_minutes)) meta.append(text('span', 'Запас по плану: ' + item.buffer_minutes + ' мин'));
       body.append(meta);
-      body.append(text('p', item.detail.split('. ')[0] + (item.detail.includes('. ') ? '.' : ''), 'risk-issue-reason'));
+      body.append(text('p', item.reason || item.detail.split('. ')[0], 'risk-issue-reason'));
+      if(item.impact)body.append(text('p',item.impact,'risk-issue-impact'));
+      if(item.next_step)body.append(text('p',item.next_step,'risk-issue-next'));
       const details = text('details', null, 'risk-issue-details'); details.open = expandedIssues.has(item.id);
-      details.append(text('summary', requests.length > 1 ? 'Причина и затронутые заявки' : 'Почему и что проверить'), text('p', item.detail));
+      details.append(text('summary', requests.length > 1 ? 'Все затронутые заявки и расчёт' : 'Основание и расчёт'), text('p', item.detail));
+      if(item.tier_reason)details.append(text('p',item.tier_reason));
       if (requests.length > 1) {
         const ul = text('ul');
         requests.forEach(request => ul.append(text('li', request.priority_label + ' · ' + request.request_id + ' · ' + request.address
           + (request.planned_start != null ? ' · по плану ' + clock(request.planned_start) : '') + ' · срок ' + clock(request.deadline)
           + (item.kind === 'late' && isFiniteNumber(request.expected_late_minutes) ? ' · ожидаемое отклонение ≈ ' + Math.round(request.expected_late_minutes) + ' мин' : '')
-          + (item.kind === 'late' && probability(request.p_sla_breach) ? ' · оценка нарушения срока ' + percent(request.p_sla_breach * 100) : ''))));
+          + (item.kind === 'late' && probability(request.p_sla_breach) ? ' · срок нарушен в ' + simulationFrequency(request.p_sla_breach, snapshot.forecast?.iterations) : ''))));
         details.append(ul);
       }
       details.addEventListener('toggle', () => {if (details.open) expandedIssues.add(item.id); else expandedIssues.delete(item.id);});
@@ -218,8 +270,6 @@
       aside.append(text('strong', item.kind === 'overtime' ? 'К концу смены ' + clock(item.deadline) : remainingLabel(item.minutes_to_deadline)),
         text('span', item.kind === 'overtime' ? '≈ ' + Math.round(item.expected_overtime_minutes) + ' мин сверх смены' : item.deadline != null ? 'Срок ' + clock(item.deadline) : '', 'hint'), attentionAction(item));
       card.append(body, aside); return card;
-    }));
-    $('risk-data-notices').replaceChildren(...(control?.notices || []).map(notice => text('p', notice)));
   }
 
   function example() {
@@ -237,6 +287,10 @@
         expected_loss:3.4,expected_affected_customers:.62,visits:[{request_id:'R-101',engineer_id:'E-01',planned_start:now+35,
           planned_sla_deadline:now+90,p_late_start:.24,p_sla_breach:.12,p_overtime:.02,expected_loss:.7,
           service_duration:{p50_minutes:70,p80_minutes:88,p90_minutes:101,source:'synthetic_prior'}}]}],
+      review:{policy:'day-review-v1',visit_ids:['R-101'],engineer_ids:['E-01'],
+        sla:{count:0,total:1,description:'Нарушение срока в ≥ 25% сценариев'},
+        late:{count:0,total:1,description:'Позднее начало в ≥ 50% сценариев и средний сдвиг ≥ 10 мин'},
+        overtime:{count:0,total:1,description:'Переработка в ≥ 50% сценариев и в среднем ≥ 10 мин'}},
       assumptions:['Длительность дороги и работ варьируется синтетически.', 'Оценка не откалибрована на фактической истории.']};
   }
 
@@ -249,7 +303,7 @@
 
   function riskDisplay(result) {
     if (!validRisk(result)) return '—';
-    if (result.measure === 'probability') return percent(result.value * 100);
+    if (result.measure === 'probability') return simulationFrequency(result.value);
     const score = result.value <= 1 ? result.value * 100 : result.value;
     return number(score) + ' / 100';
   }
@@ -258,10 +312,11 @@
     const card = text('article', null, 'risk-prediction'); card.dataset.risk = result.id;
     const count=counts?.[result.id];
     const counted=['sla','late','overtime'].includes(result.id);
-    const label=result.id==='overtime'?'бригад с риском переработки':result.id==='late'?'визитов с риском позднего начала':'визитов с риском нарушения срока';
+    const label=count?.total===0 ? (result.id==='overtime'?'активных маршрутов нет':'предстоящих визитов нет')
+      :result.id==='overtime'?'бригад стоит проверить':'предстоящих визитов стоит проверить';
     card.append(text('h4', result.title), text('strong', counted ? (count ? count.count+' из '+count.total : '—') : riskDisplay(result), 'risk-probability'),
-      text('span', counted ? (count ? label : 'нет подробной оценки') : result.measure==='probability'?'оценка вероятности':'индекс · не вероятность', 'risk-prediction-label'));
-    if(count)card.append(text('small','Оценка риска ≥ 20%', 'risk-count-threshold'));
+      text('span', counted ? (count ? label : 'нет подробной оценки') : result.measure==='probability'?'доля модельных сценариев':'индекс · не вероятность', 'risk-prediction-label'));
+    if(count)card.append(text('small',boundedText(count.description) || 'По правилам отбора ситуаций', 'risk-count-threshold'));
     if (isDemo) card.append(text('span', 'Демонстрационная оценка', 'risk-demo-tag'));
     return card;
   }
@@ -303,38 +358,45 @@
         ? observationCount + ' подтверждённых фактов · ' + groupCount + ' групп'
         : 'априорные значения · подтверждённых фактов пока нет'),
       metaItem('Монте-Карло', Number.isInteger(forecast.iterations) && forecast.iterations > 0 ? forecast.iterations + ' прогонов' : 'число прогонов не указано'),
-      metaItem('Ожидаемые потери', isFiniteNumber(expectedLoss) ? number(expectedLoss) + ' ' + lossUnitLabel(forecast) : 'не рассчитаны'),
-      metaItem('Ожидаемо затронуто', expectedCustomers == null ? 'не рассчитано' : number(expectedCustomers) + ' клиента'),
+      metaItem('Потери в модели', isFiniteNumber(expectedLoss) ? number(expectedLoss) + ' ' + lossUnitLabel(forecast) : 'не рассчитаны'),
+      metaItem('Клиентов с нарушением срока, в среднем по сценариям', expectedCustomers == null ? 'не рассчитано' : number(expectedCustomers)),
       metaItem('Веса loss units', weightLabel)
     );
   }
 
   function renderRoutes(forecast, usable, modern, isDemo) {
     const detailsNode = $('risk-route-details'), container = $('risk-routes');
-    const routes = usable && modern && Array.isArray(forecast.routes)
+    const rawRoutes = usable && modern && Array.isArray(forecast.routes)
       ? forecast.routes.filter(route => route && typeof route === 'object').slice(0, 100)
       : usable && modern && collectVisits(forecast).length ? [{visits:collectVisits(forecast)}] : [];
+    const eligible=Array.isArray(forecast.review?.visit_ids)?new Set(forecast.review.visit_ids):null;
+    const routes=rawRoutes.map(route=>({...route,visits:(Array.isArray(route.visits)?route.visits:[]).filter(visit=>visit &&
+      (eligible ? eligible.has(visit.request_id) : isFiniteNumber(visit.planned_start) && visit.planned_start>=snapshot.context.time))}))
+      .filter(route=>route.visits.length);
     detailsNode.hidden = !routes.length; container.replaceChildren();
     if (!routes.length) return;
     const visitCount = routes.reduce((total, route) => total + (Array.isArray(route.visits) ? route.visits.filter(visit => visit && typeof visit === 'object').slice(0, 200).length : 0), 0);
-    detailsNode.querySelector('summary').textContent = 'Визиты в плане · ' + visitCount;
+    detailsNode.querySelector('summary').textContent = 'Оценки предстоящих визитов · ' + visitCount;
     container.replaceChildren(...routes.map(route => {
       const card = text('article', null, 'risk-route');
       card.append(text('h4', boundedText(route.engineer_name, 300) || boundedText(route.engineer_id, 300) || 'Визиты'));
       const visits = Array.isArray(route.visits) ? route.visits.filter(visit => visit && typeof visit === 'object').slice(0, 200) : [];
       if (visits.length) {
         const scroll = text('div', null, 'risk-visit-table'), table = text('table'), head = text('thead'), header = text('tr');
-        ['Визит','Начало','Срок','Риск нарушения срока','Действие'].forEach(label => { const cell = text('th', label); cell.setAttribute('scope', 'col'); header.append(cell); });
+        ['Визит','Начало','Срок','Сценарии с нарушением срока','Средний сдвиг начала','Действие'].forEach(label => { const cell = text('th', label); cell.setAttribute('scope', 'col'); header.append(cell); });
         head.append(header); const body = text('tbody');
         visits.forEach(visit => {
-          const deadline = isFiniteNumber(visit.emergency_response_sla_deadline) ? visit.emergency_response_sla_deadline : visit.planned_sla_deadline;
+          const deadlines=[visit.emergency_response_sla_deadline,visit.planned_sla_deadline].filter(isFiniteNumber);
+          const deadline = deadlines.length ? Math.min(...deadlines) : null;
           const row = text('tr'), action = text('td');
           const requestId = boundedText(visit.request_id, 300);
           if (requestId && !isDemo) action.append(previewButton({id:'visit-' + requestId, action:'facts', planVersion:snapshot.context.plan_version,
             riskId:'sla', engineerId:boundedText(visit.engineer_id, 300) || boundedText(route.engineer_id, 300), requestId}));
           row.append(text('td', boundedText(visit.request_name, 300) || requestId || 'Без названия'),
             text('td', clock(visit.planned_start)), text('td', clock(deadline)),
-            text('td', probability(visit.p_sla_breach) ? percent(visit.p_sla_breach * 100) + ' · оценка' : 'Нет оценки'), action);
+            text('td', simulationFrequency(visit.p_sla_breach,forecast.iterations)),
+            text('td', isFiniteNumber(visit.expected_late_minutes) && visit.expected_late_minutes>=0
+              ? '≈ '+Math.round(visit.expected_late_minutes)+' мин' : 'Нет оценки'), action);
           body.append(row);
         });
         table.append(head, body); scroll.append(table); card.append(scroll);
@@ -400,7 +462,8 @@
   function clearForecastDetails() {
     if ($('risk-attention-list')) {
       $('risk-attention-list').replaceChildren(); $('risk-attention-filters').replaceChildren();
-      $('risk-attention-count').textContent = ''; $('risk-attention-more').hidden = true;
+      $('risk-attention-count').textContent = '';
+      if($('risk-incoming')){$('risk-incoming').replaceChildren();$('risk-incoming').hidden=true;}
       $('risk-data-notices').replaceChildren();
     }
     $('risk-raw-details').hidden=true;$('risk-raw-payload').textContent='';
@@ -417,7 +480,8 @@
     $('risk-forecasts').classList.toggle('risk-example', demo);
     const forecast = demo ? example() : snapshot.forecast || {};
     const modern = isEngineForecast(forecast);
-    const matches = forecast.region === snapshot.context.region && forecast.plan_version === snapshot.context.plan_version;
+    const matches = forecast.region === snapshot.context.region && forecast.plan_version === snapshot.context.plan_version
+      && (!Object.hasOwn(forecast,'evaluated_at') || forecast.evaluated_at === snapshot.context.time);
     const horizonValid = forecast.horizon_minutes == null ? modern : Number.isInteger(forecast.horizon_minutes) && forecast.horizon_minutes > 0 && forecast.horizon_minutes <= 1440;
     const usable = forecast.status === 'ready' && matches && (demo || !snapshot.context.needs_replanning) && horizonValid;
     const notices = {not_connected:'Оценка пока недоступна. Проверьте текущие показатели и статусы.',
@@ -426,7 +490,8 @@
       pending:'Обновляем оценку текущего плана…',
       stale:'Прогноз устарел. Нужна оценка текущей версии плана.'};
     $('risk-model-status').textContent = usable
-      ? (demo ? 'Учебный пример — только в разделе «Ресурсы и расчёт». Список ситуаций относится к вашему плану. ' : '') + 'Факты, расчёт по плану и прогнозы отмечены отдельно.'
+      ? (demo ? 'Учебный пример — только в разделе «Ресурсы и расчёт». Список ситуаций относится к вашему плану. ' : '')
+        + 'Модельные сигналы помогают выбрать, что проверить. Точность прогноза на реальных исходах ещё не подтверждена.'
       : forecast.status === 'ready' ? notices.stale : notices[forecast.status] || notices.error;
     if (currentAttention()?.gps_available === false) $('risk-model-status').textContent += ' GPS-сигналы для плана недоступны.';
     const risks = modern ? engineRisks(forecast) : legacyResults(forecast, usable);
@@ -541,9 +606,8 @@
   $('risk-refresh').onclick = () => load();
   $('risk-summary-button').onclick=summarizeDay;
   if ($('risk-attention-all')) {
-    $('risk-attention-all').onclick = () => {attentionFilter = 'all'; attentionLimit = 6; $('risk-attention-search').value = ''; renderAttention();};
-    $('risk-attention-search').addEventListener('input', () => {attentionLimit = 6; renderAttention();});
-    $('risk-attention-more').onclick = () => {attentionLimit += 6; renderAttention();};
+    $('risk-attention-all').onclick = () => {attentionFilter = 'all'; tierLimits.clear(); $('risk-attention-search').value = ''; renderAttention();};
+    $('risk-attention-search').addEventListener('input', () => {tierLimits.clear(); renderAttention();});
   }
   $('risk-demo').onclick = () => {if (snapshot) {
     demo = !demo; clearSummary(); summaryControls(); renderForecast();
@@ -570,7 +634,7 @@
       // A reset can reuse version 1; invalidate outstanding responses as well
       // as the snapshot so a previous run cannot reappear on another tab.
       sequence++; controller?.abort(); snapshot = null; demo = false;
-      if (runChanged) {attentionFilter = 'all'; attentionLimit = 6; expandedIssues.clear();}
+      if (runChanged) {attentionFilter = 'all'; expandedIssues.clear(); expandedTiers.clear(); tierLimits.clear();}
       $('risk-indicators').replaceChildren(); $('risk-forecasts').replaceChildren(); clearForecastDetails();
       $('risk-demo').disabled = true; $('risk-refresh').disabled = false;
       $('risk-demo').setAttribute('aria-pressed', 'false');

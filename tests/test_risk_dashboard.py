@@ -31,6 +31,11 @@ def test_readonly_dashboard_returns_deterministic_prior_forecast(make_scenario):
     assert forecast['method']=='monte_carlo'
     assert forecast['calibrated'] is False
     assert forecast['iterations']>0
+    assert forecast['evaluated_at']==session.time
+    assert forecast['measure_semantics']=='simulation_frequency'
+    assert forecast['scope']=='approved_plan'
+    assert forecast['review']==result['attention']['forecast_review']
+    assert forecast['review']['overtime']['count']==result['attention']['counts']['overtime']
     assert forecast['loss_unit']=='условные единицы'
     assert forecast['summary']['p_sla_breach']==next(
         risk['value'] for risk in forecast['risks'] if risk['id']=='sla')

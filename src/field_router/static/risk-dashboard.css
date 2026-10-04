@@ -1,14 +1,26 @@
 #panel-risk{width:100%;max-width:1120px;margin:0;min-width:0}
 #panel-risk>.risk-heading{float:none;margin:4px 0 12px}
 .risk-issue-reason{font-size:12px;line-height:1.6;color:#5f6875;margin:8px 0 0;overflow-wrap:anywhere}
-.risk-attention-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:22px 0 18px}
+.risk-attention-filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:22px 0 18px}
 .risk-filter{display:grid;grid-template-columns:1fr auto;gap:5px 10px;align-items:center;text-align:left;padding:16px;border:1px solid var(--line,#e3e3e3);border-radius:12px;background:#fff;color:#222;min-width:0}
 .risk-filter span{font-size:13px;font-weight:600}.risk-filter strong{font-size:26px;grid-column:2;grid-row:1/3}.risk-filter small{font-weight:400;font-size:11px;color:#6b7280}
 .risk-filter[aria-pressed=true]{border-color:#b29b00;background:#fff9d9;box-shadow:inset 0 0 0 1px #b29b00}
 .risk-attention-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .risk-attention-toolbar input{max-width:300px;min-width:140px;flex:1}.risk-attention-toolbar span{margin-left:auto;font-size:12px;color:#68717d}
 #risk-attention-all[aria-pressed=true]{background:#eef1f4;color:#202631}
-.risk-attention-list{background:#fff;border:1px solid var(--line,#e3e3e3);border-radius:12px;overflow:hidden}
+.risk-attention-list{display:grid;gap:14px}
+.risk-tier{background:#fff;border:1px solid var(--line,#e3e3e3);border-radius:12px;overflow:hidden;min-width:0}
+.risk-tier-heading{margin:0;padding:16px 20px;font-size:14px;font-weight:650;background:#f8f9fb;cursor:pointer}
+.risk-tier-heading strong{display:inline-block;margin-left:12px;padding:2px 8px;border-radius:6px;background:#e9edf1;font-size:13px}
+.risk-tier[data-tier=now]>.risk-tier-heading{background:#fff5e7;cursor:default}
+.risk-tier[data-tier=now]>.risk-tier-heading strong{background:#ffe4b5}
+.risk-tier-description{padding:0 20px;margin:12px 0;color:#737983;font-size:12px;line-height:1.5}
+.risk-tier-more{display:block;margin:14px auto}
+.risk-issue-impact{font-size:12px;line-height:1.6;margin:8px 0;color:#515b69}
+.risk-issue-next{font-size:12px;line-height:1.6;margin:8px 0 0;color:#253b4c}
+.risk-incoming{display:flex;align-items:center;gap:16px;justify-content:space-between;padding:12px 16px;background:#fff7dc;border:1px solid #ead393;border-radius:10px;font-size:13px;line-height:1.5}
+.risk-incoming[hidden]{display:none}.risk-incoming p{margin:0}.risk-incoming button{flex:none}
+@media(max-width:600px){.risk-incoming{flex-wrap:wrap}.risk-tier-heading{padding:14px 16px}}
 .risk-issue{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:24px;padding:20px;border-bottom:1px solid #e9ecef;border-left:3px solid transparent}
 .risk-issue:last-child{border-bottom:0}.risk-issue[data-severity=high]{border-left-color:#ce793a}
 .risk-issue-body{min-width:0}.risk-issue-heading{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.risk-issue-heading h3{margin:0;font-size:14px;line-height:1.45}
@@ -19,7 +31,6 @@
 .risk-issue-details{margin-top:10px;font-size:12px;line-height:1.6}.risk-issue-details summary{cursor:pointer;color:#5d6673;width:fit-content}.risk-issue-details p{max-width:800px;color:#434b55;margin:8px 0}.risk-issue-details ul{padding-left:18px;max-height:240px;overflow:auto}.risk-issue-details li{margin:7px 0;overflow-wrap:anywhere}
 .risk-resource-link{font-size:12px;color:#3d5869;display:inline-block;padding:8px 0;text-decoration:underline}
 .risk-count-note{font-size:11px;color:#717987;line-height:1.5;margin:12px 0 24px}.risk-empty{padding:24px;color:#68717d;font-size:13px}
-#risk-attention-more{display:block;margin:12px auto}#risk-attention-more[hidden]{display:none}
 .risk-resources{border:1px solid var(--line,#e3e3e3);border-radius:12px;padding:18px;background:#fafbfc}.risk-resources>summary{font-size:14px;font-weight:600;cursor:pointer}.risk-resources>summary span{font-size:12px;font-weight:400;color:#717987;margin-left:12px}.risk-resources>.hint{margin:16px 0}
 .risk-resources .risk-forecast{margin-top:16px}.risk-resources .risk-card{padding:14px}.risk-resources .risk-indicator-value{font-size:23px}
 @media(max-width:1100px){.risk-attention-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -45,6 +56,10 @@
 .risk-prediction h4{font-size:12px;font-weight:600;margin:0}
 .risk-probability{font-size:23px;line-height:1.2;font-weight:700;letter-spacing:-.4px}
 .risk-prediction-label{grid-column:1/-1;font-size:10px;color:#626b76}
+.risk-count-threshold{grid-column:1/-1;font-size:11px;line-height:1.5;color:#68717d}
+.risk-method{font-size:12px;line-height:1.6;margin:14px 0 18px;color:#56606e}
+.risk-method summary{cursor:pointer;font-weight:600;color:#303944;width:fit-content}
+.risk-method p{max-width:800px;margin:10px 0}
 .risk-demo-notice{padding:12px 14px;border:1px dashed #b99000;background:#fff6d6;border-radius:8px;font-size:12px;line-height:1.6;margin:12px 0}
 .risk-example .risk-prediction{border-color:#d9c360}
 .risk-demo-tag{grid-column:1/-1;display:block;width:fit-content;margin-top:6px;font-size:10px;background:#fff3ba;color:#685511;border-radius:4px;padding:3px 6px}
@@ -77,10 +92,11 @@
 .risk-route{min-width:0;padding:0;background:#fff}
 .risk-route h4{margin:0 0 8px;font-size:13px;overflow-wrap:anywhere}
 .risk-visit-table{max-width:100%;overflow:auto;border:1px solid #eceef1;border-radius:8px}
-.risk-visit-table table{width:100%;min-width:620px;border-collapse:collapse;background:#fff}
+.risk-visit-table table{width:100%;min-width:760px;border-collapse:collapse;background:#fff}
 .risk-visit-table th,.risk-visit-table td{padding:10px 12px;font-size:12px;text-align:left;border-bottom:1px solid #eceef1}
 .risk-visit-table th{font-weight:500;color:#737983;background:#fafbfc;font-size:11px}
 .risk-visit-table td:first-child{font-weight:600;max-width:300px;overflow-wrap:anywhere}
+.risk-visit-table td:nth-child(2),.risk-visit-table td:nth-child(3),.risk-visit-table td:nth-child(5){white-space:nowrap}
 .risk-visit-table tr:last-child td{border-bottom:0}
 .risk-visit-table button{white-space:nowrap;padding:6px 10px;font-size:11px}
 .risk-assumption-details ul{margin:12px 0 0;padding-left:20px;color:#555d68;font-size:12px;line-height:1.55}

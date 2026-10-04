@@ -11,6 +11,7 @@ from .risk_engine import (RISK_MODEL_VERSION, RiskEngine, application_risk_confi
 from .service_observations import confirmed_service_observations
 from .availability import shift_blocks
 from .day_control import attention
+from .risk_signals import frequency_label
 
 SCHEMA_VERSION = '1.0'
 WINDOW_BUFFER_MINUTES = 15
@@ -41,6 +42,7 @@ class DashboardSessionSnapshot:
     unavailability: tuple[dict[str, Any], ...]
     activated_off_duty_windows: dict[str, Any]
     pending_reassignment_request_ids: frozenset[str]
+    incoming_requests: list[dict[str, Any]]
 
     def excluded_engineers(self):
         return set(self.excluded_engineer_ids)
@@ -71,6 +73,7 @@ def capture_dashboard_session(session):
         unavailability=tuple(deepcopy(session.unavailability)),
         activated_off_duty_windows=dict(session.activated_off_duty_windows),
         pending_reassignment_request_ids=frozenset(session.pending_reassignment_ids()),
+        incoming_requests=deepcopy(session.incoming_requests),
     )
 
 
@@ -90,7 +93,7 @@ def _occupied(intervals, lower, upper):
 
 def forecast_placeholder(context, status='not_connected'):
     """Stable failure envelope: the deterministic indicators remain available."""
-    return {'status': status, 'region': context['region'],
+    return {'status': status, 'region': context['region'], 'evaluated_at': context['time'],
             'plan_version': context['plan_version'], 'model_version': None,
             'horizon_minutes': None, 'risks': []}
 
@@ -102,11 +105,13 @@ def _top_visit_reason(session, risk, field, title):
     visit = visits[0]
     request = session.catalog.get(visit.request_id)
     label = request.address if request else visit.request_id
-    return f'{title}: {label} — {getattr(visit, field) * 100:.1f}%.'
+    return f'{title}: {label} — в {frequency_label(getattr(visit, field))} модельных сценариев.'
 
 
 def _forecast(session, context, fleet):
     """Calculate a reproducible prior-based forecast for the approved plan."""
+    if context['needs_replanning']:
+        return forecast_placeholder(context, 'stale')
     evidence = confirmed_service_observations(session)
     try:
         seed = application_risk_seed(
@@ -153,6 +158,12 @@ def _forecast(session, context, fleet):
                             else 'Загрузите фактические автомобили, показания одометра, ТО и историю отказов.')},
     ]
     payload = result.to_dict()
+    engineers = {e.id: e.name for e in session.scenario.engineers}
+    for route in payload['routes']:
+        route['engineer_name'] = engineers.get(route['engineer_id'], route['engineer_id'])
+        for visit in route['visits']:
+            request = session.catalog.get(visit['request_id'])
+            visit['request_name'] = request.address if request else visit['request_id']
     if evidence.observation_count:
         evidence_notice = (
             f"Доступно {evidence.observation_count} подтверждённых наблюдений "
@@ -161,7 +172,9 @@ def _forecast(session, context, fleet):
     else:
         evidence_notice = "Длительности пока основаны на прозрачных априорных распределениях. "
     return {**payload, 'status': 'ready', 'region': context['region'],
-            'plan_version': context['plan_version'], 'model_version': RISK_MODEL_VERSION,
+            'plan_version': context['plan_version'], 'evaluated_at': context['time'],
+            'scope': 'approved_plan', 'measure_semantics': 'simulation_frequency',
+            'model_version': RISK_MODEL_VERSION,
             'method': 'monte_carlo', 'calibrated': False, 'horizon_minutes': horizon,
             'loss_unit': 'условные единицы', 'risks': risks,
             'summary': {key: payload[key] for key in ('p_late_start', 'p_sla_breach', 'p_overtime',
@@ -258,6 +271,7 @@ def dashboard(session, gps_snapshot=None):
     fleet = fleet_snapshot(session.scenario)
     forecast = _forecast(session, context, fleet)
     control = attention(session, forecast, fleet, gps_snapshot)
+    forecast['review'] = control['forecast_review']
     return {'schema_version': SCHEMA_VERSION, 'context': context,
             'summary': {'engineers': len(eligible), 'roster': len(session.initial_engineers),
                         'unassigned': control['counts']['unassigned']},

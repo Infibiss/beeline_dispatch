@@ -1,15 +1,17 @@
 """Read-only, actionable exceptions for the dispatcher, not a second event log.
 
-Counts are distinct requests (unassigned/tight) or engineers (verify/overtime).
+Counts are distinct requests (unassigned/tight/deadline) or engineers (verify/overtime).
 Categories overlap; their counts must never be added as a total of incidents.
 Forecast thresholds are presentation policy, not calibrated risk classes.
 """
 from .availability import shift_blocks
 from .risk_engine import RiskEngine, application_risk_config
+from .risk_signals import RULES, current_forecast, frequency_label, review_counts, signal
+from .day_triage import NOW_MINUTES, PREPARE_MINUTES, prioritize
 
-SLA_ATTENTION = .25
-OVERTIME_ATTENTION = .5
-MIN_OVERTIME = 10
+SLA_ATTENTION = RULES['sla']['frequency']
+OVERTIME_ATTENTION = RULES['overtime']['frequency']
+MIN_OVERTIME = RULES['overtime']['minutes']
 TIGHT_MINUTES = 15
 FACT_AGE_MINUTES = 60
 
@@ -23,6 +25,8 @@ def attention(session, forecast, fleet, gps=None):
     catalog = session.catalog
     done = {f.get('request_id') for f in session.fact_log
             if f.get('status') in ('completed', 'completion_pending')}
+    done.update(s.get('request_id') for s in session.statuses.values()
+                if s.get('status') in ('completed', 'completion_pending'))
     active = {r.id for r in session.scenario.requests} - done
     pending = set(session.pending_reassignment_ids()) & active
     planned = {v.request_id for r in session.plan.routes for v in r.visits}
@@ -38,10 +42,17 @@ def attention(session, forecast, fleet, gps=None):
     remaining = {key: v for key, v in all_visits.items()
                  if key[1] not in done and key[1] in catalog and
                  (v['end'] > now or session.statuses.get(key[0], {}).get('request_id') == key[1])}
-    usable = (forecast.get('status') == 'ready' and not session.needs_replanning
-              and forecast.get('plan_version') == session.version
-              and forecast.get('region') == session.scenario.region)
+    usable = current_forecast(forecast, {'needs_replanning': session.needs_replanning,
+        'plan_version': session.version, 'region': session.scenario.region, 'time': now})
     model_visits = {v['request_id']: v for r in forecast.get('routes', []) for v in r['visits']} if usable else {}
+    predecessors = {}
+    for eid in {key[0] for key in all_visits}:
+        previous = None
+        for visit in sorted((v for (owner, rid), v in all_visits.items() if owner == eid), key=lambda v: v['start']):
+            if previous:
+                predecessors[visit['request_id']] = (previous['request_id'],
+                    visit['start'] - previous['end'] - visit['travel_minutes'])
+            previous = visit
     rows, grouped, tight_ids = [], set(), set()
     deadline_engine = RiskEngine(application_risk_config(0))
 
@@ -67,6 +78,10 @@ def attention(session, forecast, fleet, gps=None):
                                   'Высокий приоритет' if req.priority == 'high' else 'Обычная',
                 'windows': [w.model_dump() for w in req.windows], 'deadline': deadline,
                 'minutes_to_deadline': deadline - now, 'planned_start': start,
+                'window_buffer_minutes': max(w.end for w in suitable) - start if suitable else None,
+                'tight_window': bool(suitable) and max(w.end for w in suitable) - start <= TIGHT_MINUTES,
+                'previous_request_id': predecessors.get(rid, (None, None))[0],
+                'schedule_buffer_minutes': predecessors.get(rid, (None, None))[1],
                 'expected_late_minutes': model_visits.get(rid, {}).get('expected_late_minutes'),
                 'p_sla_breach': model_visits.get(rid, {}).get('p_sla_breach')}
 
@@ -77,14 +92,11 @@ def attention(session, forecast, fleet, gps=None):
         urgent = kind != 'overtime' and any(r['priority_label'] == 'Авария' or r['priority'] == 'urgent' for r in requests)
         priority_rank = min((0 if r['priority_label'] == 'Авария' or r['priority'] == 'urgent'
                              else 1 if r['priority'] == 'high' else 2 for r in requests), default=2)
-        # Urgency and deadlines precede model probabilities. No probabilistic sorting.
-        severity = 'high' if (due is not None and due <= now + 30 or
-                              urgent and (kind in ('unassigned', 'unavailable') or due is not None and due <= now + 120)) else 'medium'
         rows.append({'id': key, 'kind': kind, 'evidence': evidence, 'title': title, 'detail': detail,
                      'request_ids': ids, 'requests': requests, 'engineer_id': eid, 'engineer_name': name(eid),
                      'categories': list(categories), 'deadline': due,
                      'minutes_to_deadline': due - now if due is not None else None,
-                     'severity': severity, 'urgent': urgent, 'priority_rank': priority_rank, 'action': action,
+                     'urgent': urgent, 'priority_rank': priority_rank, 'action': action,
                      'plan_version': session.version, **(extra or {})})
 
     # One outage is one incident, even when it invalidates many assignments.
@@ -149,22 +161,26 @@ def attention(session, forecast, fleet, gps=None):
         risk = model_visits.get(rid, {})
         sla = risk.get('p_sla_breach', 0)
         late = risk.get('expected_late_minutes', 0)
-        model_attention = sla >= SLA_ATTENTION or (risk.get('p_late_start', 0) >= .5 and late >= 10)
+        model_attention = signal(risk, 'sla') or signal(risk, 'late')
         outside_window = not windows
-        if not tight and not model_attention and not outside_window:
+        deadline_signal = signal(risk, 'sla') or outside_window or visit['start'] > request_info(rid, visit['start'])['deadline']
+        if not tight and not model_attention and not deadline_signal:
             continue
         if tight:
             tight_ids.add(rid)
         detail = (f'От планового начала {_clock(visit["start"])} до конца подходящего окна — {buffer} мин. '
                   if buffer is not None else 'Начало по плану вне клиентских окон. ')
         if model_attention:
-            detail += (f'Оценка нарушения срока: {sla:.0%}. ' if sla >= SLA_ATTENTION else '')
-            detail += f'Ожидаемое отклонение начала от плана: {round(late)} мин. В расчёте варьируются дорога и длительность работ; это не подтверждённое опоздание.'
+            detail += (f'Срок нарушен в {frequency_label(sla)} модельных сценариев. ' if signal(risk, 'sla') else '')
+            if signal(risk, 'late'):
+                detail += f'Средний сдвиг начала по сценариям: {round(late)} мин. '
+            detail += 'В расчёте варьируются дорога и длительность работ. Уточните текущую работу у инженера.'
         else:
             detail += 'Это запас по расписанию, не фактическое опоздание.'
         add('visit-' + rid, 'window' if tight or outside_window else 'late', 'forecast' if model_attention else 'plan',
             'Начало вне клиентского окна' if outside_window else 'Малый запас до конца окна' if tight else 'Риск опоздания', detail, [rid], eid,
-            ('tight',) if tight else (), extra={'buffer_minutes': buffer})
+            [k for k, yes in [('tight', tight), ('deadline', deadline_signal)] if yes],
+            extra={'buffer_minutes': buffer, 'deadline_request_ids': [rid] if deadline_signal else []})
 
     # A completion awaits approval even after the worker sent a later status.
     confirmations = {}
@@ -194,27 +210,30 @@ def attention(session, forecast, fleet, gps=None):
                 f'В {_clock(stamp)} инженер сообщил остаток {left} мин. Расчётное окончание {_clock(end)} уже прошло; подтверждения завершения нет.',
                 [rid], eid, ('verify',), deadline=end)
         elif end > visit['end']:
-            following, cursor = [], end
+            following, threatened, cursor = [], [], end
             for next_visit in sorted((v for (owner, key), v in remaining.items() if owner == eid and key != rid
                                       and key not in missing and v['start'] >= visit['start']), key=lambda v: v['start']):
                 start = max(next_visit['start'], cursor + next_visit['travel_minutes'])
                 if start > next_visit['start']:
                     following.append(next_visit['request_id'])
+                if start > request_info(next_visit['request_id'], next_visit['start'])['deadline']:
+                    threatened.append(next_visit['request_id'])
                 cursor = start + next_visit['end'] - next_visit['start']
             add('delay-' + eid, 'delay', 'forecast', 'Работа дольше плана · ' + name(eid),
                 f'По сообщению в {_clock(stamp)} окончание ожидается в {_clock(end)}, по плану — {_clock(visit["end"])}. '
                 f'При прежнем порядке могут сдвинуться следующие визиты: {len(following)}. Уточните остаток работы.',
-                [rid, *following], eid, ('verify',), deadline=visit['end'])
+                [rid, *following], eid, ('verify', 'deadline') if threatened else ('verify',), deadline=visit['end'],
+                extra={'deadline_request_ids': threatened})
 
     if usable:
         for route in forecast.get('routes', []):
             eid = route['engineer_id']
             ids = [v['request_id'] for v in route['visits'] if (eid, v['request_id']) in remaining and v['request_id'] not in missing]
-            if not ids or route.get('p_overtime', 0) < OVERTIME_ATTENTION or route.get('expected_overtime_minutes', 0) < MIN_OVERTIME:
+            if not ids or not signal(route, 'overtime'):
                 continue
             worker = next((e for e in session.scenario.engineers if e.id == eid), None)
             add('overtime-' + eid, 'overtime', 'forecast', 'Возможна переработка · ' + name(eid),
-                f'Ожидаемая переработка — около {round(route["expected_overtime_minutes"])} мин. '
+                f'Средняя переработка по модельным сценариям — около {round(route["expected_overtime_minutes"])} мин. '
                 'Задержки дороги и работ могут сдвинуть окончание маршрута. Проверьте последние визиты.',
                 ids, eid, ('overtime',), 'preview', deadline=worker.shift.end if worker else None,
                 extra={'expected_overtime_minutes': route['expected_overtime_minutes']})
@@ -262,6 +281,10 @@ def attention(session, forecast, fleet, gps=None):
     if session.execution_mode == 'manual':
         for eid in sorted({eid for eid, rid in remaining if rid not in missing} - set(session.statuses)):
             ids = [rid for owner, rid in remaining if owner == eid and rid not in missing]
+            existing = next((r for r in rows if r['engineer_id'] == eid and r['kind'] in ('gps', 'data')), None)
+            if existing:
+                existing['detail'] += ' Подтверждённого статуса инженера также нет.'
+                continue
             add('status-' + eid, 'data', 'unknown', 'Нет подтверждённого статуса · ' + name(eid),
                 'В ручном режиме нет факта о текущей доступности и местоположении инженера.', ids, eid, ('verify',))
 
@@ -276,32 +299,34 @@ def attention(session, forecast, fleet, gps=None):
             f'Последний факт в {_clock(stamp)}, {now - stamp} мин назад. Выполнение следующих визитов не подтверждено. '
             f'Порог проверки — {FACT_AGE_MINUTES} мин без нового статуса.', ids, eid, ('verify',))
 
-    # Several probabilistic deviations in one route are one inspection, not a
-    # separate alert for every Monte Carlo tail. Tight windows remain selectable.
-    for eid in sorted({r['engineer_id'] for r in rows if r['kind'] == 'late'}):
-        similar = [r for r in rows if r['kind'] == 'late' and r['engineer_id'] == eid]
+    # Attach derivative visit alerts to a known obstruction instead of asking
+    # the dispatcher to check the same work twice. Keep category evidence.
+    for cause in [r for r in rows if r['kind'] in ('delay', 'equipment', 'vehicle')]:
+        related = [r for r in rows if r['kind'] in ('late', 'window')
+                   and r['engineer_id'] == cause['engineer_id']
+                   and set(r['request_ids']) <= set(cause['request_ids'])]
+        for row in related:
+            cause['categories'] = sorted(set(cause['categories']) | set(row['categories']))
+            cause['deadline_request_ids'] = sorted(set(cause.get('deadline_request_ids', [])) | set(row.get('deadline_request_ids', [])))
+            cause['detail'] += ' ' + row['detail']
+            rows.remove(row)
+
+    # One route inspection; tight-window and deadline filters keep their own counts.
+    for eid in sorted({r['engineer_id'] for r in rows if r['kind'] in ('late', 'window')}):
+        similar = [r for r in rows if r['kind'] in ('late', 'window') and r['engineer_id'] == eid]
         if len(similar) < 2:
             continue
         ids = {rid for row in similar for rid in row['request_ids']}
         rows = [r for r in rows if r not in similar]
-        add('route-late-' + eid, 'late', 'forecast', 'Проверить время визитов · ' + name(eid),
-            f'Прогноз отклонения от расписания у {len(ids)} визитов одного маршрута. '
-            'В расчёте варьируются дорога и длительность работ; задержки могут накапливаться. '
-            'Уточните текущую работу; оценки отдельных визитов раскрыты ниже.', ids, eid)
+        categories = sorted({c for row in similar for c in row['categories']})
+        add('route-late-' + eid, 'late', 'forecast' if any(r['evidence'] == 'forecast' for r in similar) else 'plan',
+            ('Проверить сроки визитов · ' if 'deadline' in categories else 'Проверить начало визитов · ') + name(eid),
+            f'Требуют проверки {len(ids)} визитов одного маршрута. ' + ' '.join(r['detail'] for r in similar),
+            ids, eid, categories, extra={'deadline_request_ids': sorted({rid for r in similar for rid in r.get('deadline_request_ids', [])})})
 
-    def urgency(row):
-        left = row['minutes_to_deadline']
-        if row['severity'] == 'high':
-            return 0
-        if left is not None and left <= 60:
-            return 1
-        if left is not None and left <= 120:
-            return 2
-        return 3
-
-    rows.sort(key=lambda r: (urgency(r), r['deadline'] if r['deadline'] is not None else 10**9,
-                             r['priority_rank'], r['evidence'] != 'fact', r['id']))
+    tiers = prioritize(rows, now)
     counts = {'unassigned': len(missing), 'tight': len(tight_ids),
+              'deadline': len({rid for r in rows for rid in r.get('deadline_request_ids', [])}),
               **{category: len({r['engineer_id'] or r['id'] for r in rows if category in r['categories']})
                  for category in ('verify', 'overtime')}}
     notices = []
@@ -309,8 +334,17 @@ def attention(session, forecast, fleet, gps=None):
         notices.append('Свежие GPS-сигналы для этого плана не подключены. Отсутствие сигнала не означает отсутствие задержек.')
     if fleet['covered'] < fleet['total']:
         notices.append(f"Данные эксплуатации транспорта: {fleet['covered']} из {fleet['total']} автомобильных бригад. Риск поломки без данных не оценивается.")
+    forecast_review = review_counts(forecast.get('routes', []),
+        {rid for (eid, rid), v in remaining.items() if rid not in missing and v['start'] >= now},
+        {eid for eid, rid in remaining if rid not in missing}) if usable else None
     return {'plan_version': session.version, 'time': now, 'items': rows, 'counts': counts,
+            'tiers': tiers,
+            'incoming': {'new': sum(r.get('status') == 'new' for r in session.incoming_requests),
+                         'emergency': sum(r.get('status') == 'new' and r['event']['type'] == 'emergency'
+                                          for r in session.incoming_requests)},
+            'forecast_review': forecast_review,
             'notices': notices, 'forecast_usable': usable, 'gps_available': bool(gps_current),
             'thresholds': {'tight_minutes': TIGHT_MINUTES, 'sla_probability': SLA_ATTENTION,
+                           'act_now_minutes': NOW_MINUTES, 'prepare_minutes': PREPARE_MINUTES,
                            'overtime_probability': OVERTIME_ATTENTION, 'overtime_minutes': MIN_OVERTIME,
                            'fact_age_minutes': FACT_AGE_MINUTES}}

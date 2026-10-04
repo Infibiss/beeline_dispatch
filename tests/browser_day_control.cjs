@@ -24,21 +24,31 @@ const base = process.env.DAY_CONTROL_URL || 'http://127.0.0.1:8769';
     await page.waitForFunction(()=>!document.querySelector('#risk-refresh').disabled);
     assert.equal(await page.locator('#risk-error').isVisible(),false);
     const source = await (await context.request.get(base+'/api/risk')).json();
-    assert.equal(await page.locator('.risk-filter').count(),4);
+    assert.equal(await page.locator('.risk-filter').count(),5);
+    assert.equal(await page.locator('[data-filter="deadline"] strong').textContent(),String(source.attention.counts.deadline));
     assert.equal(await page.locator('[data-filter="unassigned"] strong').textContent(),String(source.attention.counts.unassigned));
     assert.equal(await page.locator('#risk-resources').getAttribute('open'),null);
     assert.equal(await page.locator('#risk-forecasts').isVisible(),false);
-    assert.ok(await page.locator('.risk-issue').count()<=6);
-    await page.screenshot({path:path.resolve('output/local/day-control-desktop.png'),fullPage:true});
+    assert.equal(await page.locator('.risk-tier').count(),3);
+    for(const tier of ['now','prepare','watch']){
+      assert.equal(await page.locator('.risk-tier[data-tier="'+tier+'"] .risk-tier-heading strong').textContent(),String(source.attention.tiers[tier]));
+      assert.ok(await page.locator('.risk-tier[data-tier="'+tier+'"] .risk-issue').count()<=6);
+    }
+    assert.equal(await page.locator('.risk-tier[data-tier="watch"]').getAttribute('open'),null);
+    await page.screenshot({path:path.resolve('output/local/day-control-desktop.png'),fullPage:true,animations:'disabled'});
     for(const width of [320,390,768]) {
       await page.setViewportSize({width,height:900});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Overflow at '+width);
     }
     await page.setViewportSize({width:390,height:900});
-    await page.screenshot({path:path.resolve('output/local/day-control-mobile.png'),fullPage:true});
+    await page.screenshot({path:path.resolve('output/local/day-control-mobile.png'),fullPage:true,animations:'disabled'});
     await page.setViewportSize({width:1440,height:1080});
+    await page.locator('[data-filter="deadline"]').click();
+    assert.ok(await page.locator('.risk-issue:visible').count()>0);
+    await page.screenshot({path:path.resolve('output/local/day-control-deadlines.png'),fullPage:true,animations:'disabled'});
+    await page.locator('[data-filter="deadline"]').click();
     await page.locator('[data-filter="tight"]').click();
-    assert.equal(await page.locator('.risk-issue').count(),Math.min(6,source.attention.items.filter(i=>i.categories.includes('tight')).length));
+    assert.equal(await page.locator('.risk-issue').count(),['now','prepare','watch'].reduce((n,tier)=>n+Math.min(6,source.attention.items.filter(i=>i.tier===tier && i.categories.includes('tight')).length),0));
     const factAction=page.locator('.risk-issue button').filter({hasText:'Уточнить факт'}).first();
     if(await factAction.count()) {
       await factAction.click();assert.equal(await page.locator('#panel-facts').isVisible(),true);
@@ -56,13 +66,14 @@ const base = process.env.DAY_CONTROL_URL || 'http://127.0.0.1:8769';
     }
     // A received current snapshot removes resolved incidents and updates all counters.
     const resolved=structuredClone(source);
-    resolved.attention.items=[];resolved.attention.counts={unassigned:0,tight:0,verify:0,overtime:0};
+    resolved.attention.items=[];resolved.attention.counts={unassigned:0,deadline:0,tight:0,verify:0,overtime:0};
     let response=resolved;
     await page.route('**/api/risk',r=>r.fulfill({json:response}));
     await page.locator('#risk-refresh').click();
     await page.waitForFunction(()=>!document.querySelector('#risk-refresh').disabled);
     assert.equal(await page.locator('.risk-issue').count(),0);
     assert.equal(await page.locator('[data-filter="unassigned"] strong').textContent(),'0');
+    assert.equal(await page.locator('[data-filter="deadline"] strong').textContent(),'0');
     // Old version is not rendered as current, even if its counters look plausible.
     response=structuredClone(source);response.context.plan_version=before.version+100;
     await page.locator('#risk-refresh').click();

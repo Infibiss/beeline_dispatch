@@ -96,9 +96,9 @@ const windows=$('risk-indicators').children.find(x=>x.dataset.indicator==='windo
 assert.match(windows.textContent,/1 из 4/);
 assert.doesNotMatch(windows.textContent,/25%/);
 assert.equal($('risk-forecasts').children.filter(x=>x.dataset.risk==='vehicle').length,0);
-assert.doesNotMatch($('risk-model-status').textContent,/risk-engine|модель|600/i);
-assert.match($('risk-forecasts').textContent,/оценка/i);
-assert.doesNotMatch($('risk-forecasts').textContent,/0,62|0\.62|потер|сценари|Монте|симуляц/i);
+assert.match($('risk-model-status').textContent,/Точность.*не подтверждена/);
+assert.match($('risk-forecasts').textContent,/стоит проверить/i);
+assert.doesNotMatch($('risk-forecasts').textContent,/0,62|0\.62|потер/i);
 ''')
 
 
@@ -180,12 +180,43 @@ assert.equal($('risk-raw-payload').textContent,'');assert.equal($('risk-raw-deta
 
 def test_forecast_counts_flagged_visits_and_crews_not_plan_wide_probability():
     result = node('''
-      const f={p_sla_breach:1,routes:[
-        {engineer_id:'a',p_overtime:.2,visits:[{p_sla_breach:.19,p_late_start:.2},{p_sla_breach:.8,p_late_start:.1}]},
-        {engineer_id:'b',p_overtime:.1,visits:[{p_sla_breach:.4,p_late_start:.7}]}]};
+      const f={p_sla_breach:1,review:{sla:{count:2,total:3},late:{count:0,total:3},overtime:{count:1,total:2}}};
       console.log(JSON.stringify(risk.forecastCounts(f)));
     ''')
-    assert result == {'sla': {'count': 2, 'total': 3}, 'late': {'count': 2, 'total': 3}, 'overtime': {'count': 1, 'total': 2}}
+    assert result == {'sla': {'count': 2, 'total': 3}, 'late': {'count': 0, 'total': 3}, 'overtime': {'count': 1, 'total': 2}}
+
+
+def test_finite_simulation_frequency_does_not_round_near_edges_to_certainty():
+    result = node('console.log(JSON.stringify([0,1/600,599/600,1,null].map(p=>risk.simulationFrequency(p,600))));')
+    assert result == ['0% сценариев · 0 из 600', '<1% сценариев · 1 из 600',
+                      '>99% сценариев · 599 из 600', '100% сценариев · 600 из 600', 'Нет оценки']
+
+
+def test_malformed_route_details_and_unknown_evaluation_time_are_not_current():
+    client(r'''
+snapshot.forecast.routes=[{engineer_id:'E-1',visits:{}}];await refresh();
+assert.equal($('risk-routes').children.length,0);
+snapshot.forecast.evaluated_at=null;await refresh();
+assert.equal($('risk-forecasts').children.length,0);
+assert.match($('risk-model-status').textContent,/устарел/);
+''')
+
+
+def test_visit_table_uses_earliest_deadline_and_only_reviewed_future_visits():
+    client(r'''
+const route=snapshot.forecast.routes[0];
+route.visits[0].emergency_response_sla_deadline=800;
+route.visits[0].expected_late_minutes=12.4;
+route.visits.push({request_id:'completed',planned_start:500,p_sla_breach:1});
+await refresh();
+assert.match($('risk-routes').textContent,/11:30/);
+assert.doesNotMatch($('risk-routes').textContent,/13:20|completed/);
+assert.match($('risk-routes').textContent,/31% сценариев.*186 из 600/);
+assert.match($('risk-routes').textContent,/≈ 12 мин/);
+snapshot.forecast.evaluated_at=590;await refresh();
+assert.equal($('risk-forecasts').children.length,0);
+assert.equal($('risk-route-details').hidden,true);
+''')
 
 
 def test_partial_missing_probabilities_are_not_reported_as_zero_risk():
@@ -249,7 +280,7 @@ assert.equal($('risk-summary').hidden,true);assert.equal($('risk-summary').textC
 
 
 ATTENTION = r'''
-snapshot.attention={plan_version:7,time:600,counts:{unassigned:8,tight:1,verify:0,overtime:0},notices:['Нет свежих GPS-данных.'],items:
+snapshot.attention={plan_version:7,time:600,counts:{unassigned:8,deadline:0,tight:1,verify:0,overtime:0},notices:['Нет свежих GPS-данных.'],items:
 Array.from({length:8},(_,i)=>({id:'issue-'+i,kind:'unassigned',categories:['unassigned'],evidence:'fact',title:'Нет исполнителя',
  detail:'Назначение не найдено. Проверьте ограничения.',request_ids:['R-'+i],requests:[{request_id:'R-'+i,address:'Адрес '+i,priority_label:'Обычная',windows:[{start:600,end:700}],deadline:700}],
  engineer_id:null,engineer_name:null,deadline:700,minutes_to_deadline:100,plan_version:7,severity:'medium',action:'preview'}))};
@@ -260,15 +291,15 @@ await refresh();
 
 def test_attention_filters_search_pagination_and_resource_notes():
     client(ATTENTION + r'''
-assert.equal($('risk-attention-list').children.length,6);
-assert.equal($('risk-attention-more').hidden,false);$('risk-attention-more').click();
-assert.equal($('risk-attention-list').children.length,8);
-$('risk-attention-filters').children[1].click();
-assert.equal($('risk-attention-list').children.length,1);
+assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,6);
+$('risk-attention-list').querySelector('.risk-tier-more').click();
+assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,8);
+$('risk-attention-filters').children[2].click();
+assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,1);
 assert.match($('risk-attention-list').textContent,/Адрес 1/);
 $('risk-attention-all').click();$('risk-attention-search').value='R-7';
 for(const h of $('risk-attention-search').events.input)h();
-assert.equal($('risk-attention-list').children.length,1);
+assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,1);
 assert.match($('risk-attention-list').textContent,/Адрес 7/);
 assert.match($('risk-data-notices').textContent,/GPS/);
 assert.equal($('risk-advisories').children.length,0,'No duplicate legacy incidents');
@@ -293,7 +324,7 @@ fire('planning-state',{version:7,time:610,demoRunId:'same'});
 assert.equal($('risk-attention-list').children.length,0);
 await refresh();assert.equal($('risk-error').hidden,false);
 snapshot.context.time=610;snapshot.attention.time=610;await refresh();
-assert.equal($('risk-error').hidden,true);assert.equal($('risk-attention-list').children.length,6);
+assert.equal($('risk-error').hidden,true);assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,6);
 snapshot.attention.plan_version=6;await refresh();
 assert.match($('risk-attention-list').textContent,/недоступен/);
 assert.equal($('risk-attention-filters').children[0].querySelector('strong').textContent,'—');
@@ -304,7 +335,42 @@ def test_demo_forecast_never_replaces_real_incidents_and_strings_are_not_html():
     client(ATTENTION + r'''
 snapshot.attention.items[0].requests[0].address='<img src=x onerror=alert(1)>';
 await refresh();$('risk-demo').click();
-assert.equal($('risk-attention-list').children.length,6);
+assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,6);
 assert.match($('risk-attention-list').textContent,/<img/);
 assert.equal($('risk-attention-list').querySelectorAll('img').length,0);
+''')
+
+
+def test_three_tiers_deadline_filter_and_reason_action_are_visible_without_percentages():
+    client(ATTENTION + r'''
+snapshot.attention.items=snapshot.attention.items.slice(0,3);
+snapshot.attention.items.forEach((item,i)=>{
+ item.tier=['now','prepare','watch'][i];item.reason='Фактическая причина неизвестна';
+ item.next_step='Связаться с инженером перед выездом';item.impact='Ближайшая заявка R-'+i;
+});
+snapshot.attention.items[2].categories.push('deadline');snapshot.attention.counts.deadline=1;
+await refresh();
+let groups=$('risk-attention-list').children;
+assert.deepEqual(groups.map(g=>g.dataset.tier),['now','prepare','watch']);
+assert.equal(groups[1].open,false);assert.equal(groups[2].open,false);
+assert.match(groups[0].textContent,/Связаться с инженером перед выездом/);
+assert.match(groups[0].textContent,/Фактическая причина неизвестна/);
+$('risk-attention-filters').children[1].click();
+groups=$('risk-attention-list').children;
+assert.equal(groups[2].open,true,'Category selection reveals matching watch incidents');
+assert.equal($('risk-attention-list').querySelectorAll('.risk-issue').length,1);
+assert.match(groups[2].textContent,/R-2/);
+''')
+
+
+def test_pending_incoming_is_separate_from_plan_counts_and_cleared_on_invalidation():
+    client(ATTENTION + r'''
+snapshot.attention.incoming={new:2,emergency:1};await refresh();
+assert.equal($('risk-incoming').hidden,false);
+assert.match($('risk-incoming').textContent,/2 новых заявок.*аварий: 1/);
+assert.equal($('risk-attention-filters').children[0].querySelector('strong').textContent,'8');
+$('risk-incoming').querySelector('button').click();assert.equal(intents.at(-1).action,'replan');
+snapshot.attention.incoming.new=0;await refresh();assert.equal($('risk-incoming').hidden,true);
+snapshot.attention.incoming.new=2;await refresh();
+fire('planning-state',{version:8,time:600});assert.equal($('risk-incoming').hidden,true);
 ''')

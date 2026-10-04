@@ -82,7 +82,7 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
       const wait=page.waitForResponse(r=>r.url().endsWith('/api/risk'));
       await page.click('#risk-refresh');await wait;await page.waitForFunction(()=>!document.querySelector('#risk-refresh').disabled);
     }
-    await refresh();assert.equal(await page.locator('[data-risk="windows"] .risk-probability').textContent(),'41%');
+    await refresh();assert.equal(await page.locator('[data-risk="windows"] .risk-probability').textContent(),'41% сценариев');
     assert.equal(await page.locator('[data-risk="windows"] img').count(),0);
     forecast={...forecast,region:'Другой район'};await refresh();
     assert.equal(await page.locator('[data-risk="windows"]').count(),0);
@@ -100,10 +100,14 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
       loss_weights:{late_start:.25,sla_breach:10,overtime_minute:.05},expected_loss:4.2,
       expected_affected_customers:.7,p_sla_breach:.41,p_window_sla_breach:.41,
       p_emergency_response_sla_breach:null,p_late_start:.52,p_overtime:.18,expected_overtime_minutes:9.5,
+      review:{visit_ids:['R-1'],engineer_ids:[before.engineers[0].id],
+        sla:{count:1,total:1,description:'Нарушение срока в ≥ 25% сценариев'},
+        late:{count:1,total:1,description:'Позднее начало в ≥ 50% сценариев и средний сдвиг ≥ 10 мин'},
+        overtime:{count:0,total:1,description:'Переработка в ≥ 50% сценариев и в среднем ≥ 10 мин'}},
       risks:[{id:'vehicle',measure:'heuristic_score',value:64,reasons:['ТО просрочено'],recommendation:'Проверить машину'}],
       routes:[{engineer_id:before.engineers[0].id,p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
         expected_affected_customers:.7,visits:[{request_id:'R-1',request_name:malicious,planned_start:620,planned_sla_deadline:690,
-          p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,
+          p_sla_breach:.41,p_late_start:.52,p_overtime:.18,expected_loss:4.2,expected_late_minutes:12,
           service_duration:{p50_minutes:70,p80_minutes:88,p90_minutes:101,observation_count:3}}]}],
       assumptions:['synthetic priors; not calibrated'],advisories:[{id:'sla-1',risk_id:'sla',severity:'high',
         title:'Проверить SLA',summary:malicious,plan_version:snapshot.context.plan_version,engineer_id:before.engineers[0].id,request_id:'R-1'}]};
@@ -112,13 +116,24 @@ const stop=path.join(tmp,'stop'),delay=ms=>new Promise(resolve=>setTimeout(resol
     assert.equal(await page.locator('[data-risk="sla"] .risk-probability').textContent(),'1 из 1');
     assert.equal(await page.locator('[data-risk="vehicle"] .risk-probability').textContent(),'64 / 100');
     assert.doesNotMatch(await page.locator('#risk-model-status').textContent(),/risk-engine|600/i);
-    assert.match(await page.locator('#risk-model-status').textContent(),/не откалиброваны/);
+    assert.match(await page.locator('#risk-model-status').textContent(),/Точность прогноза на реальных исходах ещё не подтверждена/);
     assert.match(await page.locator('[data-risk="sla"] .risk-prediction-label').textContent(),/визитов/);
     assert.equal(await page.locator('#risk-engine-meta').isVisible(),false);
     await page.locator('#risk-route-details>summary').click();
     assert.equal(await page.locator('#risk-routes').isVisible(),true);
     assert.match(await page.locator('#risk-routes').textContent(),/10:20/);
     assert.match(await page.locator('#risk-routes').textContent(),/11:30/);
+    assert.match(await page.locator('#risk-routes').textContent(),/41% сценариев · 246 из 600/);
+    assert.match(await page.locator('#risk-routes').textContent(),/12 мин/);
+    await page.locator('.risk-method>summary').click();
+    assert.match(await page.locator('.risk-method').textContent(),/Ни одна из этих оценок не гарантирует реальный исход/);
+    await page.setViewportSize({width:1440,height:1100});
+    await page.locator('.risk-forecast').screenshot({path:path.join(tmp,'risk-model-details.png')});
+    for(const width of [320,390,768]){
+      await page.setViewportSize({width,height:844});
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Expanded forecast overflow at '+width);
+    }
+    await page.setViewportSize({width:1440,height:1100});
     assert.doesNotMatch(await page.locator('#risk-routes').textContent(),/P50|P80|P90|потер|затронуто|0[.,]7/i);
     assert.equal(await page.locator('#risk-routes tbody tr').count(),1);
     assert.ok((await page.locator('#risk-routes').textContent()).includes(malicious),'Visit text must be escaped, not discarded');

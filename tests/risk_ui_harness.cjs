@@ -13,7 +13,7 @@ class Element {
   querySelector(selector) { return this.querySelectorAll(selector)[0]||null; }
 }
 const ids={};
-for(const id of ['risk-attention-filters','risk-attention-list','risk-attention-all','risk-attention-search','risk-attention-count','risk-attention-more','risk-data-notices'])ids[id]=new Element();
+for(const id of ['risk-attention-filters','risk-attention-list','risk-attention-all','risk-attention-search','risk-attention-count','risk-incoming','risk-data-notices'])ids[id]=new Element();
 for(const id of ['risk-summary','risk-summary-button','risk-raw-details','risk-raw-payload','panel-risk','risk-indicators','risk-engine-meta','risk-route-details','risk-routes','risk-assumption-details','risk-assumptions','risk-advisory-section','risk-advisories','risk-demo','risk-demo-notice','risk-forecasts','risk-model-status','risk-refresh','risk-error','risk-context','risk-stale','risk-facts','risk-replan'])ids[id]=new Element();
 ids['risk-route-details'].append(new Element('summary'));
 global.document={getElementById:id=>ids[id]||null,createElement:tag=>new Element(tag),createElementNS:(_,tag)=>new Element(tag),querySelectorAll:selector=>Object.values(ids).flatMap(el=>el.querySelectorAll(selector))};
@@ -25,6 +25,10 @@ const snapshot={schema_version:'1.0',context:{region:'Восток',date:'2026-0
  {id:'windows',title:'Плотные клиентские окна',value:25,caption:'визитов',detail:'1 из 4 визитов',explanation:'explanation',recommendation:'recommendation',facts:{tight_visits:1,checked_visits:4,threshold_minutes:15}},
  {id:'equipment',title:'Оборудование под план',value:50,caption:'остатка',detail:'Роутеры: нужно 2, на руках 4',explanation:'explanation',recommendation:'recommendation',facts:{equipment:[{label:'Роутеры',needed:2,on_hand:4}]}}
 ],forecast:{status:'ready',region:'Восток',plan_version:7,model_version:'risk-engine-v1.1',iterations:600,calibrated:false,p_sla_breach:.31,p_late_start:.46,p_overtime:.17,expected_loss:4.2,expected_affected_customers:.62,loss_unit:'conditional_loss_units',routes:[{engineer_id:'E-1',engineer_name:'Анна',p_sla_breach:.31,p_late_start:.46,p_overtime:.17,expected_loss:4.2,expected_affected_customers:.62,visits:[{request_id:'R-1',request_name:'Лесная, 10',planned_start:620,planned_sla_deadline:690,p_sla_breach:.31,p_late_start:.46,expected_loss:4.2,service_duration:{p50_minutes:70,p80_minutes:88,p90_minutes:101}}]}],assumptions:['synthetic priors'],advisories:[{id:'gps-1',action:'facts',title:'Проверьте задержку',detail:'Уточните положение инженера',plan_version:7,engineer_id:'E-1',request_id:'R-1'}]}};
+snapshot.forecast.review={policy:'day-review-v1',visit_ids:['R-1'],engineer_ids:['E-1'],
+  sla:{count:1,total:1,description:'Нарушение срока в ≥ 25% сценариев'},
+  late:{count:0,total:1,description:'Позднее начало в ≥ 50% сценариев и средний сдвиг ≥ 10 мин'},
+  overtime:{count:0,total:1,description:'Переработка в ≥ 50% сценариев и в среднем ≥ 10 мин'}};
 let response=snapshot;
 global.fetch=async()=>({ok:true,json:async()=>response});
 const $=id=>ids[id];

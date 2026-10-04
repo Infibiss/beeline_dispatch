@@ -93,11 +93,16 @@ def test_dashboard_uses_peer_history_without_self_leakage(make_scenario):
     session.record_fact({'version': session.version, 'time': 640, 'engineer_id': 'e1',
         'request_id': 'a', 'status': 'completed'})
 
+    assert dashboard(session)['forecast']['status'] == 'stale'
+    evidence = confirmed_service_observations(session)
+    assert evidence.group_key(session)(session.catalog['a']) not in evidence.observations
+    batch = session.preview({'version': session.version,
+        'event': {'id': 'refresh-after-completion', 'type': 'replan', 'time': 640}}, time_limit=.05)
+    session.approve({'version': session.version, 'batch_id': batch['id'], 'candidate_id': 'stable'})
     forecast = dashboard(session)['forecast']
     assert forecast['duration_evidence']['observation_count'] == 1
     visits = {visit['request_id']: visit for route in forecast['routes'] for visit in route['visits']}
-    assert visits['a']['service_duration']['observation_count'] == 0
-    assert visits['a']['service_duration']['source'] == 'prior'
+    assert 'a' not in visits
     assert visits['b']['service_duration']['observation_count'] == 1
     assert visits['b']['service_duration']['source'] == 'prior+empirical'
     assert visits['b']['service_duration']['p50_minutes'] > session.catalog['b'].duration_minutes

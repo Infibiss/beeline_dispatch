@@ -40,19 +40,25 @@
   <p id="risk-error" class="error" role="alert" hidden></p>
   <p id="risk-stale" class="notice" role="status" hidden></p>
   <section id="risk-summary" class="risk-summary" aria-live="polite" hidden></section>
+  <div id="risk-incoming" class="risk-incoming" role="status" hidden></div>
   <div id="risk-attention-filters" class="risk-attention-filters" aria-label="Фильтры ситуаций"></div>
   <div class="risk-attention-toolbar"><button id="risk-attention-all" class="secondary" type="button" aria-pressed="true">Все ситуации</button><label for="risk-attention-search" class="sr-only">Найти заявку или инженера</label><input id="risk-attention-search" type="search" placeholder="Заявка, адрес или инженер"><span id="risk-attention-count" role="status"></span></div>
   <p id="risk-model-status" role="status">Ситуации появятся после загрузки плана.</p>
   <div id="risk-attention-list" class="risk-attention-list" aria-label="Ситуации, требующие внимания"></div>
-  <button id="risk-attention-more" type="button" class="secondary" hidden>Показать ещё</button>
-  <p class="risk-count-note">Категории пересекаются: одна заявка может быть в нескольких фильтрах. Счётчики не складываются.</p>
+  <p class="risk-count-note">Сроки и последствия определяют срочность, а не процент модели. Категории пересекаются; счётчики фильтров не складываются.</p>
   <details id="risk-resources" class="risk-resources"><summary>Ресурсы и расчёт <span>Загрузка, оборудование и подробности прогноза</span></summary>
   <p class="hint">Сводные показатели не гарантируют возможность назначения: важны квалификация, местоположение и доступность конкретного инженера.</p>
   <div id="risk-indicators" class="risk-grid" aria-label="Показатели плана"></div>
   <div id="risk-data-notices" class="hint"></div>
   <section class="risk-forecast" aria-labelledby="risk-forecast-title">
-    <div class="risk-heading"><div><h3 id="risk-forecast-title">Сводный прогноз</h3></div></div>
-    <p class="hint">Обзор визитов и бригад с оценкой риска от 20%. Это более широкий отбор, чем список ситуаций выше, а не число подтверждённых опозданий. Для переработки в основном списке также учитывается ожидаемое время сверх смены.</p>
+    <div class="risk-heading"><div><h3 id="risk-forecast-title">Модельные сигналы</h3></div></div>
+    <p class="hint">Те же правила отбора, что в списке ситуаций. Счётчики показывают предстоящие визиты и бригады для проверки; категории могут пересекаться.</p>
+    <details class="risk-method"><summary>Что означают проценты и как сравнивать</summary>
+      <p>Процент — доля расчётных сценариев, в которых возникло отклонение. Например, 30% — нарушение в 180 из 600 сценариев модели. Точность этих оценок на реальных исходах ещё не подтверждена.</p>
+      <p>Сравнивайте варианты одного расчёта при одинаковых заявках, ресурсах и настройках модели. Меньшая доля сценариев с нарушением — полезный ориентир вместе с числом затронутых клиентов, минутами задержки и изменениями назначений. Небольшая разница сама по себе не доказывает преимущество.</p>
+      <p>0% означает, что нарушение не встретилось в этом прогоне; 100% — что оно встретилось во всех его сценариях. Ни одна из этих оценок не гарантирует реальный исход. Сводный риск «хотя бы одного нарушения» растёт с числом визитов, поэтому сравнивать по нему разные районы и размеры планов некорректно.</p>
+      <p>«Нарушение срока» относится к клиентскому окну или сроку реакции на аварию. «Начало позже плана» — к обещанному времени, даже если окно ещё открыто. Переработка считается после конца смены. Средние минуты включают сценарии без задержки; малый запас окна выше рассчитан прямо по расписанию.</p>
+    </details>
 
 
     <div id="risk-forecasts" class="risk-grid" aria-label="Прогноз и объяснения"></div>
